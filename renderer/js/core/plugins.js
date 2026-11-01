@@ -2,7 +2,7 @@
 (function () {
   const listeners = {};
   const Forge = {
-    version: '2.0.0',
+    version: '3.0.0',
     host: {},                 // filled in by app.js
     commands: new Map(),      // id -> {id,title,run,plugin}
     statusItems: new Map(),   // id -> {id,text,align,onClick,plugin}
@@ -112,6 +112,38 @@
         form: (o) => VX.ui.form(o),
         modal: (opts) => VX.ui.modal({ title: opts.title, body: opts.html ?? opts.body, wide: opts.wide }),
         preview: (html, title) => VX.ui.preview(html, title),
+        /** Progress dialog: set(percent, status), log(line), close(), onCancel(cb), cancelled */
+        progress(title) {
+          const h = VX.h; const bar = h('div', { class: 'prog-fill' }); const st = h('div', { class: 'prog-status' }, 'Starting…'); const pct = h('span', { class: 'prog-pct' }, '0%');
+          const log = h('pre', { class: 'prog-log' }); let cb = null; const api = { cancelled: false };
+          const cancel = h('button', { class: 'btn', onclick: () => { api.cancelled = true; cancel.disabled = true; st.textContent = 'Cancelling…'; cb && cb(); } }, 'Cancel');
+          const m = VX.ui.modal({ title, dismissable: false, body: h('div', { class: 'prog' }, h('div', { class: 'prog-row' }, st, pct), h('div', { class: 'prog-bar' }, bar), log), actions: [cancel] });
+          api.set = (p, s) => { const v = Math.max(0, Math.min(100, Math.round(p))); bar.style.width = v + '%'; pct.textContent = v + '%'; if (s != null) st.textContent = s; };
+          api.log = (l) => { log.textContent += l + '\n'; if (log.textContent.length > 20000) log.textContent = log.textContent.slice(-12000); log.scrollTop = log.scrollHeight; };
+          api.onCancel = (f) => { cb = f; };
+          api.done = (label) => { cancel.textContent = label || 'Close'; cancel.disabled = false; cancel.onclick = () => m.close(); };
+          api.close = () => m.close();
+          return api;
+        },
+      },
+      proc: {
+        /** Run npm / npx / node in a folder under store-export/. Returns a promise of the exit code with .cancel(). */
+        run({ cwd, program, args = [], onLine }) {
+          let id = null, cancelled = false;
+          const p = (async () => {
+            id = await window.native.runStart(cwd, program, args);
+            for (;;) {
+              if (cancelled) { try { await window.native.runCancel(id); } catch (e) { /* ignore */ } }
+              const r = await window.native.runPoll(id);
+              (r.lines || []).forEach((l) => { try { onLine && onLine(l); } catch (e) { /* ignore */ } });
+              if (r.done) return cancelled ? -1 : (r.code ?? -1);
+              await new Promise((res) => setTimeout(res, 150));
+            }
+          })();
+          p.cancel = () => { cancelled = true; };
+          return p;
+        },
+        available: () => !!window.__TAURI__,
       },
       account: { current: () => H().account?.() ?? null },
       fs: {
@@ -238,5 +270,6 @@ forge.editor.onSave(() => status.update('${id}: saved'));
     },
   };
 
+  Forge._makeApi = makeApi;
   window.Forge = Forge;
 })();

@@ -16,7 +16,7 @@
   const guiVars = (g) => Object.assign({}, g.vars, g.sceneVars);
   VXRT.gui = {
     label(g, id, o) {
-      let rec = gm(g).get(id); if (rec && !rec.el.isConnected) { gm(g).delete(id); rec = null; } if (!rec) { const e = el('div', 'pointer-events:none;white-space:pre-wrap;'); rec = register(g, id, e, {}); }
+      let rec = gm(g).get(id); if (rec && !rec.el.isConnected) { gm(g).delete(id); rec = null; } if (!rec) { const e = el('div', 'pointer-events:none;white-space:pre-wrap;'); e.setAttribute('data-vx-label', '1'); if (g._fxLabels) e.style.filter = g._fxLabels; rec = register(g, id, e, {}); }
       rec.o = Object.assign(rec.o || {}, o); const q = rec.o, e = rec.el; e.style.font = `${q.bold ? 700 : 500} ${U.num(q.size, 22)}px system-ui,sans-serif`; e.style.color = q.color || '#fff'; e.style.textShadow = q.shadow === false ? '' : '0 2px 6px rgba(0,0,0,.55)';
       e.style.background = q.bg || 'transparent'; e.style.padding = q.bg ? '6px 12px' : '0'; e.style.borderRadius = '8px'; e.style.display = q.hidden ? 'none' : 'block';
       rec.tpl = q.text; rec.refresh = () => { e.textContent = U.tpl(rec.tpl ?? '', guiVars(g)); if (!q.follow) place(e, q); }; rec.refresh(); return rec;
@@ -49,6 +49,7 @@
     cursor(g, o) {
       let rec = gm(g).get('__cursor'); if (!rec) { const e = el('div', 'pointer-events:none;z-index:70;transform:translate(-50%,-50%);position:absolute'); rec = register(g, '__cursor', e, {}); }
       rec.o = Object.assign(rec.o || {}, o); const q = rec.o, e = rec.el; e.textContent = ''; e.style.display = q.hidden ? 'none' : 'block'; const s = U.num(q.size, 28);
+      if (q.shape === 'none') { e.style.display = 'none'; g.container.style.cursor = q.hidden ? '' : 'none'; return rec; }
       if (q.shape === 'emoji') { e.textContent = q.emoji || '🎯'; e.style.fontSize = s + 'px'; } else if (q.shape === 'image' && q.sprite) { const sp = g.data.assets?.sprites?.[q.sprite]; if (sp && sp.frames[0]) { const im = new Image(); im.src = sp.frames[0]; im.style.cssText = `width:${s}px;height:${s}px;image-rendering:${g.settings.pixelArt ? 'pixelated' : 'auto'}`; e.append(im); } }
       else if (q.shape === 'cross') { e.style.cssText += `;width:${s}px;height:${s}px;background:linear-gradient(${q.color || '#fff'},${q.color || '#fff'}) center/2px 100% no-repeat,linear-gradient(${q.color || '#fff'},${q.color || '#fff'}) center/100% 2px no-repeat`; }
       else if (q.shape === 'dot') { e.style.cssText += `;width:${s / 2}px;height:${s / 2}px;border-radius:50%;background:${q.color || '#fff'}`; }

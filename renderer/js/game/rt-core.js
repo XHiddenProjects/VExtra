@@ -204,6 +204,7 @@
       this.log('info', `Scene loaded: ${sc.name} (${this.dim.toUpperCase()}) – ${this.objects.length - 1} objects`);
     }
     teardownScene() {
+      if (VXRT.fx) VXRT.fx.clear(this);
       this.pending.length = 0;
       for (const o of [...this.objects]) this.removeObject(o, true);
       for (const c of this.sceneCleanups.splice(0)) { try { c(); } catch { /* ignore */ } }
@@ -276,6 +277,7 @@
       dt *= this.timeScale; this.dt = dt; this.time += dt; this.frame++;
       try {
         VXRT.input_beginFrame(this);
+        if (this.selfQ && this.selfQ.length) { const q = this.selfQ.splice(0, 200); this.sendDepth = 0; for (const [t, v] of q) { if (t.node.dead) continue; try { t.node.def.onInput && t.node.def.onInput(t.node, t.port, v, this); } catch (e) { this.nodeError(t.node, e); } } } // self-connected blocks feed themselves one step per frame
         for (const n of [...this.updating]) { if (n.dead) { this.updating.delete(n); continue; } try { n.def.update(n, dt, this); } catch (e) { this.nodeError(n, e); } }
         VXRT.stepPhysics(this, dt); VXRT.stepObjects(this, dt);
         if (this.pending.length) { const p = this.pending.splice(0); for (const fn of p) { try { fn(); } catch (e) { this.log('error', e.message); } } }
@@ -305,8 +307,10 @@
       if (o.spin) { if (is3) o['r' + (o.spinAxis || 'y')] += o.spin * dt; else o.rot += o.spin * dt; }
       if (o.parent && o.offset) { o.x = o.parent.x + o.offset.x; o.y = o.parent.y + o.offset.y; o.z = o.parent.z + o.offset.z; }
       if (o.anim && o.anim.playing) VXRT.stepAnim && VXRT.stepAnim(g, o, dt);
+      // (keyframe clips are stepped after this loop)
       if (o.lerpTargets) for (const k of Object.keys(o.lerpTargets)) { const t = o.lerpTargets[k]; o[k] += (t.to - o[k]) * Math.min(1, t.rate * dt); if (Math.abs(t.to - o[k]) < 0.01) { o[k] = t.to; delete o.lerpTargets[k]; } }
       if (o.destroyAt !== undefined && g.time >= o.destroyAt) g.later(() => g.removeObject(o));
     }
+    VXRT.stepClips && VXRT.stepClips(g, dt);
   };
 })();

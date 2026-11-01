@@ -194,3 +194,41 @@ body[data-mode="simple"] .adv { display: none !important; }
 .dbt-gtools { padding: 6px 8px; position: sticky; left: 0; }
 .dbt-cols { display: grid; gap: 6px; margin-top: 6px; } .dbt-col { display: grid; grid-template-columns: 1fr 110px auto auto auto; gap: 6px; align-items: center; font-size: 12px; }
 .xs { display: grid; gap: 10px; min-width: min(420px, 80vw); } .xs-row { display: grid; gap: 4px; } .xs-row label { font-weight: 600; font-size: 12.5px; } .xs-row small { color: var(--muted); } .xs-row input:not([type=checkbox]), .xs-row select { width: 100%; }
+.fbadge { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 22px; height: 15px; padding: 0 3px; border: 1px solid; border-radius: 4px; font: 700 8.5px/1 system-ui, sans-serif; letter-spacing: .02em; box-sizing: border-box; background: #ffffff0a; }
+/* Library */
+.lib-top { margin-bottom: 4px; } .lib-row { display: flex; gap: 6px; margin: 4px 0; } .lib-row input { flex: 1; min-width: 0; } .lib-note { font-size: 11.5px; color: var(--muted); padding: 2px 2px 6px; line-height: 1.5; } .lib-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.lib-card { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg3, var(--bg2)); } .lib-card.slim { padding: 5px 8px; } .lib-ic { font-size: 20px; flex: none; width: 28px; text-align: center; } .lib-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; } .lib-tx b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .lib-tx span { font-size: 11px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } .lib-x { float: right; cursor: pointer; color: var(--muted); font-weight: 400; } .lib-x:hover { color: var(--danger); }
+
+/* progress dialog (forge.ui.progress) */
+.prog{display:flex;flex-direction:column;gap:10px;min-width:min(520px,80vw)}
+.prog-row{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.prog-bar{height:10px;border-radius:6px;background:var(--bg-3,#222);overflow:hidden}
+.prog-fill{height:100%;width:0;background:var(--accent,#5b8cff);transition:width .25s}
+.prog-log{margin:0;max-height:220px;overflow:auto;font:11px/1.45 var(--mono,monospace);background:var(--bg-0,#0b0d12);padding:8px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
+
+/* ---------- flexible layout: everything reflows with the window ---------- */
+html, body { max-width: 100vw; overflow-x: hidden; }
+#toolbar > *, .lg-bar > *, .gl-tabs > * { flex-shrink: 0; }
+#toolbar .tag { flex-shrink: 1; min-width: 0; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#toolbar .btn, .lg-bar .btn, .gl-tabs .btn { white-space: nowrap; }
+.tiles { grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); }
+.modal { max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+.field { grid-template-columns: minmax(70px, 92px) minmax(0, 1fr); }
+@media (max-width: 1100px) {
+  .dz { grid-template-columns: 1fr 220px; }
+  #statusbar { gap: 8px; } #statusbar > span { gap: 8px; }
+}
+@media (max-width: 860px) {
+  #app { grid-template-columns: 44px 0 0 minmax(0, 1fr); }
+  #activity .act { width: 34px; height: 34px; }
+  #sidebar:not(.collapsed) { position: fixed; left: 44px; top: 0; bottom: 24px; width: min(var(--sidew, 270px), calc(100vw - 52px)); z-index: 40; box-shadow: 6px 0 24px rgba(0,0,0,.4); }
+  #side-resizer { display: none; }
+  .dz { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .dz-side { max-height: 40vh; overflow: auto; }
+  #statusbar .sb-item:nth-child(n+4) { display: none; }
+  .field { grid-template-columns: 1fr; gap: 3px; }
+}
+@media (max-width: 560px) {
+  #toolbar { padding: 4px 6px; gap: 4px; } #toolbar .btn { padding: 3px 7px; }
+  .tiles { grid-template-columns: 1fr; }
+  .modal.wide, .modal { width: calc(100vw - 16px) !important; }
+}

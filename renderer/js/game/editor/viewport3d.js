@@ -7,8 +7,8 @@
     constructor(ctx) {
       const T = window.THREE; this.T = T; this.ctx = ctx; this.scene = null; this.project = null; this.sel = []; this.map = new Map(); this.tool = 'translate'; this.snap = false; this.showGrid = true; this._need = false;
       this.el = h('div', { class: 'vp' }); this.canvas = h('canvas', { class: 'vp-canvas', tabindex: '0' }); this.el.append(this.canvas);
-      this.renderer = new T.WebGLRenderer({ canvas: this.canvas, antialias: true, preserveDrawingBuffer: false }); this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap; this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-      this.three = new T.Scene(); this.cam = new T.PerspectiveCamera(60, 1, 0.05, 2000); this.cam.position.set(9, 7, 11);
+      this.renderer = new T.WebGLRenderer({ canvas: this.canvas, antialias: true, preserveDrawingBuffer: false }); this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFShadowMap; this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      this.three = new T.Scene(); VXRT.studioEnv && VXRT.studioEnv(T, this.renderer, this.three); this.cam = new T.PerspectiveCamera(60, 1, 0.05, 2000); this.cam.position.set(9, 7, 11);
       this.orbit = new VX_THREE.OrbitControls(this.cam, this.canvas); this.orbit.enableDamping = false; this.orbit.target.set(0, 1, 0); this.orbit.addEventListener('change', () => this.render()); this.orbit.mouseButtons = { LEFT: -1, MIDDLE: T.MOUSE.DOLLY, RIGHT: T.MOUSE.ROTATE }; this.orbit.update();
       this.tc = new VX_THREE.TransformControls(this.cam, this.canvas); this.tc.addEventListener('change', () => this.render()); this.tc.addEventListener('dragging-changed', (e) => { this.orbit.enabled = !e.value; this._dragging = e.value; if (!e.value) this.ctx.onChange && this.ctx.onChange(); });
       this.tc.addEventListener('objectChange', () => this._fromGizmo()); this.three.add(this.tc.getHelper ? this.tc.getHelper() : this.tc);

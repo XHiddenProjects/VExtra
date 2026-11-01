@@ -55,11 +55,37 @@
     if (!t) { t = new T.TextureLoader().load(sp.frames[0], () => env.onImageLoad && env.onImageLoad()); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; cache.set(key, t); }
     const c = t.clone(); c.needsUpdate = true; c.repeat.set(rx || 1, ry || 1); return c;
   }
+  /** Procedural pattern textures for material assets (no image needed). */
+  VXRT.patternCanvas = function (kind, c1, c2, size) {
+    const S = size || 64, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'); x.fillStyle = c1 || '#888'; x.fillRect(0, 0, S, S); x.fillStyle = c2 || '#444'; let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    if (kind === 'checker') { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2) x.fillRect(i * S / 8, j * S / 8, S / 8, S / 8); }
+    else if (kind === 'stripes') { for (let i = 0; i < 8; i += 2) x.fillRect(i * S / 8, 0, S / 8, S); }
+    else if (kind === 'bricks') { for (let r = 0; r < 4; r++) { for (let k = 0; k < 2; k++) x.fillRect(((k * S / 2 + (r % 2) * S / 4) % S), r * S / 4 + 1, S / 2 - 2, S / 4 - 2); } x.globalAlpha = 0.0; }
+    else if (kind === 'noise') { for (let i = 0; i < S * 14; i++) { x.globalAlpha = rnd() * 0.5; x.fillRect(rnd() * S, rnd() * S, 2, 2); } }
+    else if (kind === 'wood') { x.globalAlpha = 0.5; for (let i = 0; i < 12; i++) { x.fillRect(0, (i * S) / 12 + rnd() * 3, S, 1 + rnd() * 2); } }
+    else if (kind === 'grass') { for (let i = 0; i < 260; i++) { x.globalAlpha = 0.25 + rnd() * 0.5; x.fillRect(rnd() * S, rnd() * S, 1, 2 + rnd() * 4); } }
+    else if (kind === 'dots') { for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { x.beginPath(); x.arc((i + 0.5) * S / 4, (j + 0.5) * S / 4, S / 12, 0, 6.3); x.fill(); } }
+    else if (kind === 'grid') { x.fillRect(0, 0, S, 2); x.fillRect(0, 0, 2, S); }
+    x.globalAlpha = 1; return c;
+  };
+  /** The material asset (if any) that applies to this object / model. */
+  function materialAsset(o, env) {
+    const A = (env.assets || (env.data && env.data.assets) || {}), mats = A.materials; if (!mats) return null; const id = o.matAsset || (o.props && o.props.material) || (o.props && o.props.model && A.models && A.models[o.props.model] && A.models[o.props.model].matAsset); return (id && mats[id]) || null;
+  }
+  VXRT.materialAsset = materialAsset;
+  function applyMaterialAsset(T, mat, ma, env, vertexColors) {
+    mat.metalness = ma.metalness ?? 0.1; mat.roughness = ma.roughness ?? 0.7; mat.emissive.set(ma.emissive || '#000000'); mat.emissiveIntensity = ma.emissiveIntensity ?? 1; mat.wireframe = !!ma.wireframe; mat.flatShading = !!ma.flat;
+    const op = (ma.opacity ?? 1) * mat.opacity; mat.opacity = op; mat.transparent = op < 1; mat.side = ma.doubleSided ? T.DoubleSide : mat.side; if (!vertexColors) mat.color.set(ma.color || '#cccccc');
+    let tex = null; if (ma.texture) tex = texture(T, env, ma.texture, ma.repeatX, ma.repeatY);
+    if (!tex && ma.pattern && ma.pattern !== 'none') { const cache = env.patTex || (env.patTex = new Map()); const key = [ma.pattern, ma.color, ma.color2].join('|'); let t = cache.get(key); if (!t) { t = new T.CanvasTexture(VXRT.patternCanvas(ma.pattern, ma.color, ma.color2 || '#444')); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; cache.set(key, t); } tex = t.clone(); tex.needsUpdate = true; tex.repeat.set(ma.repeatX || 1, ma.repeatY || 1); if (!vertexColors) mat.color.set('#ffffff'); }
+    if (tex) mat.map = tex; if (ma.bump) { const b = texture(T, env, ma.bump, ma.repeatX, ma.repeatY); if (b) { mat.bumpMap = b; mat.bumpScale = ma.bumpScale ?? 1; } }
+  }
   function makeMaterial(T, o, env, vertexColors) {
     const m = o.material || {}; const alpha = U.clamp(o.alpha ?? 1, 0, 1), op = (m.opacity ?? 1) * alpha;
     const mat = new T.MeshStandardMaterial({ color: o.color || m.color || '#cccccc', metalness: m.metalness ?? 0.1, roughness: m.roughness ?? 0.7, emissive: m.emissive || '#000000', emissiveIntensity: m.emissiveIntensity ?? 1, transparent: op < 1, opacity: op, wireframe: !!m.wireframe, flatShading: !!m.flat, vertexColors: !!vertexColors, side: o.type === 'plane' ? T.DoubleSide : T.FrontSide });
     if (vertexColors) mat.color.set('#ffffff');
     if (m.texture) { const t = texture(T, env, m.texture, m.repeatX, m.repeatY); if (t) { mat.map = t; } }
+    const ma = materialAsset(o, env); if (ma) { applyMaterialAsset(T, mat, ma, env, vertexColors); mat.userData.vxMat = true; }
     return mat;
   }
   const VERT = 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }';
@@ -124,11 +150,19 @@
   };
 
   /* ---------- runtime hooks ---------- */
+  /** A soft sky/ground studio environment so metallic and glossy materials have something to reflect. */
+  VXRT.studioEnv = function (T, renderer, scene) {
+    try {
+      const key = renderer.__vxEnv; let tex = key; if (!tex) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const x = cv.getContext('2d'); const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#cfe3ff'); gr.addColorStop(0.48, '#ffffff'); gr.addColorStop(0.5, '#6b7385'); gr.addColorStop(1, '#2a3047'); x.fillStyle = gr; x.fillRect(0, 0, 256, 128); x.fillStyle = '#fff'; x.fillRect(40, 18, 40, 14); x.fillRect(170, 26, 50, 10);
+        const eq = new T.CanvasTexture(cv); eq.mapping = T.EquirectangularReflectionMapping; eq.colorSpace = T.SRGBColorSpace; const pm = new T.PMREMGenerator(renderer); tex = pm.fromEquirectangular(eq).texture; pm.dispose(); eq.dispose(); renderer.__vxEnv = tex; }
+      scene.environment = tex; if ('environmentIntensity' in scene) scene.environmentIntensity = 0.55;
+    } catch (e) { /* PMREM unavailable: metals simply look darker */ }
+  };
   VXRT.setupScene3D = function (g, sc) {
     const T = window.THREE; if (!T) throw new Error('This scene is 3D but three.js is not loaded');
-    if (!g.canvas3d) { const c = document.createElement('canvas'); c.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%'; g.stageEl.append(c); g.canvas3d = c; g.renderer3d = new T.WebGLRenderer({ canvas: c, antialias: true, preserveDrawingBuffer: !!g.opts.preserveBuffer }); g.renderer3d.shadowMap.enabled = true; g.renderer3d.shadowMap.type = T.PCFSoftShadowMap; g.renderer3d.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); }
+    if (!g.canvas3d) { const c = document.createElement('canvas'); c.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%'; g.stageEl.append(c); g.canvas3d = c; g.renderer3d = new T.WebGLRenderer({ canvas: c, antialias: true, preserveDrawingBuffer: !!g.opts.preserveBuffer }); g.renderer3d.shadowMap.enabled = true; g.renderer3d.shadowMap.type = T.PCFShadowMap; g.renderer3d.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); }
     g.canvas3d.style.display = 'block';
-    const env = sc.env || {}; g.scene3d = new T.Scene(); g.THREE = T;
+    const env = sc.env || {}; g.scene3d = new T.Scene(); g.THREE = T; VXRT.studioEnv(T, g.renderer3d, g.scene3d);
     if (env.skyMode === 'gradient') { const cv = document.createElement('canvas'); cv.width = 2; cv.height = 256; const x = cv.getContext('2d'); const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, env.skyTop || '#3a6bd8'); gr.addColorStop(1, env.skyBottom || '#cfe8ff'); x.fillStyle = gr; x.fillRect(0, 0, 2, 256); const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; g.scene3d.background = t; } else g.scene3d.background = new T.Color(env.sky || sc.bg || '#1a2233');
     if (env.fog) g.scene3d.fog = new T.Fog(env.fogColor || env.sky || '#1a2233', U.num(env.fogNear, 20), U.num(env.fogFar, 120));
     if (env.ambient !== false) g.scene3d.add(new T.AmbientLight(env.ambientColor || '#ffffff', U.num(env.ambientIntensity, 0.45)));
@@ -161,7 +195,7 @@
       if (o.dirty3d) { o.dirty3d = false; if (o.obj3d) { g.scene3d.remove(o.obj3d); VXRT.onObjectAdded(g, o); } continue; }
       if (o.obj3d.isMesh || o.obj3d.type === 'Group') o.obj3d.traverse((m) => {
         if (!m.isMesh) return; const mat = m.userData.baseMat; if (mat) {
-          if (o._lastColor !== o.color && !mat.map && !mat.vertexColors && !m.userData.keepColor) { mat.color.set(o.color); }
+          if (o._lastColor !== o.color && !mat.map && !mat.vertexColors && !m.userData.keepColor && !mat.userData.vxMat) { mat.color.set(o.color); }
           const op = U.clamp(o.alpha, 0, 1) * ((o.material && o.material.opacity) ?? 1); if (mat.opacity !== op) { mat.opacity = op; mat.transparent = op < 1; mat.needsUpdate = true; }
           if (o.material) { if (o.material.metalness !== undefined) mat.metalness = o.material.metalness; if (o.material.roughness !== undefined) mat.roughness = o.material.roughness; if (o.material.emissive) mat.emissive.set(o.material.emissive); mat.wireframe = !!o.material.wireframe; }
         }
@@ -183,6 +217,6 @@
       const n = P.length, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), cc = new T.Color(); P.forEach((p, i) => { pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; cc.set(p.color); const f = p.fade ? 1 - p.life / p.max : 1; col[i * 3] = cc.r * f; col[i * 3 + 1] = cc.g * f; col[i * 3 + 2] = cc.b * f; });
       g.particles3d.geometry.setAttribute('position', new T.BufferAttribute(pos, 3)); g.particles3d.geometry.setAttribute('color', new T.BufferAttribute(col, 3)); g.particles3d.visible = true; g.particles3d.material.size = Math.max(0.1, (P[0].size || 6) / 24);
     } else if (g.particles3d) g.particles3d.visible = false;
-    g.renderer3d.render(g.scene3d, cam);
+    g.renderer3d.render(g.scene3d, cam); VXRT.fx && VXRT.fx.screen(g, g.canvas3d);
   };
 })();

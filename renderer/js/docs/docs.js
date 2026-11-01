@@ -9,7 +9,8 @@
   function blockMd(def) {
     const ports = VXRT.ports(def, VXRT.paramDefaults(def), null); const pl = (a) => (a.length ? a.map((p) => '`' + p.id + '`').join(', ') : '—');
     let md = `### ${def.label}\n\n\`${def.id}\` ${def.plugin ? '· from plugin **' + def.plugin + '**' : ''}\n\n${def.desc || ''}\n\n**Inputs:** ${pl(ports.inputs)}  \n**Outputs:** ${pl(ports.outputs)}\n\n`;
-    if (def.params && def.params.length) { md += '| Setting | Type | Default | Notes |\n|---|---|---|---|\n' + def.params.map(paramLine).join('\n') + '\n\n'; }
+    if (def.params && def.params.length) { md += '| Setting | Type | Default | Notes |\n|---|---|---|---|\n' + def.params.map(paramLine).join('\n') + '\n\n';
+      for (const p of def.params) if (p.options && p.options.some((o) => Array.isArray(o) && o[2])) md += '**' + p.label + '**\n\n' + p.options.map((o) => (Array.isArray(o) && o[2] ? '- **' + o[1] + '** – ' + o[2] : null)).filter(Boolean).join('\n') + '\n\n'; }
     return md;
   }
   function categoryMd(cat) { const defs = Object.values(VXRT.blocks).filter((b) => b.cat === cat.id); return `# ${cat.label}\n\n${defs.length} blocks.\n\n` + (CAT_INTRO[cat.id] || '') + '\n\n' + defs.map(blockMd).join('\n'); }

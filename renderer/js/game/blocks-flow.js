@@ -24,7 +24,7 @@
     onInput(n, port, v, g) { VXRT.gui.alert(g, { mode: n.p.mode, kind: n.p.kind, title: n.p.title, message: String(n.p.message).replace(/\{value\}/g, str(v)), button: n.p.button, duration: n.p.duration, pause: n.p.pause }, () => g.send(n, 'ok', 1)); } });
 
   B({ id: 'cursor', cat: 'gui', label: 'Cursor', desc: 'Replaces the mouse cursor with an emoji, image, ring, cross or dot that follows the pointer.',
-    inputs: ['in', 'show', 'hide'], outputs: [], params: [P.sel('shape', 'Shape', ['ring', 'cross', 'dot', 'emoji', 'image']), P.text('emoji', 'Emoji', '🎯'), P.sprite('sprite', 'Image (sprite asset)'), P.num('size', 'Size', 28), P.color('color', 'Colour', '#ffffff'), P.bool('hideSystem', 'Hide the normal cursor', true)],
+    inputs: ['in', 'show', 'hide'], outputs: [], params: [P.sel('shape', 'Shape', [['ring', 'Ring'], ['cross', 'Cross'], ['dot', 'Dot'], ['emoji', 'Emoji'], ['image', 'Image'], ['none', 'None (hide the cursor completely, no icon)']]), P.text('emoji', 'Emoji', '🎯'), P.sprite('sprite', 'Image (sprite asset)'), P.num('size', 'Size', 28), P.color('color', 'Colour', '#ffffff'), P.bool('hideSystem', 'Hide the normal cursor', true)],
     init(n, g) { VXRT.gui.cursor(g, { shape: n.p.shape, emoji: n.p.emoji, sprite: n.p.sprite, size: n.p.size, color: n.p.color, hideSystem: n.p.hideSystem, hidden: false }); },
     onInput(n, port, v, g) { VXRT.gui.cursor(g, { hidden: port === 'hide' }); } });
 

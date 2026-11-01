@@ -16,13 +16,13 @@
     constructor(w = 320, hgt = 260) {
       const T = window.THREE; this.T = T; this.el = h('canvas', { class: 'mp-canvas' }); this.w = w; this.hgt = hgt;
       this.r = new T.WebGLRenderer({ canvas: this.el, antialias: true, alpha: true }); this.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); this.r.setSize(w, hgt, false); this.el.style.width = w + 'px'; this.el.style.height = hgt + 'px';
-      this.scene = new T.Scene(); this.scene.add(new T.AmbientLight(0xffffff, 0.7)); const d = new T.DirectionalLight(0xffffff, 1.1); d.position.set(3, 5, 4); this.scene.add(d);
+      this.scene = new T.Scene(); VXRT.studioEnv && VXRT.studioEnv(T, this.r, this.scene); this.scene.add(new T.AmbientLight(0xffffff, 0.7)); const d = new T.DirectionalLight(0xffffff, 1.1); d.position.set(3, 5, 4); this.scene.add(d);
       const grid = new T.GridHelper(4, 8, 0x4a5578, 0x2a3047); grid.position.y = -0.5; this.scene.add(grid);
       this.cam = new T.PerspectiveCamera(45, w / hgt, 0.05, 100); this.cam.position.set(1.8, 1.4, 2.2); this.orbit = new VX_THREE.OrbitControls(this.cam, this.el); this.orbit.addEventListener('change', () => this.draw()); this.orbit.update(); this.obj = null;
     }
     set(asset, project) {
       const T = this.T; if (this.obj) this.scene.remove(this.obj); this.obj = null; if (!asset) { this.draw(); return; }
-      const env = { assets: { sprites: {}, sounds: {}, models: { m: asset }, ...(project ? { sprites: project.assets.sprites } : {}) }, imgs: new Map(), onImageLoad: () => this.draw() };
+      const env = { assets: { sprites: {}, sounds: {}, models: { m: asset }, materials: {}, ...(project ? { sprites: project.assets.sprites, materials: project.assets.materials || {} } : {}) }, imgs: new Map(), onImageLoad: () => this.draw() };
       try {
         const o = { type: 'model', x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, w: 1, h: 1, d: 1, color: '#ffffff', alpha: 1, material: {}, props: { model: 'm' } };
         this.obj = VXRT.build3D(T, o, env);
@@ -39,6 +39,9 @@
   function thumbOf(kind, a, project) {
     if (kind === 'sprites') { const im = h('img', { class: 'as-img', src: (a.frames && a.frames[0]) || '', draggable: 'false' }); if (project && project.settings.pixelArt) im.style.imageRendering = 'pixelated'; return im; }
     if (kind === 'sounds') return h('div', { class: 'as-glyph' }, a.kind === 'sample' ? '🎵' : a.kind === 'melody' ? '🎼' : '🔊');
+    if (kind === 'shaders') return h('div', { class: 'as-glyph' }, '🔆');
+    if (kind === 'animations') return h('div', { class: 'as-glyph' }, '🎬');
+    if (kind === 'materials') { const d = h('div', { class: 'as-glyph as-mat', style: `background:radial-gradient(circle at 35% 30%, #fff8, ${a.color || '#ccc'} 55%, #0008)` }); if (a.emissive && a.emissive !== '#000000') d.style.boxShadow = `0 0 12px ${a.emissive}`; return d; }
     return h('div', { class: 'as-glyph' }, a.kind === 'voxel' ? '🧱' : a.kind === 'obj' ? '📐' : '🧩');
   }
 
@@ -49,10 +52,10 @@
     }
     get A() { return this.ctx.project.assets; }
     render() {
-      const el = this.el; el.textContent = ''; const kinds = [['sprites', 'Sprites', '🖼'], ['sounds', 'Sounds', '🔊'], ['models', '3D Models', '🧊']];
+      const el = this.el; el.textContent = ''; const kinds = [['sprites', 'Sprites', '🖼'], ['sounds', 'Sounds', '🔊'], ['models', '3D Models', '🧊'], ['materials', 'Materials', '🎨'], ['animations', 'Animations', '🎬'], ['shaders', 'Shaders', '🔆']]; for (const [k] of kinds) this.A[k] = this.A[k] || {};
       const bar = h('div', { class: 'as-bar' }, kinds.map(([k, l, i]) => h('button', { class: 'as-tab' + (this.tab === k ? ' on' : ''), onclick: () => { this.tab = k; this.render(); } }, i + ' ' + l + ' ', h('span', { class: 'cnt' }, String(Object.keys(this.A[k]).length)))),
         h('span', { class: 'sp' }), h('input', { class: 'as-search', placeholder: 'Filter…', value: this.filter, oninput: (e) => { this.filter = e.target.value; this.renderGrid(); } }),
-        h('button', { class: 'btn sm primary', onclick: () => this.create() }, '＋ New'), h('button', { class: 'btn sm', onclick: () => this.import() }, 'Import…'));
+        h('button', { class: 'btn sm primary', onclick: () => this.create() }, '＋ New'), h('button', { class: 'btn sm', onclick: () => this.defaults() }, '✨ Defaults…'), h('button', { class: 'btn sm', onclick: () => this.import() }, 'Import…'));
       this.grid = h('div', { class: 'as-grid' }); el.append(bar, this.grid, h('div', { class: 'as-hint' }, 'Double-click to edit • drag onto the Scene to place • assets are stored inside your .vxgame file'));
       this.renderGrid();
     }
@@ -60,11 +63,11 @@
       const kind = this.tab, list = Object.values(this.A[kind]).filter((a) => !this.filter || a.name.toLowerCase().includes(this.filter.toLowerCase())); this.grid.textContent = '';
       if (!list.length) this.grid.append(h('div', { class: 'as-empty' }, 'Nothing here yet. Click ', h('b', {}, '＋ New'), ' to draw, synthesize or build one — or ', h('b', {}, 'Import…'), ' a file.'));
       for (const a of list) {
-        const card = h('div', { class: 'as-card', title: a.id }, thumbOf(kind, a, this.ctx.project), h('div', { class: 'as-name' }, a.name), h('div', { class: 'as-meta' }, kind === 'sprites' ? `${a.w}×${a.h} · ${a.frames.length}f` : kind === 'sounds' ? (a.kind || 'synth') : (a.kind || 'voxel')));
+        const card = h('div', { class: 'as-card', title: a.id }, thumbOf(kind, a, this.ctx.project), h('div', { class: 'as-name' }, a.name), h('div', { class: 'as-meta' }, kind === 'sprites' ? `${a.w}×${a.h} · ${a.frames.length}f` : kind === 'sounds' ? (a.kind || 'synth') : kind === 'materials' ? (a.pattern && a.pattern !== 'none' ? a.pattern : 'PBR') : kind === 'animations' ? `${a.duration}s · ${(a.tracks || []).length} tracks` : kind === 'shaders' ? 'GLSL' : (a.kind || 'voxel')));
         card.addEventListener('dblclick', () => this.ctx.openStudio(kind, a.id));
         card.addEventListener('contextmenu', (e) => { e.preventDefault(); VX.ui.menu(e.clientX, e.clientY, [{ label: 'Edit', run: () => this.ctx.openStudio(kind, a.id) }, ...(kind === 'sounds' ? [{ label: 'Play', run: () => VX.assetAudio.play(a) }] : []), { label: 'Rename…', run: () => this.rename(kind, a) }, { label: 'Duplicate', run: () => this.duplicate(kind, a) }, { label: 'Copy id', run: () => navigator.clipboard && navigator.clipboard.writeText(a.id) }, '-', { label: 'Delete', danger: true, run: () => this.remove(kind, a) }]); });
         if (kind === 'sounds') card.addEventListener('click', () => VX.assetAudio.play(a));
-        VX.dnd.draggable(card, () => ({ kind: kind === 'sprites' ? 'asset-sprite' : kind === 'models' ? 'asset-model' : 'asset-sound', id: a.id, name: a.name }), a.name);
+        VX.dnd.draggable(card, () => ({ kind: kind === 'sprites' ? 'asset-sprite' : kind === 'models' ? 'asset-model' : kind === 'sounds' ? 'asset-sound' : 'asset-' + kind, id: a.id, name: a.name }), a.name);
         this.grid.append(card);
       }
     }
@@ -73,18 +76,33 @@
     async remove(kind, a) { if (!(await VX.ui.confirm(`Delete “${a.name}”? Objects and blocks using it will show nothing.`, 'Delete', { danger: true }))) return; delete this.A[kind][a.id]; this.ctx.onChange(); this.renderGrid(); }
     async create() {
       const kind = this.tab;
+      if (kind === 'materials') { const a = { id: uid('mat'), name: 'Material', color: '#6c8cff', metalness: 0.1, roughness: 0.6, emissive: '#000000', emissiveIntensity: 1, opacity: 1, pattern: 'none', color2: '#444444', repeatX: 1, repeatY: 1 }; this.A.materials[a.id] = a; this.ctx.onChange(); this.renderGrid(); return this.ctx.openStudio('materials', a.id); }
+      if (kind === 'animations') { const a = { id: uid('anm'), name: 'Animation', duration: 1, loop: 'once', relative: true, tracks: [{ prop: 'y', keys: [{ t: 0, v: 0 }, { t: 0.5, v: -20, e: 'quadOut' }, { t: 1, v: 0, e: 'quadIn' }] }] }; this.A.animations[a.id] = a; this.ctx.onChange(); this.renderGrid(); return this.ctx.openStudio('animations', a.id); }
+      if (kind === 'shaders') { const a = { id: uid('shd'), name: 'My shader', code: VX.SHADER_TEMPLATE }; this.A.shaders[a.id] = a; this.ctx.onChange(); this.renderGrid(); return this.ctx.openStudio('shaders', a.id); }
       if (kind === 'sprites') { const v = await VX.ui.form({ title: 'New sprite', fields: [{ key: 'name', label: 'Name', value: 'sprite', required: true }, { key: 'size', label: 'Canvas size', type: 'select', value: '32', options: [['16', '16 × 16'], ['32', '32 × 32'], ['48', '48 × 48'], ['64', '64 × 64'], ['128', '128 × 128'], ['64x32', '64 × 32 (wide)'], ['32x64', '32 × 64 (tall)']] }], submit: 'Create' }); if (!v) return; const [w, hh] = v.size.includes('x') ? v.size.split('x').map(Number) : [+v.size, +v.size]; const a = { id: uid('spr'), name: v.name, w, h: hh, frames: [VX.blankFrame(w, hh)], fps: 8, anims: {} }; this.A.sprites[a.id] = a; this.ctx.onChange(); this.renderGrid(); this.ctx.openStudio('sprites', a.id); }
       else if (kind === 'sounds') { const a = { id: uid('snd'), name: 'sound', kind: 'synth', params: Object.assign({}, VX.SOUND_PRESETS.coin) }; this.A.sounds[a.id] = a; this.ctx.onChange(); this.renderGrid(); this.ctx.openStudio('sounds', a.id); }
       else { const v = await VX.ui.form({ title: 'New 3D model', fields: [{ key: 'name', label: 'Name', value: 'model', required: true }, { key: 'kind', label: 'Type', type: 'select', value: 'voxel', options: [['voxel', 'Voxel (paint blocks)'], ['group', 'Shape group (combine primitives)'], ['obj', 'OBJ mesh (paste / import)']] }], submit: 'Create' }); if (!v) return; const a = { id: uid('mdl'), name: v.name, kind: v.kind }; if (v.kind === 'voxel') { a.palette = ['#e0e4ee', '#6c8cff', '#ff7a8a', '#ffd54a', '#4ade80', '#8a5a2b', '#1b2a63', '#10131a']; a.voxels = [[0, 0, 0, 1], [1, 0, 0, 1], [0, 1, 0, 2]]; } else if (v.kind === 'group') a.parts = [{ type: 'cube', x: 0, y: 0, z: 0, w: 1, h: 1, d: 1, color: '#6c8cff' }]; else a.text = 'v -0.5 -0.5 0\nv 0.5 -0.5 0\nv 0 0.5 0\nf 1 2 3\n'; this.A.models[a.id] = a; this.ctx.onChange(); this.renderGrid(); this.ctx.openStudio('models', a.id); }
     }
+    /** Picker for the built-in default assets of the current tab. */
+    defaults() {
+      const kind = this.tab, list = VX.defaultAssets.catalog(kind); const body = h('div', { class: 'dflt' }); const tags = [...new Set(list.map((e) => e.tag))]; let tag = '';
+      const grid = h('div', { class: 'as-grid dflt-grid' });
+      const draw = () => { grid.textContent = ''; for (const e of list.filter((x) => !tag || x.tag === tag)) { const a = e.make(this.ctx.project); const card = h('div', { class: 'as-card', title: 'Click to add “' + e.name + '” to this project' }, thumbOf(kind, a, this.ctx.project), h('div', { class: 'as-name' }, e.name), h('div', { class: 'as-meta' }, e.tag)); card.addEventListener('click', () => { const n = VX.defaultAssets.add(this.ctx.project, kind, e.key); if (n) { this.ctx.onChange(); this.renderGrid(); card.classList.add('added'); VX.ui.toast('Added ' + n.name, 'ok'); } }); if (kind === 'sounds') card.addEventListener('dblclick', () => VX.assetAudio.play(a)); grid.append(card); } };
+      const bar = h('div', { class: 'row g6 wrap' }, h('button', { class: 'btn sm on', onclick: (ev) => { tag = ''; bar.querySelectorAll('.btn').forEach((b) => b.classList.remove('on')); ev.target.classList.add('on'); draw(); } }, 'All'), ...tags.map((t) => h('button', { class: 'btn sm', onclick: (ev) => { tag = t; bar.querySelectorAll('.btn').forEach((b) => b.classList.remove('on')); ev.target.classList.add('on'); draw(); } }, t)), h('span', { class: 'sp' }), h('button', { class: 'btn sm primary', onclick: () => { const cur = list.filter((x) => !tag || x.tag === tag); for (const e of cur) VX.defaultAssets.add(this.ctx.project, kind, e.key); this.ctx.onChange(); this.renderGrid(); VX.ui.toast('Added ' + cur.length + ' assets', 'ok'); } }, 'Add all shown'));
+      body.append(bar, grid, h('div', { class: 'as-hint' }, kind === 'sounds' ? 'Click to add • double-click to hear it' : 'Click an item to add a copy to this project')); draw();
+      VX.ui.modal({ title: 'Default ' + kind, body, wide: true });
+    }
     async import() {
-      const kind = this.tab; const accept = kind === 'sprites' ? 'image/*' : kind === 'sounds' ? 'audio/*' : '.obj';
+      const kind = this.tab; const accept = kind === 'sprites' ? 'image/*' : kind === 'sounds' ? 'audio/*' : kind === 'materials' ? '.vxmat,.json,.mtl' : kind === 'animations' ? '.vxanim,.json' : kind === 'shaders' ? '.glsl,.frag,.vert,.vxshader,.txt' : '.obj';
       const files = await VX.pickBrowserFile(accept, true); if (!files || !files.length) return;
       for (const f of files) {
         const name = f.name.replace(/\.[^.]+$/, '');
         try {
           if (kind === 'sprites') { const url = await VX.readFileAsDataURL(f); const dim = await new Promise((res) => { const im = new Image(); im.onload = () => res([im.naturalWidth, im.naturalHeight]); im.onerror = () => res([32, 32]); im.src = url; }); const a = { id: uid('spr'), name, w: dim[0], h: dim[1], frames: [url], fps: 8, anims: {} }; this.A.sprites[a.id] = a; }
           else if (kind === 'sounds') { const url = await VX.readFileAsDataURL(f); if (url.length > 4_000_000) VX.ui.toast('Large sound (' + (url.length / 1e6).toFixed(1) + ' MB) – it will bloat the project file', 'warn'); const a = { id: uid('snd'), name, kind: 'sample', data: url }; this.A.sounds[a.id] = a; }
+          else if (kind === 'materials') { const a = Object.assign({ id: uid('mat'), name, color: '#cccccc', metalness: 0.1, roughness: 0.7 }, VX.parseMaterialFile(await VX.readFileAsText(f), f.name)); a.id = uid('mat'); this.A.materials[a.id] = a; }
+          else if (kind === 'animations') { const j = JSON.parse(await VX.readFileAsText(f)); const a = Object.assign({ duration: 1, loop: 'once', tracks: [] }, j, { id: uid('anm'), name: j.name || name }); this.A.animations[a.id] = a; }
+          else if (kind === 'shaders') { const a = { id: uid('shd'), name, code: await VX.readFileAsText(f) }; this.A.shaders[a.id] = a; }
           else { const text = await VX.readFileAsText(f); const a = { id: uid('mdl'), name, kind: 'obj', text }; this.A.models[a.id] = a; }
         } catch (e) { VX.ui.toast('Could not import ' + f.name + ': ' + e.message, 'error'); }
       }
@@ -97,9 +115,9 @@
 
   /** Open an asset studio in a modal. */
   VX.openStudio = function (kind, asset, project, onChange) {
-    const make = { sprites: VX.SpriteEditor, sounds: VX.SoundEditor, models: VX.ModelEditor }[kind]; if (!make) return;
+    const make = { sprites: VX.SpriteEditor, sounds: VX.SoundEditor, models: VX.ModelEditor, materials: VX.MaterialEditor, animations: VX.AnimEditor, shaders: VX.ShaderEditor }[kind]; if (!make) return;
     const ed = new make(asset, project, onChange);
-    const m = VX.ui.modal({ title: (kind === 'sprites' ? 'Sprite Editor – ' : kind === 'sounds' ? 'Sound Studio – ' : 'Model Editor – ') + asset.name, body: ed.el, wide: true, className: 'studio flush', onClose: () => { ed.dispose && ed.dispose(); onChange && onChange(true); } });
+    const m = VX.ui.modal({ title: ({ sprites: 'Sprite Editor – ', sounds: 'Sound Studio – ', materials: 'Material Editor – ', animations: 'Animation Editor – ', shaders: 'Shader Editor – ' }[kind] || 'Model Editor – ') + asset.name, body: ed.el, wide: true, className: 'studio flush', onClose: () => { ed.dispose && ed.dispose(); onChange && onChange(true); } });
     ed.mounted && ed.mounted();
     return m;
   };

@@ -1,4 +1,4 @@
-/** @forge-plugin {"id":"store-export","name":"Store Export","version":"1.0.0","description":"Package a game as ready-to-build projects for Steam (Electron), Google Play (Android) and the App Store (iOS)."} */
+/** @forge-plugin {"id":"store-export","name":"Store Export","version":"2.0.0","description":"Package a game and (on the desktop app) install, assign and build it automatically, with a progress bar, for for Steam (Electron), Google Play (Android) and the App Store (iOS)."} */
 /** @forge-docs
  * ## Using Store Export
  * Open a game and press **📦 Store export** in its toolbar (or run **Store Export: Package game…** from the Command Palette). A project folder must be open so the files have somewhere to go.
@@ -41,7 +41,7 @@ async function makeCanvases(project, o) {
 function mobileFiles(o, slug) {
   const land = o.orientation === 'landscape', port = o.orientation === 'portrait';
   const f = {};
-  f['package.json'] = JSONF({ name: slug + '-mobile', version: o.version, private: true, description: o.name, scripts: { setup: 'npx cap add android && npx cap add ios && npm run assets && npm run patch', assets: 'npx capacitor-assets generate --iconBackgroundColor ' + o.color + ' --splashBackgroundColor ' + o.color, patch: 'node scripts/patch-native.js', sync: 'npx cap sync', 'open:android': 'npx cap open android', 'open:ios': 'npx cap open ios' }, dependencies: { '@capacitor/core': '^7.0.0', '@capacitor/android': '^7.0.0', '@capacitor/ios': '^7.0.0' }, devDependencies: { '@capacitor/cli': '^7.0.0', '@capacitor/assets': '^3.0.5' } });
+  f['package.json'] = JSONF({ name: slug + '-mobile', version: o.version, private: true, description: o.name, scripts: { setup: 'npx cap add android && npx cap add ios && npm run assets && npm run patch', assets: 'npx capacitor-assets generate --iconBackgroundColor ' + o.color + ' --splashBackgroundColor ' + o.color, patch: 'node scripts/patch-native.js', sync: 'npx cap sync', 'open:android': 'npx cap open android', 'open:ios': 'npx cap open ios', 'build:android': 'node scripts/build-android.js' }, dependencies: { '@capacitor/core': '^7.0.0', '@capacitor/android': '^7.0.0', '@capacitor/ios': '^7.0.0' }, devDependencies: { '@capacitor/cli': '^7.0.0', '@capacitor/assets': '^3.0.5' } });
   f['capacitor.config.json'] = JSONF({ appId: o.id, appName: o.name, webDir: 'www', backgroundColor: o.color, android: { allowMixedContent: false }, ios: { contentInset: 'never' } });
   f['scripts/patch-native.js'] = [
     "// Best-effort patches after `cap add`: orientation + version numbers. Safe to run repeatedly.",
@@ -58,6 +58,14 @@ function mobileFiles(o, slug) {
     "if (dirs) edit(plist, (s) => s.replace(/(<key>UISupportedInterfaceOrientations<\\/key>\\s*<array>)[\\s\\S]*?(<\\/array>)/, (m, a, b) => a + dirs.map((d) => '<string>' + d + '</string>').join('') + b));",
     "edit(plist, (s) => s.replace(/(<key>CFBundleShortVersionString<\\/key>\\s*<string>)[^<]*/, '$1' + cfg.version));",
     "console.log('Done. In Xcode set the build number; in Android Studio check the signing config.');", '',
+  ].join('\n');
+  f['scripts/build-android.js'] = [
+    "// Builds a debug APK with Gradle (needs the Android SDK; set ANDROID_HOME). Release/signed builds: use Android Studio.",
+    "const cp = require('child_process'), path = require('path'), fs = require('fs');",
+    "const dir = path.resolve(__dirname, '..', 'android'); if (!fs.existsSync(dir)) { console.error('No android/ folder – run `npx cap add android` first.'); process.exit(1); }",
+    "const win = process.platform === 'win32';",
+    "const r = cp.spawnSync(win ? 'gradlew.bat' : './gradlew', ['assembleDebug'], { cwd: dir, stdio: 'inherit', shell: win });",
+    "process.exit(r.status === null ? 1 : r.status);", '',
   ].join('\n');
   f['README-MOBILE.md'] = `# ${o.name} – Google Play & App Store
 
@@ -187,6 +195,34 @@ function checklist(o) { return `# Store checklist – ${o.name}
 - [ ] Review the Steam rules for AI-generated content and for third-party code/assets, and answer the disclosure questions truthfully
 `; }
 
+/* Runs the npm steps for each target with one overall progress bar. Optional steps may fail without stopping the export. */
+async function autoBuild(o, out) {
+  const host = { win32: 'win', windows: 'win', darwin: 'mac', macos: 'mac', linux: 'linux' }[String((await window.native.info()).platform || '').toLowerCase()] || 'linux';
+  const steps = [];
+  if (o.steam) { const d = out + '/steam'; steps.push({ t: 'Steam: installing packages (npm install)', cwd: d, p: 'npm', a: ['install'], w: 5 }, { t: 'Steam: building for ' + host, cwd: d, p: 'npm', a: ['run', 'build:' + host], w: 4 }); }
+  if (o.android) {
+    const d = out + '/mobile';
+    steps.push({ t: 'Mobile: installing packages (npm install)', cwd: d, p: 'npm', a: ['install'], w: 4 }, { t: 'Mobile: adding Android project', cwd: d, p: 'npx', a: ['cap', 'add', 'android'], w: 3, opt: true });
+    if (host === 'mac') steps.push({ t: 'Mobile: adding iOS project', cwd: d, p: 'npx', a: ['cap', 'add', 'ios'], w: 3, opt: true });
+    steps.push({ t: 'Mobile: generating icons and splash', cwd: d, p: 'npm', a: ['run', 'assets'], w: 2, opt: true }, { t: 'Mobile: applying orientation and version', cwd: d, p: 'npm', a: ['run', 'patch'], w: 1, opt: true }, { t: 'Mobile: syncing web assets', cwd: d, p: 'npx', a: ['cap', 'sync'], w: 1, opt: true }, { t: 'Mobile: building Android debug APK', cwd: d, p: 'npm', a: ['run', 'build:android'], w: 4, opt: true });
+  }
+  const total = steps.reduce((n, x) => n + x.w, 0); let doneW = 0; const issues = [];
+  const ui = forge.ui.progress('Exporting ' + o.name); let cur = null; ui.onCancel(() => cur && cur.cancel());
+  for (const st of steps) {
+    if (ui.cancelled) break;
+    ui.set(doneW / total * 100, st.t); ui.log('\n$ ' + st.p + ' ' + st.a.join(' '));
+    let code = -1;
+    try { cur = forge.proc.run({ cwd: st.cwd, program: st.p, args: st.a, onLine: ui.log }); code = await cur; } catch (e) { ui.log('! ' + e.message); }
+    if (ui.cancelled) break;
+    if (code !== 0) { issues.push(st.t + ' (exit ' + code + ')'); if (!st.opt) { ui.log('Stopped: a required step failed.'); break; } }
+    doneW += st.w;
+  }
+  const ok = !ui.cancelled && !issues.length;
+  ui.set(ui.cancelled || issues.some((x) => !/^Mobile: (?!installing)/.test(x)) ? doneW / total * 100 : 100, ui.cancelled ? 'Cancelled' : ok ? 'Done – builds are in the dist/ and android/ folders' : 'Finished with problems');
+  if (issues.length) ui.log('\nProblems:\n- ' + issues.join('\n- ') + '\nOpen the README in the folder for the manual steps (Android SDK, Xcode, signing).');
+  ui.done('Close'); forge.ui.toast(ok ? 'Store export finished' : ui.cancelled ? 'Store export cancelled' : 'Store export finished with problems', ok ? 'ok' : 'warn');
+}
+
 async function run() {
   const project = forge.game.current(); const root = forge.fs.root();
   if (!project) return forge.ui.toast('Open a game first (a .vxgame tab).', 'warn');
@@ -202,6 +238,7 @@ async function run() {
     { key: 'publisher', label: 'Publisher / author', value: forge.account.current()?.displayName || '' },
     { key: 'steamId', label: 'Steam App ID (optional)', placeholder: 'e.g. 1234560' },
     { key: 'depotBase', label: 'First Steam depot id', type: 'number', value: 1234561, hint: 'Windows, macOS, Linux use this and the next two.' },
+    { key: 'auto', label: 'Install, assign and build automatically (desktop app)', type: 'checkbox', value: true, hint: 'Runs npm install, platform setup, asset generation and the build, with a progress bar. Needs Node.js; Android builds need the Android SDK (failures there are reported, not fatal).' },
     { key: 'android', label: 'Google Play + App Store project (Capacitor)', type: 'checkbox', value: true }, { key: 'steam', label: 'Steam project (Electron)', type: 'checkbox', value: true },
   ], validate: (x) => (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(x.id) ? 'Package id must look like com.company.game' : !/^\d+(\.\d+){0,2}$/.test(x.version) ? 'Version must be numbers like 1.0.0' : !x.android && !x.steam ? 'Pick at least one target' : null) });
   if (!v) return;
@@ -220,6 +257,7 @@ async function run() {
       await write('steam/www/index.html', html); for (const [k, rel] of Object.entries(steamFiles(o, slug))) await write('steam/' + k, rel); await writeImg('steam/build/icon.png', cv.iconOnly);
     }
     forge.ui.toast('Packages written to store-export/' + slug, 'ok');
+    if (o.auto && forge.proc.available()) { await autoBuild(o, out); return; }
     forge.ui.modal({ title: 'Packages ready', html: `<div style="line-height:1.6"><p>Created in <code>store-export/${slug}/</code>:</p><ul>${o.android ? '<li><b>mobile/</b> – Google Play + App Store (Capacitor). Open <code>README-MOBILE.md</code>.</li>' : ''}${o.steam ? '<li><b>steam/</b> – Steam (Electron + steamcmd files). Open <code>README-STEAM.md</code>.</li>' : ''}<li><b>STORE-CHECKLIST.md</b> – assets and forms the stores require.</li></ul><p>Next: <code>npm install</code> in the target folder and follow its README. Signing and uploading happen with your own store accounts.</p></div>` });
   } catch (e) { forge.ui.toast('Store export failed: ' + e.message, 'error'); }
 }

@@ -5,9 +5,10 @@
   /** a numeric signal wins; a plain pulse falls back to the block's own amount */
   const val = (v, d) => (isNum(v) ? +v : d);
 
+  const NUMR = (n) => { const v = U.num(n.p.value), f = { round: Math.round, floor: Math.floor, ceil: Math.ceil }[n.p.rounding]; if (!f) return v; const k = Math.pow(10, Math.max(0, Math.min(10, U.num(n.p.decimals, 0)))); return f(v * k) / k; };
   B({ id: 'number', cat: 'logic', label: 'Number', desc: 'A constant number. Sends its value whenever it receives a signal (or once at start).',
-    inputs: ['in'], outputs: ['out'], params: [P.num('value', 'Value', 1, { step: 0.1 }), P.bool('onStart', 'Send once at start', false)],
-    init(n, g) { if (n.p.onStart) g.send(n, 'out', U.num(n.p.value)); }, onInput(n, port, v, g) { g.send(n, 'out', U.num(n.p.value)); } });
+    inputs: ['in'], outputs: ['out'], params: [P.num('value', 'Value', 1, { step: 0.1 }), P.sel('rounding', 'Rounding', [['none', 'None'], ['round', 'Round'], ['floor', 'Round down'], ['ceil', 'Round up']], 'none'), P.num('decimals', 'Decimal places', 0, { min: 0, max: 10, hint: 'Used when rounding is on' }), P.bool('onStart', 'Send once at start', false)],
+    init(n, g) { if (n.p.onStart) g.send(n, 'out', NUMR(n)); }, onInput(n, port, v, g) { g.send(n, 'out', NUMR(n)); } });
 
   B({ id: 'expression', cat: 'logic', label: 'Expression', desc: 'Evaluates an arithmetic expression. Variables: a, b, c, d, e, f (inputs), value (last "in"), time, dt, any global variable name, and self.x / self.y / self.speed… Functions: sin cos abs min max floor round sqrt pow clamp lerp rand… Operators: + - * / % ^ < > == && || ?:',
     inputs: ['in', 'a', 'b', 'c', 'd', 'e', 'f'], outputs: ['out', 'error'], params: [P.text('expr', 'Expression', 'a * 2 + 1'), P.sel('trigger', 'Calculate when', [['any', 'Any input arrives'], ['in', 'Only "in" arrives']])],
@@ -63,12 +64,21 @@
       else if (op === 'every') { s.count = (s.count || 0) + 1; ok = s.count % Math.max(1, U.num(n.p.value, 1)) === 0; } else if (op === 'truthy') ok = U.truthy(v); else ok = { '>': a > b, '<': a < b, '>=': a >= b, '<=': a <= b, '==': a == b, '!=': a != b }[op]; // eslint-disable-line eqeqeq
       g.send(n, ok ? 'pass' : 'fail', v); } });
 
-  B({ id: 'switch', cat: 'logic', label: 'Switch', desc: 'Compares the incoming value with a list of cases and sends the signal out of the matching output (or "default"). In index mode the number picks the output directly.',
+  B({ id: 'switch', cat: 'logic', label: 'Switch', desc: 'An on/off gate. While it is ON, signals arriving at "in" pass through to "out"; while OFF they are blocked. "on" and "off" change the state. Property: Current state.',
+    inputs: ['off', 'on', 'in'], outputs: ['out'], params: [P.sel('state', 'Current state', [['on', 'On'], ['off', 'Off']], 'on')],
+    init(n) { n.st.on = n.p.state !== 'off'; }, onInput(n, port, v, g) { if (port === 'on') n.st.on = true; else if (port === 'off') n.st.on = false; else if (n.st.on) g.send(n, 'out', v === undefined ? 1 : v); } });
+
+  B({ id: 'toggleSwitch', cat: 'logic', label: 'Toggle Switch', desc: 'Routes "in" to one of two outputs. "next" moves to the other output (out1 → out2; with Loop on it wraps back to out1, otherwise it stays on out2). Properties: Loop, Current state.',
+    inputs: ['next', 'in'], outputs: ['out1', 'out2'], params: [P.bool('loop', 'Loop', true), P.sel('state', 'Current state', [['out1', 'Output 1'], ['out2', 'Output 2']], 'out1')],
+    init(n) { n.st.cur = n.p.state === 'out2' ? 1 : 0; }, onInput(n, port, v, g) { if (port === 'next') { n.st.cur = n.st.cur === 0 ? 1 : (n.p.loop ? 0 : 1); return; } g.send(n, n.st.cur === 0 ? 'out1' : 'out2', v === undefined ? 1 : v); } });
+
+  /* Older projects used these two ids for a case-matcher and an on/off flag; they were renamed and are migrated automatically (VXRT.migrateGraph). */
+  B({ id: 'caseSwitch', cat: 'logic', label: 'Case Switch', desc: 'Compares the incoming value with a list of cases and sends the signal out of the matching output (or "default"). In index mode the number picks the output directly.',
     inputs: ['in'], outputs: (p) => [...String(p.cases || '').split(',').map((c, i) => ({ id: 'c' + i, label: c.trim() || 'case ' + (i + 1) })), { id: 'default', label: 'default' }],
     params: [P.text('cases', 'Cases (comma separated)', 'a, b, c'), P.sel('mode', 'Match by', [['value', 'Value equals case'], ['index', 'Number = output index (0-based)']])],
     onInput(n, port, v, g) { const cases = String(n.p.cases || '').split(',').map((c) => c.trim()); let i = -1; if (n.p.mode === 'index') i = Math.floor(U.num(v, -1)); else i = cases.findIndex((c) => c === String(v) || (isNum(c) && isNum(v) && +c === +v)); g.send(n, i >= 0 && i < cases.length ? 'c' + i : 'default', v); } });
 
-  B({ id: 'toggleSwitch', cat: 'logic', label: 'Toggle Switch', desc: 'Remembers on/off. "toggle" flips it, "on" / "off" set it, "set" uses the truthiness of the incoming value. Emits the new state.',
+  B({ id: 'stateFlag', cat: 'logic', label: 'State Flag', desc: 'Remembers on/off. "toggle" flips it, "on" / "off" set it, "set" uses the truthiness of the incoming value. Emits the new state.',
     inputs: ['toggle', 'on', 'off', 'set'], outputs: ['out', 'on', 'off'], params: [P.bool('initial', 'Starts on', false)],
     init(n) { n.st.on = !!n.p.initial; }, onInput(n, port, v, g) { const s = n.st; if (port === 'toggle') s.on = !s.on; else if (port === 'on') s.on = true; else if (port === 'off') s.on = false; else s.on = U.truthy(v); g.send(n, s.on ? 'on' : 'off', 1); g.send(n, 'out', s.on); } });
 

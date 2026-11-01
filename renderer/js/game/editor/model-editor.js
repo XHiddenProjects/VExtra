@@ -14,11 +14,13 @@
       this.prev = new VX.ModelPreview(340, 300);
       const name = h('input', { value: a.name, oninput: (e) => { a.name = e.target.value; this.ch(); } });
       const side = h('div', { class: 'me-side' }, h('label', { class: 'mini' }, 'Name'), name, h('label', { class: 'mini' }, 'Live preview (drag to orbit, scroll to zoom)'), this.prev.el,
-        h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: () => this.exportOBJ() }, 'Export OBJ')), h('div', { class: 'mini' }, 'Models fit a 1×1×1 box; use the object’s size in the inspector to scale.'));
+        h('label', { class: 'mini' }, 'Material file (whole model)'), this.matSelect(a, 'matAsset'), h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: () => this.exportOBJ() }, 'Export OBJ')), h('div', { class: 'mini' }, 'Models fit a 1×1×1 box; use the object’s size in the inspector to scale.'));
       this.main = h('div', { class: 'me-main' }); el.append(this.main, side);
       if (a.kind === 'voxel') this.voxelUI(); else if (a.kind === 'group') this.groupUI(); else this.objUI();
       this.refresh();
     }
+    /** dropdown of the project's material assets (stored as asset id in obj[key]) */
+    matSelect(obj, key) { const list = Object.values((this.project.assets.materials) || {}); return h('select', { onchange: (e) => { obj[key] = e.target.value || undefined; this.ch(); this.refresh(); } }, h('option', { value: '' }, '— none —'), list.map((m) => h('option', { value: m.id, selected: obj[key] === m.id }, m.name))); }
     /* ---------------- voxel ---------------- */
     voxelUI() {
       const a = this.a, N = this.N; a.palette = a.palette || ['#e0e4ee']; a.voxels = a.voxels || [];
@@ -46,7 +48,7 @@
       const draw = () => { list.textContent = ''; a.parts.forEach((p, i) => list.append(h('div', { class: 'me-part' + (i === this.sel ? ' on' : ''), onclick: () => { this.sel = i; } },
         h('div', { class: 'row' }, h('b', {}, '#' + (i + 1)), h('select', { onchange: (e) => { p.type = e.target.value; this.ch(); this.refresh(); } }, PRIMS.map((t) => h('option', { value: t, selected: t === p.type }, t))), h('input', { type: 'color', value: p.color || '#cccccc', oninput: (e) => { p.color = e.target.value; this.ch(); this.refresh(); } }), h('span', { class: 'sp' }), h('button', { class: 'btn sm', title: 'Duplicate', onclick: () => { a.parts.splice(i + 1, 0, VX.clone(p)); draw(); this.ch(); this.refresh(); } }, '⧉'), h('button', { class: 'btn sm', onclick: () => { a.parts.splice(i, 1); draw(); this.ch(); this.refresh(); } }, '✕')),
         h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'pos'), num(p, 'x'), num(p, 'y'), num(p, 'z'), h('span', { class: 'mini' }, 'size'), num(p, 'w'), num(p, 'h'), num(p, 'd')),
-        h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'rot'), num(p, 'rx', 5), num(p, 'ry', 5), num(p, 'rz', 5))))); };
+        h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'rot'), num(p, 'rx', 5), num(p, 'ry', 5), num(p, 'rz', 5), h('span', { class: 'mini' }, 'material'), this.matSelect(p, 'matAsset'))))); };
       this.main.append(h('div', { class: 'row' }, h('b', {}, 'Parts'), h('button', { class: 'btn sm primary', onclick: () => { a.parts.push({ type: 'cube', x: 0, y: a.parts.length * 0.6, z: 0, w: 1, h: 0.5, d: 1, rx: 0, ry: 0, rz: 0, color: '#6c8cff' }); draw(); this.ch(); this.refresh(); } }, '＋ Add shape'), h('span', { class: 'mini' }, 'Parts are combined and scaled to fit a unit box.')), list); draw();
     }
     /* ---------------- obj ---------------- */

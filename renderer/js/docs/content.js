@@ -454,6 +454,52 @@ For 3D: \`dim: '3d'\` and \`build(THREE, o)\` returning a \`THREE.Object3D\`.
 
 Blocks and object types appear in the editor palettes as soon as the plugin is enabled.`);
 
+  A('library', 'Share & publish', 'Library: templates & games', `# Library
+
+Open the **Library** (books icon in the left bar, or the Welcome page). It lists website templates and 2D/3D games you can install in one click.
+
+- **Defaults** ship with the app.
+- **Install from a URL**: paste an \`https://\` link to a \`.zip\`, a single \`.vxgame\` file, a GitHub repository (the main or master branch is downloaded), or an \`index.json\` catalog (\`{"name":"…","items":[{"name":"…","desc":"…","type":"website|game2d|game3d","url":"…"}]}\`).
+- You always see what will be installed and confirm first. File paths are sanitised and downloads are capped at 50 MB.
+- Websites are extracted into a new folder you choose; games open in a new tab.
+
+Only install things from people you trust: a website template can contain scripts.`);
+
+  A('anim', 'Making games', 'Animation, materials & shaders', `# Animation, materials & shaders
+
+## Animation clips
+**Assets → Animations** holds keyframe clips. Each clip has a duration, a loop mode (once, loop, ping-pong), optional *relative* values and tracks for properties such as x, y, z, rotation, scale, opacity and colour. Click on a track to add keys, pick an easing per key, and press Play to preview. Run a clip from a block with **Play animation** (the *clip* block). Works for 2D and 3D objects.
+
+## Material files
+**Assets → Materials** creates reusable materials (colour, pattern, texture, bump, metalness, roughness, emissive, opacity, wireframe, flat shading, double-sided, repeat). Assign one to a 3D object (**Material file** in the inspector), to a whole model or to a single model part in the Model editor. Import \`.vxmat\` (JSON) or \`.mtl\` files.
+
+## Shaders
+The **Shader** block applies a screen effect from a list (Bloom, Blur, Glitch, Pixelize, Retro TV, Wavy and more). Choose a **Mode**: Everything, Background, Game Layer, UI Layer, Labels Only, or This object only. Hover an option in the block settings to read what it does.
+
+**Custom shaders**: **Assets → Shaders → Import** loads a \`.frag\`/\`.glsl\` file (or create one from the template). Write a \`main()\` that sets \`gl_FragColor\` (or just a main body); \`uTex, uRes, vUv, uTime, uAmount, uSize, uA, uB\` are provided – the template lists them all. Your shader appears in the same list.
+
+## Behaviour blocks that talk to themselves
+A block's output can now be wired back to its own input; the signal arrives on the next frame, so loops are safe.
+
+## Other block updates
+- **Switch**: inputs *off, on, in*, output *out*, property *current state*. **Toggle switch**: inputs *next, in*, outputs *out1, out2*, properties *loop, current state*.
+- **Number**: rounding property (none, round, round down, round up).
+- **Collision**: outputs *side* and a *side* filter (top, bottom, left, right, front, back…).
+- **Cursor**: the *none* shape hides the system cursor completely.
+- Block settings panels can be resized horizontally by dragging their edge.`);
+
+  A('store-export', 'Share & publish', 'Store Export', `# Store Export (plugin)
+
+Open a game and press **📦 Store export**. Pick your targets and details, then **Create packages**. With *Install, assign and build automatically* ticked (desktop app) Vextra runs the npm steps for you and shows a **progress bar** with a live log and a Cancel button:
+
+1. Steam: \`npm install\` → \`npm run build:<your OS>\`
+2. Mobile: \`npm install\` → \`npx cap add android\` (and iOS on a Mac) → \`npm run assets\` → \`npm run patch\` → \`npx cap sync\` → \`npm run build:android\` (debug APK)
+
+Steam install/build steps are required; mobile steps after install are optional, and any that fail (for example no Android SDK) are listed at the end without stopping the rest. Only \`npm\`, \`npx\` and \`node\` can be run, only inside your \`store-export/\` folder. Signing and uploading stay manual.
+
+## Building Vextra itself
+\`npm run build:win\`, \`npm run build:linux\`, \`npm run build:mac\` (each builds installers for that OS; build on the target OS).`);
+
   A('mobile', 'Making games', 'Mobile & device features', `# Mobile & device features
 
 | Block | Browser | Phone / tablet |

@@ -227,7 +227,8 @@
       /* appearance */
       const ap = [this.row('Colour', this.colorIn(o, 'color')), this.row('Opacity', (() => { const r = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: o.alpha ?? 1 }); r.addEventListener('input', () => { o.alpha = +r.value; this.touch(o); }); r.addEventListener('change', () => this.commit()); return r; })()), this.row('Visible', this.boolIn(o, 'visible', () => this.touch(o))), this.row('Enabled', this.boolIn(o, 'enabled'))];
       if (!is3) ap.push(this.row('Draw order', this.numIn(o, 'order', { step: 1 })), this.row('Flip', h('label', { class: 'chk' }, this.boolIn(o, 'flipX', () => this.touch(o)), ' X'), h('label', { class: 'chk' }, this.boolIn(o, 'flipY', () => this.touch(o)), ' Y'))); else { o.material = o.material || {}; ap.push(this.row('Metalness', this.numIn(null, 'metalness', { target: o.material, step: 0.1, min: 0, max: 1, scope: 'mat' })), this.row('Roughness', this.numIn(null, 'roughness', { target: o.material, step: 0.1, min: 0, max: 1, scope: 'mat' })), this.row('Emissive', this.colorIn(null, 'emissive', { target: o.material })), this.row('Wireframe', this.boolIn(o.material, 'wireframe', () => this.touch(o))), this.row('Cast shadow', (() => { const c = h('input', { type: 'checkbox' }); c.checked = o.castShadow !== false; c.addEventListener('change', () => { o.castShadow = c.checked; this.commit(); this.touch(o); }); return c; })())); if (o.castShadow === undefined) { /* default on */ } }
-      const shaders = is3 ? VXRT.SHADERS_3D : VXRT.SHADERS_2D; o.shader = o.shader || null; ap.push(this.row('Shader', (() => { const s = h('select', {}, shaders.map((n) => h('option', { value: n }, n))); s.value = (o.shader && o.shader.name) || 'none'; s.addEventListener('change', () => { o.shader = s.value === 'none' ? null : Object.assign({}, o.shader || {}, { name: s.value }); this.touch(o); this.commit(); }); return s; })()));
+      const shaders = is3 ? VXRT.SHADERS_3D : VXRT.SHADERS_2D; o.shader = o.shader || null; if (is3) { const mats = Object.values(this.project.assets.materials || {}); ap.push(this.row('Material file', (() => { const s = h('select', {}, h('option', { value: '' }, '— none —'), mats.map((m) => h('option', { value: m.id }, m.name))); s.value = o.matAsset || ''; s.addEventListener('change', () => { o.matAsset = s.value || undefined; o.dirty3d = true; this.commit(true); this.refreshView(); }); return s; })())); }
+      ap.push(this.row('Shader', (() => { const s = h('select', {}, shaders.map((n) => h('option', { value: n }, n))); s.value = (o.shader && o.shader.name) || 'none'; s.addEventListener('change', () => { o.shader = s.value === 'none' ? null : Object.assign({}, o.shader || {}, { name: s.value }); this.touch(o); this.commit(); }); return s; })()));
       box.append(this.sec('Appearance', ...ap));
       /* type-specific props */
       if (T.schema && T.schema.length) box.append(this.sec(T.label + ' settings', ...T.schema.map((f) => this.propField(o, f))));
@@ -273,7 +274,7 @@
 
     /* ------------------------------------------------------------------ logic (behaviours: blocks + code) */
     buildLogic() {
-      this.begList = h('div', { class: 'lg-list' }); this.begToolbar = h('div', { class: 'lg-bar' }); this.graphHost = h('div', { class: 'lg-graph' }); this.codeHost = h('div', { class: 'lg-code' }); this.codeStatus = h('div', { class: 'lg-status' }); this.codeWrap = h('div', { class: 'lg-codewrap' }, this.codeHost, this.codeStatus);
+      this.begList = h('div', { class: 'lg-list' }); this.begToolbar = h('div', { class: 'lg-bar' }); this.graphHost = h('div', { class: 'lg-graph' }); this.codeHost = h('div', { class: 'lg-code' }); this.codeStatus = h('div', { class: 'lg-status' }); this.codeWrap = h('div', { class: 'lg-codewrap' }, this.codeStatus, this.codeHost);
       this.lgBody = h('div', { class: 'lg-body' }, this.graphHost, this.codeWrap);
       const left = h('div', { class: 'lg-left' }, h('div', { class: 'gl-sec-h' }, h('span', {}, 'BEHAVIOURS'), h('button', { class: 'btn sm ghost', title: 'New behaviour', onclick: () => this.newBehavior() }, '＋')), this.begList);
       this.logicView.append(left, h('div', { class: 'lg-main' }, this.begToolbar, this.lgBody));
@@ -316,7 +317,7 @@
     regenCode(fresh) {
       const b = this.curB(); if (!b || b.mode !== 'graph') return; const res = VX.codegen.graphToCode(b.graph, b.name); this.genMap = res;
       if (fresh || !this.doc) { if (this.doc) this.code.releaseDoc(this.doc); this.doc = this.code.createDoc(res.code, 'javascript', true, { gameScript: true }); this.code.setDoc(this.doc); this.applyCodeLook(); } else { this.suppress = true; this.code.setValue(res.code); this.suppress = false; }
-      this.codeStatus.textContent = 'Generated from the blocks – read only. Use “Convert to code” to edit as a script.'; this.codeStatus.className = 'lg-status';
+      this.codeStatus.textContent = '🔒 Read only – generated from the blocks. Use “Convert to code” to edit it as a script.'; this.codeStatus.className = 'lg-status ro';
     }
     onNodeSelected(id) {
       const b = this.curB(); if (!b || !id || this.logicMode === 'blocks') return; const map = b.mode === 'graph' ? this.genMap && this.genMap.nodeLine : this.codeMap && this.codeMap.nodeLine; const line = map && map[id]; if (!line) return;

@@ -70,6 +70,7 @@
     docs: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M8 8h6M8 11.5h6M8 15h3"/>',
     plugin: '<path d="M10 3h4v3a2 2 0 0 0 2 2h3v4h-3a2 2 0 0 0-2 2v3h-4v-3a2 2 0 0 0-2-2H5V8h3a2 2 0 0 0 2-2z"/>',
     theme: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-3.9-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
+    library: '<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16 6l3.8-1 3.2 14.5-3.8 1z" transform="translate(-2 0)"/>',
     cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 10.5 3.75 3.75 0 0 1 17.5 18z"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     play: '<path d="M7 4.5v15l12-7.5z"/>',
@@ -109,7 +110,9 @@
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>',
     warn: '<path d="M12 3 2 20h20z"/><path d="M12 10v5M12 17.5v.01"/>',
   };
-  VX.icon = (name, size) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('class', 'ico'); if (size) { s.style.width = s.style.height = size + 'px'; } s.innerHTML = P[name] || P.file; return s; };
+  /** "badge:LABEL:#colour" icons: small coloured file-type chips (PHP, SQL, DB, MD …) */
+  const baseIcon = (name, size) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('class', 'ico'); if (size) { s.style.width = s.style.height = size + 'px'; } s.innerHTML = P[name] || P.file; return s; };
+  VX.icon = (name, size) => { if (typeof name === 'string' && name.startsWith('badge:')) { const [, label, color] = name.split(':'); const b = document.createElement('span'); b.className = 'fbadge'; b.textContent = label; if (color) { b.style.color = color; b.style.borderColor = color + '88'; } if (size) b.style.fontSize = Math.max(7, size * 0.52) + 'px'; return b; } return baseIcon(name, size); };
   VX.iconHTML = (name) => `<svg class="ico" viewBox="0 0 24 24">${P[name] || P.file}</svg>`;
 
   /** Secure parent <-> preview/game messaging: a random per-session token plus a pinned origin (never "*" when the origin is known). */

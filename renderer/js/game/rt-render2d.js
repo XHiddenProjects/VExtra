@@ -49,7 +49,12 @@
     }
   }
 
+  let _bg = null; const getBg = (w, h) => { if (!_bg) _bg = document.createElement('canvas'); if (_bg.width !== w || _bg.height !== h) { _bg.width = w; _bg.height = h; } return _bg; };
   function withShader(ctx, o, env, draw) {
+    if (o.fx && o.fx.length && VXRT.fx && VXRT.fx.active1(o)) {
+      const pad = 16, W = Math.min(1024, Math.ceil(Math.abs(o.w)) + pad * 2), H = Math.min(1024, Math.ceil(Math.abs(o.h)) + pad * 2), tc = getTmp(W, H), tx = tc.getContext('2d', { willReadFrequently: false });
+      tx.setTransform(1, 0, 0, 1, 0, 0); tx.clearRect(0, 0, W, H); tx.save(); tx.translate(W / 2, H / 2); draw(tx); tx.restore(); if (VXRT.fx.object(env, ctx, o, W, H, tc)) return; return ctx.drawImage(tc, -W / 2, -H / 2);
+    }
     const sh = o.shader; if (!sh || !sh.name || sh.name === 'none') return draw(ctx);
     const pad = 28; const W = Math.min(1024, Math.ceil(Math.abs(o.w)) + pad * 2), H = Math.min(1024, Math.ceil(Math.abs(o.h)) + pad * 2); const amt = U.clamp(U.num(sh.amount, 1), 0, 1);
     const tc = getTmp(W, H), tx = tc.getContext('2d', { willReadFrequently: true }); tx.setTransform(1, 0, 0, 1, 0, 0); tx.clearRect(0, 0, W, H); tx.save(); tx.translate(W / 2, H / 2); draw(tx); tx.restore();
@@ -167,9 +172,14 @@
     const sx = c.shake ? (Math.random() - 0.5) * c.shake : 0, sy = c.shake ? (Math.random() - 0.5) * c.shake : 0;
     ctx.setTransform(c.zoom, 0, 0, c.zoom, W / 2 - c.x * c.zoom + sx, H / 2 - c.y * c.zoom + sy);
     g.imgs = g.imgs || new Map(); g.vars = g.vars || {}; g.assets = g.data.assets;
-    for (const o of draw2D.sorted(g.objects)) if (o.alive && o.enabled) draw2D.object(ctx, o, g);
+    const sorted = draw2D.sorted(g.objects), bgFx = VXRT.fx && VXRT.fx.active(g, 'bg'); let rest = sorted;
+    if (bgFx) { // Background layer: the scene colour + objects tagged "background" go through their own shader pass
+      const isBg = (o) => (o.tags || []).includes('background'); const bc = getBg(W, H), bx = bc.getContext('2d'); bx.setTransform(1, 0, 0, 1, 0, 0); bx.fillStyle = g.scene.bg || g.settings.bg; bx.fillRect(0, 0, W, H); bx.setTransform(c.zoom, 0, 0, c.zoom, W / 2 - c.x * c.zoom + sx, H / 2 - c.y * c.zoom + sy);
+      for (const o of sorted) if (isBg(o) && o.alive && o.enabled) draw2D.object(bx, o, g); bx.setTransform(1, 0, 0, 1, 0, 0); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); if (!VXRT.fx.layer(g, ctx, 'bg', bc, W, H)) ctx.drawImage(bc, 0, 0); ctx.restore(); rest = sorted.filter((o) => !isBg(o));
+    }
+    for (const o of rest) if (o.alive && o.enabled) draw2D.object(ctx, o, g);
     drawParticles2D(ctx, g); if (g.debug) for (const o of g.objects) draw2D.collider(ctx, o);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); VXRT.fx && VXRT.fx.screen(g, g.canvas2d);
   };
   VXRT.camera2dView = (g) => g.camera2d;
 })();

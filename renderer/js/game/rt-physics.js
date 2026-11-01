@@ -1,6 +1,19 @@
 /* Vextra game runtime – lightweight 2D/3D physics: AABB + circle/sphere colliders, gravity, bounce, friction,
    collision events (enter/stay/exit), joints and ray casts. */
 (function () {
+  /** Which side of each body a contact normal (pointing a -> b) touches. 2D: y grows downward. 3D: y grows upward, +z = front.
+   *  side is the dominant side ("top", "bottom-left", …); sides lists every side that is touched. */
+  function sidesOf(n, is3) {
+    const mk = (nx, ny, nz) => { const ax = Math.abs(nx), ay = Math.abs(ny), az = is3 ? Math.abs(nz) : 0, m = Math.max(ax, ay, az) || 1, sides = [];
+      if (ay / m > 0.45) sides.push(ny > 0 ? (is3 ? 'top' : 'bottom') : (is3 ? 'bottom' : 'top'));
+      if (ax / m > 0.45) sides.push(nx > 0 ? 'right' : 'left');
+      if (is3 && az / m > 0.45) sides.push(nz > 0 ? 'front' : 'back');
+      const order = ['top', 'bottom', 'left', 'right', 'front', 'back']; sides.sort((p, q) => order.indexOf(p) - order.indexOf(q));
+      const dom = ay >= ax && ay >= az ? (ny > 0 ? (is3 ? 'top' : 'bottom') : (is3 ? 'bottom' : 'top')) : ax >= az ? (nx > 0 ? 'right' : 'left') : (nz > 0 ? 'front' : 'back');
+      return { side: sides.length > 1 ? sides.join('-') : dom, sides: sides.length ? sides : [dom] }; };
+    return { a: mk(n[0], n[1], n[2] || 0), b: mk(-n[0], -n[1], -(n[2] || 0)) };
+  }
+
   const VXRT = window.VXRT, U = VXRT.util;
   const NONSOLID = new Set(['empty', 'light', 'camera', 'text']);
 
@@ -84,14 +97,15 @@
           if (is3) { if (ny > 0.5) b.grounded = true; if (ny < -0.5) a.grounded = true; } else { if (ny > 0.5) a.grounded = true; if (ny < -0.5) b.grounded = true; }
         }
         const had = a.contacts.has(b.id);
-        if (!had) { a.contacts.add(b.id); b.contacts.add(a.id); a.lastOther = b; b.lastOther = a; g.emit('collide:' + a.id, { other: b, phase: 'enter' }); g.emit('collide:' + b.id, { other: a, phase: 'enter' }); }
-        else { g.emit('collide:' + a.id, { other: b, phase: 'stay' }); g.emit('collide:' + b.id, { other: a, phase: 'stay' }); }
+        const sd = sidesOf(r.n, is3); (a.contactSide ||= new Map()).set(b.id, sd.a); (b.contactSide ||= new Map()).set(a.id, sd.b);
+        if (!had) { a.contacts.add(b.id); b.contacts.add(a.id); a.lastOther = b; b.lastOther = a; g.emit('collide:' + a.id, { other: b, phase: 'enter', side: sd.a.side, sides: sd.a.sides }); g.emit('collide:' + b.id, { other: a, phase: 'enter', side: sd.b.side, sides: sd.b.sides }); }
+        else { g.emit('collide:' + a.id, { other: b, phase: 'stay', side: sd.a.side, sides: sd.a.sides }); g.emit('collide:' + b.id, { other: a, phase: 'stay', side: sd.b.side, sides: sd.b.sides }); }
       }
     }
     // exits
     for (const o of list) for (const id of [...o.contacts]) {
       const other = g.byId.get(id); const key = o.id < id ? o.id + '|' + id : id + '|' + o.id;
-      if (!now.has(key)) { o.contacts.delete(id); if (other) { other.contacts.delete(o.id); } if (other && o.id < id) { g.emit('collide:' + o.id, { other, phase: 'exit' }); g.emit('collide:' + id, { other: o, phase: 'exit' }); } else if (!other) g.emit('collide:' + o.id, { other: null, phase: 'exit' }); }
+      if (!now.has(key)) { o.contacts.delete(id); if (other) { other.contacts.delete(o.id); } if (other && o.id < id) { const s1 = (o.contactSide && o.contactSide.get(id)) || {}, s2 = (other.contactSide && other.contactSide.get(o.id)) || {}; g.emit('collide:' + o.id, { other, phase: 'exit', side: s1.side || '', sides: s1.sides || [] }); g.emit('collide:' + id, { other: o, phase: 'exit', side: s2.side || '', sides: s2.sides || [] }); } else if (!other) g.emit('collide:' + o.id, { other: null, phase: 'exit' }); }
     }
     // world bounds (optional)
     const wb = g.scene && g.scene.bounds; if (wb) for (const o of g.objects) if (o.physics.body === 'dynamic') { if (o.y > wb.bottom) { o.y = wb.bottom; o.vy = 0; } }

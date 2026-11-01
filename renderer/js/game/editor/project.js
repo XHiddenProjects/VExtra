@@ -61,9 +61,9 @@
       if (!data || typeof data !== 'object') return GP.blank({});
       if (data.format === 'forge-scene' || (Array.isArray(data.items) && !data.scenes)) return GP.fromLegacyScene(data);
       data.format = 'vextra-game'; data.version = 2; data.settings = Object.assign({ id: uid('game'), title: 'My game', width: 960, height: 540, bg: '#10131a', pixelArt: false, startScene: 0, cloudUrl: '' }, data.settings || {});
-      data.scenes = data.scenes && data.scenes.length ? data.scenes : [GP.blankScene('2d')]; data.behaviors = data.behaviors || {}; data.assets = Object.assign({ sprites: {}, sounds: {}, models: {} }, data.assets || {}); for (const k of ['sprites', 'sounds', 'models']) data.assets[k] = data.assets[k] || {}; data.prefabs = data.prefabs || [];
-      for (const b of Object.values(data.behaviors)) if (b && b.graph) GP.fixWires(b.graph);
-      for (const s of data.scenes) { s.id = s.id || uid('s'); s.dim = s.dim || '2d'; s.objects = s.objects || []; s.behaviors = s.behaviors || []; for (const o of s.objects) { o.id = o.id || uid(); o.props = o.props || {}; o.physics = o.physics || { body: 'none' }; o.tags = o.tags || []; o.behaviors = o.behaviors || []; } }
+      data.scenes = data.scenes && data.scenes.length ? data.scenes : [GP.blankScene('2d')]; data.behaviors = data.behaviors || {}; data.assets = Object.assign({ sprites: {}, sounds: {}, models: {} }, data.assets || {}); for (const k of ['sprites', 'sounds', 'models', 'shaders', 'materials', 'animations']) data.assets[k] = data.assets[k] || {}; data.prefabs = data.prefabs || [];
+      for (const b of Object.values(data.behaviors)) if (b && b.graph) { VXRT.migrateGraph(b.graph); GP.fixWires(b.graph); }
+      for (const s of data.scenes) { s.id = s.id || uid('s'); s.dim = s.dim || '2d'; s.objects = s.objects || []; s.behaviors = s.behaviors || []; for (const o of s.objects) { if (o.graph) VXRT.migrateGraph(o.graph); o.id = o.id || uid(); o.props = o.props || {}; o.physics = o.physics || { body: 'none' }; o.tags = o.tags || []; o.behaviors = o.behaviors || []; } }
       return data;
     },
     fromLegacyScene(old) {
@@ -73,7 +73,7 @@
     },
 
     blank({ name = 'My game', dim = '2d', sample = false } = {}) {
-      const p = { format: 'vextra-game', version: 2, settings: { id: uid('game'), title: name, width: 960, height: 540, bg: dim === '3d' ? '#1a2233' : '#10131a', pixelArt: false, startScene: 0, cloudUrl: '' }, scenes: [], behaviors: {}, assets: { sprites: {}, sounds: {}, models: {} }, prefabs: [] };
+      const p = { format: 'vextra-game', version: 2, settings: { id: uid('game'), title: name, width: 960, height: 540, bg: dim === '3d' ? '#1a2233' : '#10131a', pixelArt: false, startScene: 0, cloudUrl: '' }, scenes: [], behaviors: {}, assets: { sprites: {}, sounds: {}, models: {}, shaders: {}, materials: {}, animations: {} }, prefabs: [] };
       if (!sample) { p.scenes.push(GP.blankScene(dim)); return p; }
       return dim === '3d' ? GP.sample3d(p) : GP.sample2d(p);
     },

@@ -12,7 +12,7 @@
   async function fetchLatest() {
     let err = 'unreachable';
     for (const b of BRANCHES) {
-      try { const r = await window.native.http({ method: 'GET', url: RAW(b), headers: { 'Cache-Control': 'no-cache' } }); if (r.status === 200 && parse(r.body)) return String(r.body).trim().split(/\s/)[0].replace(/^v/, ''); err = r.status === 404 ? 'no VERSION file found in the repository' : 'HTTP ' + r.status; } catch (e) { err = e.message || String(e); }
+      try { const r = await window.native.http({ method: 'GET', url: RAW(b) }); if (r.status === 200 && parse(r.body)) return String(r.body).trim().split(/\s/)[0].replace(/^v/, ''); err = r.status === 404 ? 'no VERSION file found in the repository' : 'HTTP ' + r.status; } catch (e) { err = e.message || String(e); }
     }
     throw new Error(err);
   }

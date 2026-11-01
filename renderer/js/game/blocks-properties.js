@@ -76,7 +76,42 @@
     onInput(n, port, v, g) { each(n, g, (o) => { const m = n.p.mode; let c; if (m === 'random') c = U.hsl(Math.random() * 360); else if (m === 'hue' || (n.p.source === 'signalColor' && typeof v === 'number')) c = U.hsl(U.num(v)); else { c = n.p.source === 'signalColor' && typeof v === 'string' ? v : n.p.color; if (m === 'lerp') { const a = toRGB(o.color), b = toRGB(c), k = U.num(n.p.amount, 0.5); c = fromRGB(a.map((x, i) => x + (b[i] - x) * k)); } }
       if (/^hsl/.test(c)) { const t = document.createElement('canvas').getContext('2d'); t.fillStyle = c; c = t.fillStyle; } o.color = c; if (o.material) o.material.color = c; g.send(n, 'out', c); }); } });
 
-  B({ id: 'shader', cat: 'properties', label: 'Shader', desc: 'Visual effects. 2D: grayscale, invert, sepia, tint, brightness, pixelate, blur, glow, outline, shadow. 3D: toon, wireframe, unlit, glass, hologram, fresnel, gradient, or your own GLSL fragment code (custom). "none" removes the effect.',
-    inputs: ['in'], outputs: ['out'], params: [P.target(), P.sel('effect', 'Effect', ['none', 'grayscale', 'invert', 'sepia', 'tint', 'brightness', 'pixelate', 'blur', 'glow', 'outline', 'shadow', 'toon', 'wireframe', 'unlit', 'glass', 'hologram', 'fresnel', 'gradient', 'custom'], 'grayscale'), P.color('color', 'Colour', '#6c8cff'), P.color('color2', 'Second colour (3D)', '#34e1c5'), P.num('amount', 'Amount 0–1', 1, { min: 0, max: 1, step: 0.05 }), P.num('value', 'Strength (pixel size, blur, outline width, brightness)', 6), P.code('code', 'Custom 3D fragment code', 'void main(){\n  float p = 0.5 + 0.5 * sin(vUv.x * 20.0 + uTime * 3.0);\n  gl_FragColor = vec4(uColor * p, 1.0);\n}')],
-    onInput(n, port, v, g) { each(n, g, (o) => { o.shader = n.p.effect === 'none' ? null : { name: n.p.effect, color: n.p.color, color2: n.p.color2, amount: U.num(n.p.amount, 1), value: U.num(n.p.value, 6), code: n.p.code }; o.shaderDirty = true; g.send(n, 'out', n.p.effect); }); } });
+  B({ id: 'clip', cat: 'properties', label: 'Animation Clip', desc: 'Plays a keyframe animation clip made in Assets → Animations on an object (2D or 3D): position, rotation, size, opacity, colour and sprite frame over time. "play" starts it, "stop" ends it, "pause"/"resume" freeze it and "speed" changes its speed. "done" fires when a Once clip ends.',
+    inputs: ['play', 'stop', 'pause', 'resume', 'speed'], outputs: ['out', 'done'], params: [P.target(), P.clip('clip', 'Clip'), P.sel('mode', 'Playback', [['', 'Clip default'], ['once', 'Once'], ['loop', 'Loop'], ['pingpong', 'Ping-pong']], ''), P.num('speed', 'Speed', 1, { step: 0.1 }), P.bool('relative', 'Relative (offset from where the object is now)', false)],
+    onInput(n, port, v, g) {
+      const A = (g.data.assets && g.data.assets.animations) || {}; const clip = A[n.p.clip];
+      each(n, g, (o) => { if (port === 'stop') VXRT.stopClip(o, n.p.clip); else if (port === 'pause' || port === 'resume') (o.clips || []).forEach((c) => { if (c.id === n.p.clip) c.paused = port === 'pause'; }); else if (port === 'speed') (o.clips || []).forEach((c) => { if (c.id === n.p.clip) c.speed = U.num(v, 1); });
+        else { if (!clip) return g.log('warn', 'Animation Clip block: pick a clip (Assets → Animations).'); VXRT.playClip(g, o, clip, { speed: U.num(n.p.speed, 1), mode: n.p.mode, relative: n.p.relative, id: n.p.clip, onDone: () => g.send(n, 'done', o.name) }); g.send(n, 'out', o.name); } });
+    } });
+
+  /* Shader: post-process effects (see rt-fx.js). The Type list is generated from VXRT.FX so docs and editor always match. */
+  const CLASSIC = [['sepia', 'Sepia (classic)', '2D warm brown tone – This object only'], ['tint', 'Tint (classic)', '2D multiply colour – This object only'], ['brightness', 'Brightness (classic)', '2D brighten / darken – This object only'], ['pixelate', 'Pixelate (classic)', '2D coarse blocks – This object only'], ['glow', 'Glow (classic)', '2D soft halo – This object only'], ['outline', 'Outline (classic)', '2D coloured outline – This object only'], ['shadow', 'Shadow (classic)', '2D drop shadow – This object only'],
+    ['toon', 'Toon (3D material)', 'cel shading for 3D objects – This object only'], ['wireframe', 'Wireframe (3D material)', 'draws 3D objects as wire – This object only'], ['unlit', 'Unlit (3D material)', 'ignores lights – This object only'], ['glass', 'Glass (3D material)', 'see-through glass – This object only'], ['hologram', 'Hologram (3D material)', 'scanline hologram – This object only'], ['fresnel', 'Fresnel (3D material)', 'rim light – This object only'], ['gradient', 'Gradient (3D material)', 'vertical colour gradient – This object only'], ['custom3d', 'Custom 3D code (classic)', 'your own GLSL fragment code – This object only']];
+  const LEGACY = new Set(CLASSIC.map((c) => c[0]));
+  const effectOptions = () => [['none', 'None', 'removes the effect'], ...VXRT.FX.map((f) => [f.id, f.label, f.desc.replace(/<\/?i>/g, '')]), ['custom', 'Custom shader file', 'your own GLSL fragment shader from a .glsl / .frag / .vxshader file added in Assets → Shaders'], ...CLASSIC];
+  B({ id: 'shader', cat: 'properties', label: 'Shader', desc: 'Visual effects for the whole game, a layer, or one object. Pick a Type and a Mode. Inputs: "in" applies it, "on" / "off" switch it, and the numeric inputs amount, size, a, b, x, y, xpos, ypos change its settings live (ramp "amount" from 0 to 100 for Dissolve, Scatter or Color Shift). Add your own effects as shader files in Assets → Shaders and choose them with Type = Custom shader file.',
+    inputs: ['in', 'on', 'off', 'amount', 'size', 'a', 'b', 'x', 'y', 'xpos', 'ypos'], outputs: ['out'],
+    params: [P.sel('effect', 'Type', effectOptions(), 'grayscale'), P.sel('mode', 'Mode', VXRT.FX_MODES, 'all'), P.target('target', 'Object (This object only)'), P.shader('file', 'Custom shader file'),
+      P.num('amount', 'Amount 0–100', 100, { min: 0, max: 100, step: 1 }), P.num('size', 'Size / radius / speed', 8, { step: 0.5 }), P.num('a', 'Extra A (threshold, vertical blur, angle, width…)', 0, { step: 0.05 }), P.num('b', 'Extra B (contrast, duration…)', 0, { step: 0.05 }), P.color('color', 'Colour', '#6c8cff'), P.color('color2', 'Second colour (3D styles)', '#34e1c5'),
+      P.num('x', 'X / xpos (0–1 across the screen)', 0.5, { step: 0.05 }), P.num('y', 'Y / ypos (0–1 down the screen)', 0.5, { step: 0.05 }), P.bool('auto', 'Apply when the game starts', true), P.code('code', 'Custom 3D fragment code (classic 3D style)', 'void main(){\n  float p = 0.5 + 0.5 * sin(vUv.x * 20.0 + uTime * 3.0);\n  gl_FragColor = vec4(uColor * p, 1.0);\n}')],
+    init(n, g) { n.st.on = !!n.p.auto; n.st.p = { amount: n.p.amount, size: n.p.size, a: n.p.a, b: n.p.b, color: n.p.color, x: n.p.x, y: n.p.y }; if (n.st.on) apply(n, g); n.cleanups.push(() => { if (VXRT.fx && g.fxState) { const st = g.fxState; for (const k of VXRT.fx.layers) st[k] = st[k].filter((e) => e.id !== n.id); VXRT.fx.sync(g); } }); },
+    onInput(n, port, v, g) {
+      const s = n.st; s.p = s.p || {}; const num = ['amount', 'size', 'a', 'b', 'x', 'y'];
+      if (port === 'off') { s.on = false; apply(n, g); } else if (port === 'on') { s.on = true; s.fresh = true; apply(n, g); } else if (num.includes(port) || port === 'xpos' || port === 'ypos') { s.p[port === 'xpos' ? 'x' : port === 'ypos' ? 'y' : port] = U.num(v); if (s.on) apply(n, g, true); } else { s.on = true; s.fresh = true; apply(n, g); }
+      g.send(n, 'out', n.p.effect);
+    } });
+  /** create / update the effect entry that rt-fx renders */
+  function apply(n, g, live) {
+    const s = n.st, eff = n.p.effect; let mode = n.p.mode; const p = Object.assign({}, s.p || {}, { color: n.p.color });
+    if (eff === 'sphere' || LEGACY.has(eff)) mode = 'object';
+    if (mode === 'object') {
+      for (const o of g.targets(n.p.target, n.owner, n.owner.lastOther)) { if (!o.alive) continue;
+        if (LEGACY.has(eff)) { const nm = eff === 'custom3d' ? 'custom' : eff; o.shader = s.on === false || eff === 'none' ? null : { name: nm, color: n.p.color, color2: n.p.color2, amount: U.clamp(U.num(p.amount, 100) / 100, 0, 1), value: U.num(p.size, 6), code: n.p.code }; o.shaderDirty = true; continue; }
+        if (live && o.fx && o.fx[0] && o.fx[0].owner === n.id) { Object.assign(o.fx[0].p, p); continue; }
+        VXRT.fx.set(g, { id: n.id, owner: n.id, mode: 'object', object: o, effect: s.on === false ? 'none' : eff, file: n.p.file, p: Object.assign({}, p), on: true }); }
+      return;
+    }
+    if (live && s.entry) { Object.assign(s.entry.p, p); return; }
+    s.entry = { id: n.id, mode, effect: s.on === false ? 'none' : eff, file: n.p.file, p, on: true }; VXRT.fx.set(g, s.entry); if (s.entry.effect === 'none') s.entry = null;
+  }
 })();

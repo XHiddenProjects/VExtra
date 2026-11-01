@@ -39,7 +39,15 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
-## What's new in this version
+## What's new in 3.0.0
+- **Library**: install website templates and 2D/3D games from a URL, GitHub repo or catalog (defaults included).
+- **Animation clips**, **material files** (also in the model editor), a 25-effect **shader** list with modes and custom shader files.
+- Blocks: self-connect, Switch / Toggle switch, Number rounding, Collision side, Cursor *none*, icons on blocks and file types, resizable block settings.
+- **Store Export** installs, assigns and builds automatically with a progress bar.
+- Flexible layout that reflows with the window; more default 2D/3D assets; read-only notice moved to the top of the code pane.
+- Build scripts: `npm run build:win`, `build:linux`, `build:mac` (replaces `build:exe`).
+
+## What was new in 2.0.0
 - Web projects: any file type, a built-in SQLite database (browse/edit/SQL/import/export), `window.VXDB` in previews, PHP run (desktop, needs PHP installed), local-server preview, and **Export website** to ZIP / tar.gz with `.htaccess`, `nginx.conf`, database and deploy notes.
 - Games: `Once` trigger, Expression variables a–f, camera view width/height, GUI banner ads with an ad-service choice (house, image, HTML tag, AdSense, own code), first-person 3D demo, blank new projects (demos under the Command Palette), labels that survive restarts, working device frames in Play.
 - Editor: collapsible block palette / settings / nodes, panels that adapt to window size, real Simple vs Advanced modes.

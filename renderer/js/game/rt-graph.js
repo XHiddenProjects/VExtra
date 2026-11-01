@@ -7,6 +7,15 @@
     { id: 'properties', label: 'Properties', color: '#58a6ff' }, { id: 'text', label: 'Text & Lists', color: '#bc8cff' }, { id: 'gui', label: 'GUI', color: '#f778ba' },
     { id: 'flow', label: 'Game Flow', color: '#39c5cf' }, { id: 'mobile', label: 'Mobile Device', color: '#f0883e' }, { id: 'bundles', label: 'Behavior Bundles', color: '#8b949e' }, { id: 'plugins', label: 'Plugins', color: '#7ee787' },
   ]);
+  const ICONS = { always: '🔁', timer: '⏱️', once: '1️⃣', mouseClick: '🖱️', mouseMove: '↗️', mouseWheel: '🎡', gesture: '👆', lockedMouse: '🔒', keyboard: '⌨️', controller: '🎮', collision: '💥', inView: '👁️', sensor: '📡', mailbox: '📬', custom: '🧩',
+    clip: '🎬', number: '🔢', expression: 'ƒ', customBehavior: '🧠', globalVariable: '🌐', objectVariable: '📦', ease: '〰️', repeater: '🔂', random: '🎲', filter: '🚦', switch: '🎚️', toggleSwitch: '🔀', caseSwitch: '🔣', stateFlag: '🚩', router: '🛤️', logicGate: '⚙️',
+    sound: '🔊', emit: '✨', spawn: '➕', attacher: '📎', physics: '🧲', joint: '⛓️', proximity: '📏', pushMotor: '🚀', spinMotor: '🌀', impulse: '💨', pointAt: '🎯', destroyer: '🗑️', camera: '🎥', message: '✉️', rayCast: '🔦',
+    position: '📍', rotation: '🔄', alpha: '👻', size: '↔️', enabled: '✅', animation: '🎞️', velocity: '➡️', spin: '🌪️', material: '🎨', flip: '🪞', extractor: '🧪', displayOrder: '🥞', blending: '🌗', colors: '🌈', shader: '🔆',
+    text: '🔤', textCase: 'Aa', textLength: '📐', toNumber: '#️⃣', textCompare: '⚖️', textSanitize: '🧼', textList: '📝', numberList: '🔢', listModify: '✏️', listOrder: '↕️', listEach: '🔁', listCount: '🧮',
+    calendar: '📅', clock: '🕒', label: '🏷️', bar: '📊', alert: '⚠️', cursor: '🖱️', pauseGame: '⏸️', loadLevel: '🗺️', restartGame: '🔄', fetchUrl: '🌍', saveValue: '💾', gameSave: '💾', leaderboard: '🏆', achievement: '🏅', level: '🪜', gamePhysics: '🌍', userInfo: '👤', clipboard: '📋', cloud: '☁️', fullScreen: '⛶', shake: '📳', ad: '📢', vibrate: '📳', accelerometer: '📱', gameCenter: '🎲', deviceCheck: '📱', touchCheck: '👇', exitGame: '🚪', bundle: '📦', bundleInput: '⬅️', bundleOutput: '➡️' };
+  const CAT_ICON = { triggers: '⚡', logic: '🧮', components: '🧱', properties: '🎛️', text: '🔤', gui: '🖼️', flow: '🕹️', mobile: '📱', bundles: '📦', plugins: '🔌' };
+  /** Emoji icon for a block definition (plugins may set def.icon). */
+  VXRT.blockIcon = (def) => (def && (def.icon || ICONS[def.id] || CAT_ICON[def.cat])) || '▫️';
   VXRT.catColor = (id) => (CATS.find((c) => c.id === id) || CATS[0]).color;
 
   /** Register a block. def: {id,cat,label,desc,inputs,outputs,params,init,onInput,update,destroy}. inputs/outputs may be arrays or (params)=>array of 'id' | {id,label}. */
@@ -20,8 +29,22 @@
   VXRT.ports = (def, params, node) => ({ inputs: portList(def.inputs, params, node), outputs: portList(def.outputs, params, node) });
   VXRT.paramDefaults = (def) => { const o = {}; for (const p of def.params || []) o[p.key] = p.def !== undefined ? p.def : p.type === 'bool' ? false : p.type === 'number' ? 0 : ''; return o; };
 
+  /** Rename blocks that changed meaning (switch/toggleSwitch in v2 -> caseSwitch/stateFlag) so old projects keep working. Safe to call repeatedly. */
+  VXRT.migrateGraph = function (graph) {
+    if (!graph || graph._mig3) return graph; const nodes = graph.nodes || [], wires = graph.wires || [];
+    for (const n of nodes) {
+      const p = n.params || {};
+      if (n.type === 'switch' && (p.cases !== undefined || p.mode !== undefined || wires.some((w) => w.from === n.id && /^(c\d+|default)$/.test(w.out || '')))) n.type = 'caseSwitch';
+      else if (n.type === 'toggleSwitch' && (p.initial !== undefined || wires.some((w) => (w.from === n.id && /^(on|off)$/.test(w.out || '')) || (w.to === n.id && /^(toggle|on|off|set)$/.test(w.in || ''))))) n.type = 'stateFlag';
+      if (n.type === 'shader' && p.mode === undefined && n.params) { n.params.mode = 'object'; if (p.effect === 'custom' && !p.file) n.params.effect = 'custom3d'; }
+      if (n.graph) VXRT.migrateGraph(n.graph);
+    }
+    try { Object.defineProperty(graph, '_mig3', { value: true, enumerable: false }); } catch { /* frozen */ } return graph;
+  };
+
   /* ---------- graph instantiation ---------- */
   function buildGraph(g, owner, graph, scope) {
+    VXRT.migrateGraph(graph);
     const map = new Map(), list = [];
     for (const n of graph.nodes || []) {
       const def = blocks[n.type]; if (!def) { g.log('warn', `Unknown block "${n.type}" in ${owner.name} – skipped`); continue; }
@@ -33,7 +56,7 @@
       const a = map.get(w.from), b = map.get(w.to); if (!a || !b) continue;
       let po = w.out || 'out', pi = w.in || 'in';
       try { const oa = VXRT.ports(a.def, a.p, a).outputs.map((x) => x.id), ib = VXRT.ports(b.def, b.p, b).inputs.map((x) => x.id); if (oa.length && !oa.includes(po)) po = oa[0]; if (ib.length && !ib.includes(pi)) pi = ib[0]; } catch { /* dynamic ports */ }
-      (a.out[po] ||= []).push({ node: b, port: pi });
+      (a.out[po] ||= []).push({ node: b, port: pi, self: a === b });
     }
     const res = { map, list };
     g.later(() => { for (const n of list) { if (n.dead) continue; try { n.def.init && n.def.init(n, g); } catch (e) { g.nodeError(n, e); } if (n.def.update && !n.dead) g.updating.add(n); } });
@@ -48,7 +71,7 @@
     if (node.dead) return; const targets = node.out[port]; if (!targets) return;
     if (g.sendDepth > 60) { if (!g._depthWarned) { g._depthWarned = true; g.log('warn', 'Signal loop detected (depth > 60) – check for a cycle without a delay.'); } return; }
     g.sendDepth++;
-    try { for (const t of targets) { if (t.node.dead) continue; try { t.node.def.onInput && t.node.def.onInput(t.node, t.port, value, g); } catch (e) { g.nodeError(t.node, e); } } } finally { g.sendDepth--; }
+    try { for (const t of targets) { if (t.node.dead) continue; if (t.self) { (g.selfQ ||= []).push([t, value]); continue; } try { t.node.def.onInput && t.node.def.onInput(t.node, t.port, value, g); } catch (e) { g.nodeError(t.node, e); } } } finally { g.sendDepth--; }
   };
   VXRT.Game.prototype.send = function (node, port, value) { VXRT.send(this, node, port, value); };
   VXRT.Game.prototype.listen = function (node, off) { node.cleanups.push(off); return off; };

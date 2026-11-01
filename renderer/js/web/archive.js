@@ -52,5 +52,20 @@
   async function tarGz(entries) { const t = tar(entries); const g = await pipe(t, 'gzip'); if (!g) throw new Error('This runtime has no gzip support (CompressionStream). Use ZIP instead.'); return g; }
   const toB64 = (u8) => { let s = ''; const C = 0x8000; for (let i = 0; i < u8.length; i += C) s += String.fromCharCode.apply(null, u8.subarray(i, i + C)); return btoa(s); };
   const fromB64 = (b) => { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
-  VX.archive = { zip, tar, tarGz, crc32, toB64, fromB64, hasGzip: () => typeof CompressionStream !== 'undefined' };
+  /** Read a .zip (stored or deflated entries). Returns Promise<[{ path, data: Uint8Array, dir }]>. Rejects zip64 / encrypted archives. */
+  async function unzip(buf, limits) {
+    const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength); const maxFiles = (limits && limits.files) || 3000, maxBytes = (limits && limits.bytes) || 120 * 1024 * 1024;
+    let eocd = -1; for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } if (eocd < 0) throw new Error('This is not a valid ZIP file.');
+    const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true); if (n > maxFiles) throw new Error('The ZIP has too many files (' + n + ').'); const dec = new TextDecoder(); const out = []; let total = 0;
+    for (let k = 0; k < n; k++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('Damaged ZIP directory.'); const flags = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      const name = dec.decode(u.subarray(p + 46, p + 46 + nl)); p += 46 + nl + el + cl; if (flags & 1) throw new Error('Encrypted ZIP files are not supported.'); const dir = name.endsWith('/'); total += usize; if (total > maxBytes) throw new Error('The ZIP is too large when unpacked.');
+      if (dir) { out.push({ path: name.replace(/\/$/, ''), dir: true, data: new Uint8Array(0) }); continue; }
+      const lnl = dv.getUint16(off + 26, true), lel = dv.getUint16(off + 28, true), start = off + 30 + lnl + lel, raw = u.subarray(start, start + csize); let data;
+      if (method === 0) data = raw.slice(); else if (method === 8) { if (typeof DecompressionStream === 'undefined') throw new Error('This runtime cannot unpack compressed ZIP files.'); const ds = new DecompressionStream('deflate-raw'); const w = ds.writable.getWriter(); w.write(raw); w.close(); data = new Uint8Array(await new Response(ds.readable).arrayBuffer()); } else throw new Error('Unsupported ZIP compression method ' + method + '.');
+      out.push({ path: name, dir: false, data });
+    }
+    return out;
+  }
+  VX.archive = { zip, tar, tarGz, unzip, crc32, toB64, fromB64, hasGzip: () => typeof CompressionStream !== 'undefined' };
 })();

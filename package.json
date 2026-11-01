@@ -1,7 +1,7 @@
 {
   "name": "vextra-studio",
   "productName": "Vextra Studio",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Vextra Studio – professional web development and 2D/3D game creation in one workspace (Tauri v2)",
   "author": "Vextra",
   "license": "MIT",
@@ -9,7 +9,9 @@
     "postinstall": "node scripts/vendor.js",
     "start": "tauri dev",
     "build": "tauri build",
-    "build:exe": "tauri build --no-bundle",
+    "build:win": "tauri build --bundles nsis,msi",
+    "build:linux": "tauri build --bundles deb,appimage",
+    "build:mac": "tauri build --bundles app,dmg",
     "tauri": "tauri",
     "vendor": "node scripts/vendor.js",
     "web": "node scripts/dev-server.js",
@@ -27,5 +29,8 @@
     "esbuild": "^0.28.2",
     "sql.js": "^1.15.2",
     "three": "^0.186.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

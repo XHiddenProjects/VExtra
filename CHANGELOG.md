@@ -2,7 +2,28 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [2.0.0] — current
+## [3.0.0] — current
+
+### Added
+- **Library** tab: install website templates and 2D/3D games from an https URL (zip, `.vxgame`, GitHub repo or `index.json` catalog) with defaults and a confirm step. New native `http_download` command and in-app ZIP reader.
+- **Animation clips** (keyframe editor, loop modes, easing, relative values) and a **Play animation** block.
+- **Material files** (`.vxmat`, `.mtl` import) usable on 3D objects, models and model parts; shared studio lighting so metals render correctly.
+- **Shaders**: 25 effects with modes (everything, background, game layer, UI layer, labels, object) and custom shader files.
+- More default 2D/3D assets via a default-asset picker.
+- Blocks: self-connection, **Switch** and **Toggle switch**, Number rounding, Collision `side` output/filter, Cursor `none`, block icons, horizontally resizable block settings.
+- File-type badges (PHP, SQL, SQLite, …) in the explorer.
+- **Store Export 2.0**: after writing the packages it runs `npm install`, platform setup, asset generation and the build with a progress bar, live log and cancel. Backed by a restricted Rust runner (`run_start/run_poll/run_cancel`: npm/npx/node only, cwd must be inside `store-export`, no shell, safe argument characters).
+- Plugin API: `forge.proc.run`, `forge.ui.progress`.
+
+### Changed
+- `build:exe` replaced by `build:win`, `build:linux`, `build:mac`.
+- Responsive layout: toolbars wrap, side panels overlay on narrow windows, grids reflow.
+- Read-only notice now shows at the top of the code pane.
+
+### Security
+- The Library only downloads over https, caps size at 50 MB and sanitises archive paths. See SECURITY.md.
+
+## [2.0.0] — previous release
 
 Everything after the first downloadable build (v1.0.0).
 

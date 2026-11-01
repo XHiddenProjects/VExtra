@@ -9,7 +9,10 @@ use std::{
     path::{Path, PathBuf},
     net::TcpListener,
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, AtomicU32, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use tauri::{
@@ -526,6 +529,160 @@ async fn http_request(req: HttpReq) -> Res<HttpRes> {
     .map_err(err)?
 }
 
+/// Download a binary file (zip, image…) and return it base64-encoded. https only, 50 MB cap. Used by the Library to install templates and games.
+#[tauri::command]
+async fn http_download(url: String) -> Res<String> {
+    if !url.starts_with("https://") {
+        return Err("only https:// links can be downloaded".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::io::Read;
+        const MAX: u64 = 50 * 1024 * 1024;
+        let resp = ureq::get(&url).timeout(Duration::from_secs(90)).call().map_err(|e| format!("download failed: {e}"))?;
+        let mut buf = Vec::new();
+        resp.into_reader().take(MAX + 1).read_to_end(&mut buf).map_err(err)?;
+        if buf.len() as u64 > MAX {
+            return Err("file is larger than 50 MB".to_string());
+        }
+        Ok(B64.encode(&buf))
+    })
+    .await
+    .map_err(err)?
+}
+
+/* ---------------------------------------------------------------- run npm / npx / node with live output (Store Export) */
+struct Run {
+    lines: Arc<Mutex<Vec<String>>>,
+    done: Arc<AtomicBool>,
+    code: Arc<Mutex<Option<i32>>>,
+    child: Arc<Mutex<Child>>,
+}
+#[derive(Default)]
+struct RunState(Mutex<HashMap<u32, Run>>, AtomicU32);
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RunPoll {
+    lines: Vec<String>,
+    done: bool,
+    code: Option<i32>,
+}
+
+/// Start `npm` / `npx` / `node` inside a `store-export` folder. No shell is involved, arguments are restricted to a safe character set.
+#[tauri::command]
+async fn run_start(state: tauri::State<'_, RunState>, cwd: String, program: String, args: Vec<String>) -> Res<u32> {
+    if !matches!(program.as_str(), "npm" | "npx" | "node") {
+        return Err("only npm, npx and node can be run".into());
+    }
+    let dir = PathBuf::from(&cwd);
+    if !dir.is_dir() {
+        return Err("the folder does not exist".into());
+    }
+    if !cwd.replace('\\', "/").split('/').any(|s| s == "store-export") {
+        return Err("commands can only run inside a store-export folder".into());
+    }
+    for a in &args {
+        if a.is_empty() || a.len() > 200 || !a.chars().all(|c| c.is_ascii_alphanumeric() || "@./:=,+-_".contains(c)) {
+            return Err(format!("argument not allowed: {a}"));
+        }
+    }
+    let exe = if cfg!(windows) && program != "node" { format!("{program}.cmd") } else { program.clone() };
+    let mut cmd = Command::new(exe);
+    cmd.args(&args).current_dir(&dir).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).env("CI", "1").env("FORCE_COLOR", "0").env("NO_COLOR", "1");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd.spawn().map_err(|e| format!("could not start {program}: {e} (is Node.js installed and on your PATH?)"))?;
+    let lines = Arc::new(Mutex::new(Vec::<String>::new()));
+    let pump = |stream: Option<Box<dyn std::io::Read + Send>>, lines: Arc<Mutex<Vec<String>>>| {
+        if let Some(mut s) = stream {
+            std::thread::spawn(move || {
+                use std::io::Read;
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 4096];
+                loop {
+                    match s.read(&mut chunk) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            buf.extend_from_slice(&chunk[..n]);
+                            while let Some(p) = buf.iter().position(|b| *b == b'\n') {
+                                let line: Vec<u8> = buf.drain(..=p).collect();
+                                if let Ok(mut l) = lines.lock() {
+                                    if l.len() < 5000 {
+                                        l.push(String::from_utf8_lossy(&line).trim_end().to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if !buf.is_empty() {
+                    if let Ok(mut l) = lines.lock() {
+                        l.push(String::from_utf8_lossy(&buf).trim_end().to_string());
+                    }
+                }
+            });
+        }
+    };
+    pump(child.stdout.take().map(|s| Box::new(s) as Box<dyn std::io::Read + Send>), lines.clone());
+    pump(child.stderr.take().map(|s| Box::new(s) as Box<dyn std::io::Read + Send>), lines.clone());
+    let child = Arc::new(Mutex::new(child));
+    let done = Arc::new(AtomicBool::new(false));
+    let code = Arc::new(Mutex::new(None));
+    {
+        let (child, done, code) = (child.clone(), done.clone(), code.clone());
+        std::thread::spawn(move || loop {
+            let st = child.lock().ok().and_then(|mut c| c.try_wait().ok().flatten());
+            if let Some(s) = st {
+                if let Ok(mut c) = code.lock() {
+                    *c = Some(s.code().unwrap_or(-1));
+                }
+                std::thread::sleep(Duration::from_millis(150));
+                done.store(true, Ordering::SeqCst);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(120));
+        });
+    }
+    let id = state.inner().1.fetch_add(1, Ordering::SeqCst) + 1;
+    state.inner().0.lock().map_err(err)?.insert(id, Run { lines, done, code, child });
+    Ok(id)
+}
+
+#[tauri::command]
+async fn run_poll(state: tauri::State<'_, RunState>, id: u32) -> Res<RunPoll> {
+    let mut map = state.inner().0.lock().map_err(err)?;
+    let (out, done, code) = match map.get(&id) {
+        Some(r) => {
+            let mut l = r.lines.lock().map_err(err)?;
+            let n = l.len().min(400);
+            let out: Vec<String> = l.drain(..n).collect();
+            let empty = l.is_empty();
+            let done = r.done.load(Ordering::SeqCst) && empty;
+            let code = r.code.lock().map_err(err)?.clone();
+            (out, done, code)
+        }
+        None => return Ok(RunPoll { lines: vec![], done: true, code: None }),
+    };
+    if done {
+        map.remove(&id);
+    }
+    Ok(RunPoll { lines: out, done, code })
+}
+
+#[tauri::command]
+async fn run_cancel(state: tauri::State<'_, RunState>, id: u32) -> Res<()> {
+    let map = state.inner().0.lock().map_err(err)?;
+    if let Some(r) = map.get(&id) {
+        if let Ok(mut c) = r.child.lock() {
+            let _ = c.kill();
+        }
+    }
+    Ok(())
+}
+
 /* ---------------------------------------------------------------- menu & entry point */
 
 fn build_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
@@ -801,6 +958,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(PhpState::default())
         .manage(ServeState::default())
+        .manage(RunState::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 if let Ok(mut map) = window.app_handle().state::<PhpState>().inner().0.lock() {
@@ -824,7 +982,7 @@ pub fn run() {
             fs_open_folder, fs_open_file, fs_save_as, fs_pick_files, fs_read_dir, fs_read_file, fs_read_base64, fs_write_file,
             fs_write_base64, fs_create, fs_remove, fs_rename, fs_exists, fs_reveal, fs_list_files, fs_search, ext_list, ext_save,
             ext_remove, ext_import, ext_open_dir, settings_load, settings_save, secret_get, secret_set, app_info, app_clean,
-            http_request, open_url, php_check, php_start, php_stop, serve_start, serve_stop
+            http_request, http_download, run_start, run_poll, run_cancel, open_url, php_check, php_start, php_stop, serve_start, serve_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running Vextra Studio");
