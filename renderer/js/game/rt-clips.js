@@ -20,6 +20,16 @@
     if (mode === 'pingpong') { const m = ((time % (2 * D)) + 2 * D) % (2 * D); return { t: m > D ? 2 * D - m : m, done: false }; }
     return { t: Math.min(time, D), done: time >= D };
   }
+  VXRT.clipFold = fold;
+  /** Pose a model (the root returned by build3D). vals: { 'w.x': 0.1, 'p2.ry': 30, 'p0.sx': 1.2 } – w = whole model, pN = part N; x/y/z move, rx/ry/rz rotate (degrees), sx/sy/sz scale (multiplier). */
+  VXRT.poseModel = function (root, vals) {
+    const G = root && root.children && root.children[0]; if (!G) return;
+    for (const key in vals) {
+      const m = /^(w|p(\d+))\.(x|y|z|rx|ry|rz|sx|sy|sz)$/.exec(key); if (!m) continue; const t = m[1] === 'w' ? G : G.children[+m[2]]; if (!t) continue;
+      const b = t.userData.base || (t.userData.base = { x: t.position.x, y: t.position.y, z: t.position.z, rx: t.rotation.x, ry: t.rotation.y, rz: t.rotation.z, sx: t.scale.x, sy: t.scale.y, sz: t.scale.z }); const v = U.num(vals[key]), p = m[3];
+      if (p === 'x' || p === 'y' || p === 'z') t.position[p] = b[p] + v; else if (p[0] === 'r') t.rotation[p[1]] = b[p] + U.rad(v); else t.scale[p[1]] = b[p] * v;
+    }
+  };
   const APPLY = (g, o, prop, v, rel, base) => {
     if (v === undefined) return;
     if (prop === 'color') { o.color = v; if (o.material) o.material.color = v; return; }

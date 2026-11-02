@@ -7,7 +7,7 @@
   class SpriteEditor {
     constructor(asset, project, onChange) {
       this.a = asset; this.project = project; this.onChange = onChange; this.tool = 'pencil'; this.color = '#6c8cff'; this.size = 1; this.zoom = Math.max(2, Math.min(24, Math.floor(480 / Math.max(asset.w, asset.h)))); this.cur = 0; this.mx = false; this.my = false; this.onion = false; this.grid = true; this.history = []; this.redo = []; this.frames = []; this.alphaLock = false;
-      this.el = h('div', { class: 'se' }); this.loaded = false; this.load().then(() => { this.loaded = true; this.build(); });
+      this.paint = h('div', { class: 'se' }); this.el = h('div', { class: 'se-root' }); this.mode = 'draw'; this.loaded = false; this.load().then(() => { this.loaded = true; this.build(); });
     }
     async load() {
       const a = this.a; this.frames = [];
@@ -17,10 +17,17 @@
         this.frames.push(c);
       }
     }
+    /** top bar: ✏ Draw | 🎞 Animate – animation has its own studio so drawing and timing never fight for the same space */
+    mountModes() {
+      const set = (m) => { if (this.mode === m) return; if (this.mode === 'animate' && this.anim) { this.anim.dispose(); this.anim = null; } this.mode = m; if (m === 'animate') { this.flush(); this.anim = new VX.SpriteAnimator(this); } this.mountModes(); };
+      const tab = (m, l) => h('button', { class: 'btn sm se-mode' + (this.mode === m ? ' on' : ''), onclick: () => set(m) }, l);
+      this.el.textContent = ''; this.el.append(h('div', { class: 'se-modes' }, tab('draw', '✏ Draw'), tab('animate', '🎞 Animate'), h('span', { class: 'sp' }), h('span', { class: 'mini' }, this.mode === 'animate' ? 'Arrange frames into named animations and preview them.' : 'Draw each picture (frame). Switch to Animate to time them.')), this.mode === 'animate' ? this.anim.el : this.paint);
+      if (this.mode === 'draw' && this.frameList) { this.renderFrames(); this.draw(); }
+    }
     get c() { return this.frames[this.cur]; }
     get ctx2() { return this.c.getContext('2d', { willReadFrequently: true }); }
     build() {
-      const a = this.a, el = this.el; el.textContent = '';
+      const a = this.a, el = this.paint; el.textContent = ''; this.mountModes();
       const tools = [['pencil', '✏️', 'Pencil (B)'], ['eraser', '🧽', 'Eraser (E)'], ['fill', '🪣', 'Fill (G)'], ['line', '📏', 'Line (L)'], ['rect', '▭', 'Rectangle (R)'], ['ellipse', '◯', 'Ellipse (O)'], ['pick', '💧', 'Color picker (I)'], ['move', '✥', 'Shift pixels']];
       this.toolBtns = tools.map(([k, i, t]) => h('button', { class: 'btn sm tool' + (k === this.tool ? ' on' : ''), title: t, onclick: () => { this.tool = k; this.toolBtns.forEach((b, j) => b.classList.toggle('on', tools[j][0] === k)); } }, i));
       const sizeSel = h('select', { onchange: (e) => { this.size = +e.target.value; } }, [1, 2, 3, 4, 6, 8].map((n) => h('option', { value: n }, n + ' px')));
@@ -39,12 +46,12 @@
       const name = h('input', { value: a.name, oninput: (e) => { a.name = e.target.value; this.changed(); } });
       const fps = h('input', { type: 'number', min: 1, max: 60, value: a.fps || 8, oninput: (e) => { a.fps = Math.max(1, +e.target.value || 8); this.changed(); } });
       const right = h('div', { class: 'se-side' }, h('label', { class: 'mini' }, 'Name'), name, h('label', { class: 'mini' }, 'Color'), h('div', { class: 'row' }, this.picker), palette,
-        h('label', { class: 'mini' }, 'Preview'), this.prev, h('label', { class: 'mini' }, 'Frames per second'), fps,
+        h('label', { class: 'mini' }, 'Current frame'), this.prev, h('label', { class: 'mini' }, 'Default speed (fps)'), fps,
         h('div', { class: 'row wrap' }, h('button', { class: 'btn sm', onclick: () => this.importImage() }, 'Import image…'), h('button', { class: 'btn sm', onclick: () => this.resize() }, 'Resize…'), h('button', { class: 'btn sm', onclick: () => this.exportPNG() }, 'Export PNG')),
-        h('label', { class: 'mini' }, 'Animations'), this.animBox);
+        h('button', { class: 'btn primary block', onclick: () => this.el.querySelector('.se-mode:last-of-type').click() }, '🎞 Open animation editor'), h('div', { class: 'mini' }, 'Frames play only in the Animate tab.'));
       const frames = h('div', { class: 'se-framebar' }, h('div', { class: 'row' }, h('b', {}, 'Frames'), h('button', { class: 'btn sm', onclick: () => this.addFrame(false) }, '＋ Blank'), h('button', { class: 'btn sm', onclick: () => this.addFrame(true) }, 'Duplicate'), h('button', { class: 'btn sm', onclick: () => this.delFrame() }, 'Delete'), h('button', { class: 'btn sm', onclick: () => this.moveFrame(-1) }, '◀'), h('button', { class: 'btn sm', onclick: () => this.moveFrame(1) }, '▶')), this.frameList);
       el.append(left, center, right, frames);
-      this.bindCanvas(); this.renderFrames(); this.renderAnims(); this.draw(); this.startPreview();
+      this.bindCanvas(); this.renderFrames(); this.draw();
       this.keyH = (e) => { if (!document.body.contains(el) || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const k = e.key.toLowerCase(); const mp = { b: 'pencil', e: 'eraser', g: 'fill', l: 'line', r: 'rect', o: 'ellipse', i: 'pick' }; if (e.ctrlKey || e.metaKey) { if (k === 'z') { e.preventDefault(); e.shiftKey ? this.redoOp() : this.undo(); } return; } if (mp[k]) { this.tool = mp[k]; this.toolBtns.forEach((b, j) => b.classList.toggle('on', tools[j][0] === this.tool)); } }; document.addEventListener('keydown', this.keyH);
     }
     fit() { const a = this.a; this.cv.width = a.w * this.zoom; this.cv.height = a.h * this.zoom; this.cv.style.width = this.cv.width + 'px'; this.cv.style.height = this.cv.height + 'px'; }
@@ -57,8 +64,8 @@
       if (this.grid && z >= 6) { x.strokeStyle = 'rgba(255,255,255,.08)'; x.lineWidth = 1; x.beginPath(); for (let i = 0; i <= a.w; i++) { x.moveTo(i * z + 0.5, 0); x.lineTo(i * z + 0.5, this.cv.height); } for (let j = 0; j <= a.h; j++) { x.moveTo(0, j * z + 0.5); x.lineTo(this.cv.width, j * z + 0.5); } x.stroke(); }
       this.updatePrev();
     }
-    updatePrev() { if (!this.prev) return; const x = this.prev.getContext('2d'); x.clearRect(0, 0, this.prev.width, this.prev.height); x.imageSmoothingEnabled = false; x.drawImage(this.animPlaying != null ? this.frames[this.animPlaying % this.frames.length] : this.c, 0, 0); }
-    startPreview() { let i = 0; clearInterval(this.pt); this.pt = setInterval(() => { if (!document.body.contains(this.el)) { clearInterval(this.pt); return; } if (this.frames.length > 1) { this.animPlaying = i++ % this.frames.length; this.updatePrev(); } else this.animPlaying = null; }, 1000 / (this.a.fps || 8)); }
+    updatePrev() { if (!this.prev) return; const x = this.prev.getContext('2d'); x.clearRect(0, 0, this.prev.width, this.prev.height); x.imageSmoothingEnabled = false; x.drawImage(this.c, 0, 0); }
+    startPreview() { /* the draw tab shows the current frame only; playback lives in the Animate tab */ }
     px(e) { const r = this.cv.getBoundingClientRect(); return [Math.floor(((e.clientX - r.left) / r.width) * this.a.w), Math.floor(((e.clientY - r.top) / r.height) * this.a.h)]; }
     snapshot() { this.history.push({ f: this.cur, d: this.ctx2.getImageData(0, 0, this.a.w, this.a.h) }); if (this.history.length > 60) this.history.shift(); this.redo = []; }
     undo() { const s = this.history.pop(); if (!s) return; this.redo.push({ f: s.f, d: this.frames[s.f].getContext('2d').getImageData(0, 0, this.a.w, this.a.h) }); this.frames[s.f].getContext('2d').putImageData(s.d, 0, 0); this.cur = s.f; this.afterEdit(); }
@@ -108,9 +115,9 @@
     renderFrames() {
       this.frameList.textContent = ''; this.frames.forEach((c, i) => { const t = h('canvas', { class: 'se-thumb' + (i === this.cur ? ' on' : ''), width: this.a.w, height: this.a.h, title: 'Frame ' + i, onclick: () => { this.cur = i; this.renderFrames(); this.draw(); } }); const x = t.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0); t.style.height = '56px'; t.style.width = Math.max(24, Math.round((56 * this.a.w) / this.a.h)) + 'px'; this.frameList.append(h('div', { class: 'se-fr' }, t, h('span', { class: 'mini' }, String(i)))); });
     }
-    addFrame(dup) { const c = document.createElement('canvas'); c.width = this.a.w; c.height = this.a.h; if (dup) c.getContext('2d').drawImage(this.c, 0, 0); this.frames.splice(this.cur + 1, 0, c); this.cur++; this.afterEdit(); }
-    delFrame() { if (this.frames.length < 2) return VX.ui.toast('A sprite needs at least one frame'); this.frames.splice(this.cur, 1); this.cur = Math.max(0, this.cur - 1); this.afterEdit(); }
-    moveFrame(d) { const j = this.cur + d; if (j < 0 || j >= this.frames.length) return; [this.frames[this.cur], this.frames[j]] = [this.frames[j], this.frames[this.cur]]; this.cur = j; this.afterEdit(); }
+    addFrame(dup) { const c = document.createElement('canvas'); c.width = this.a.w; c.height = this.a.h; if (dup) c.getContext('2d').drawImage(this.c, 0, 0); VX.spriteAnims && VX.spriteAnims.remap(this.a, 'ins', this.cur + 1); this.frames.splice(this.cur + 1, 0, c); this.cur++; this.afterEdit(); }
+    delFrame() { if (this.frames.length < 2) return VX.ui.toast('A sprite needs at least one frame'); VX.spriteAnims && VX.spriteAnims.remap(this.a, 'del', this.cur); this.frames.splice(this.cur, 1); this.cur = Math.max(0, this.cur - 1); this.afterEdit(); }
+    moveFrame(d) { const j = this.cur + d; if (j < 0 || j >= this.frames.length) return; VX.spriteAnims && VX.spriteAnims.remap(this.a, 'swap', this.cur, j); [this.frames[this.cur], this.frames[j]] = [this.frames[j], this.frames[this.cur]]; this.cur = j; this.afterEdit(); }
     renderAnims() {
       const a = this.a, box = this.animBox; box.textContent = ''; a.anims = a.anims || {};
       for (const [n, fr] of Object.entries(a.anims)) { box.append(h('div', { class: 'row' }, h('b', {}, n), h('input', { value: fr.join(','), title: 'Frame indices, comma separated', onchange: (e) => { a.anims[n] = e.target.value.split(/[ ,]+/).map(Number).filter((v) => Number.isFinite(v)); this.changed(); } }), h('button', { class: 'btn sm', onclick: () => { delete a.anims[n]; this.renderAnims(); this.changed(); } }, '✕'))); }
@@ -127,7 +134,7 @@
       this.a.w = w; this.a.h = hh; this.history = []; this.zoom = Math.max(2, Math.min(24, Math.floor(480 / Math.max(w, hh)))); this.flush(); this.build();
     }
     exportPNG() { const u = this.c.toDataURL('image/png'); const a = document.createElement('a'); a.href = u; a.download = (this.a.name || 'sprite') + '.png'; a.click(); }
-    dispose() { clearTimeout(this._t); if (this.loaded) this.flush(); clearInterval(this.pt); document.removeEventListener('keydown', this.keyH); }
+    dispose() { clearTimeout(this._t); if (this.loaded) this.flush(); this.anim && this.anim.dispose(); document.removeEventListener('keydown', this.keyH); }
   }
   VX.SpriteEditor = SpriteEditor;
 })();

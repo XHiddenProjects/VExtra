@@ -467,6 +467,15 @@ Only install things from people you trust: a website template can contain script
 
   A('anim', 'Making games', 'Animation, materials & shaders', `# Animation, materials & shaders
 
+## Sprite animation studio
+In the Sprite editor press **🎞 Animate**. Make a named animation (idle, walk…), click pictures in the **frame bin** to add them to the timeline, drag cards to reorder, use **− / +** to hold a frame longer, and set **fps** and **When it ends** (loop, once, ping-pong). The preview starts paused; press Play or Space. In the **Animation** block use *Play* with the animation's name.
+
+## Model animation studio
+In the Model editor press **🎞 Animate**. Add an animation, then add tracks for the whole model or any part (move, rotate, scale), double-click a lane to add keys, and press Play for a live 3D preview. Play it with the Animation block (*Play*, name = the animation's name).
+
+## Lights
+**3D**: add a 💡 Light (point, directional, spot, ambient, hemisphere). Lights need something to shine on; lower the scene's *Ambient* to see them clearly. The editor draws a reach sphere (point) or an aim line (directional/spot). **2D**: add a 💡 Light, then raise **Darkness** in the Scene settings; each light cuts a soft glow (circle or cone) out of the dark.
+
 ## Animation clips
 **Assets → Animations** holds keyframe clips. Each clip has a duration, a loop mode (once, loop, ping-pong), optional *relative* values and tracks for properties such as x, y, z, rotation, scale, opacity and colour. Click on a track to add keys, pick an easing per key, and press Play to preview. Run a clip from a block with **Play animation** (the *clip* block). Works for 2D and 3D objects.
 

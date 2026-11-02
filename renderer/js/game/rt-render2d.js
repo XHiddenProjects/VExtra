@@ -24,6 +24,20 @@
     else { ctx.beginPath(); const r = Math.min(U.num(p.radius, 0), Math.abs(hw), Math.abs(hh)); if (r > 0 && ctx.roundRect) ctx.roundRect(-hw, -hh, o.w, o.h, r); else ctx.rect(-hw, -hh, o.w, o.h); }
   }
 
+  const rgba = (hex, a) => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex || '#ffffff') || [0, 'ff', 'ff', 'ff']; return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`; };
+  const flick = (p, env) => { const f = U.num(p.flicker, 0); if (!f) return 1; const t = (env.time || 0) * 9; return 1 - f * (0.5 + 0.25 * Math.sin(t) + 0.25 * Math.sin(t * 2.3 + 1.7)) * 0.8; };
+  let _dk = null;
+  /** Darkness overlay: fills the view with the scene's dark colour and cuts a soft hole for every Light. ctx must already carry the world transform. */
+  VXRT.drawDarkness = function (ctx, objects, sc, env, cap) {
+    let d = U.clamp(U.num(sc && sc.darkness, 0), 0, 1); if (!d) return; if (cap) d = Math.min(d, cap);
+    const W = ctx.canvas.width, H = ctx.canvas.height; if (!_dk) _dk = document.createElement('canvas'); if (_dk.width !== W || _dk.height !== H) { _dk.width = W; _dk.height = H; }
+    const x = _dk.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.clearRect(0, 0, W, H); x.globalAlpha = d; x.fillStyle = sc.darkColor || '#000000'; x.fillRect(0, 0, W, H); x.globalAlpha = 1;
+    x.setTransform(ctx.getTransform()); x.globalCompositeOperation = 'destination-out';
+    for (const o of objects) { if (o.type !== 'light2d' || o.alive === false || o.enabled === false || o.visible === false || o.hidden) continue; const p = o.props || {}, r = U.num(p.radius, 260), I = U.clamp(U.num(p.intensity, 1) * flick(p, env), 0, 1), soft = U.clamp(U.num(p.softness, 0.55), 0, 1);
+      x.save(); x.translate(o.x, o.y); const gr = x.createRadialGradient(0, 0, r * (1 - soft) * 0.9, 0, 0, r); gr.addColorStop(0, `rgba(0,0,0,${I})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.beginPath();
+      if (p.shape === 'cone') { x.moveTo(0, 0); const dir = U.rad(U.num(p.direction, 0) + (o.rot || 0)), a = U.rad(U.num(p.angle, 60)) / 2; x.arc(0, 0, r, dir - a, dir + a); x.closePath(); } else x.arc(0, 0, r, 0, Math.PI * 2); x.fill(); x.restore(); }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(_dk, 0, 0); ctx.restore();
+  };
   function drawBody(ctx, o, env) {
     const p = o.props || {};
     switch (o.type) {
@@ -40,6 +54,7 @@
         else { ctx.fillStyle = '#394155'; ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h); ctx.strokeStyle = '#6c8cff'; ctx.strokeRect(-o.w / 2, -o.h / 2, o.w, o.h); }
         break;
       }
+      case 'light2d': { const r = U.num(p.radius, 260), I = U.clamp(U.num(p.intensity, 1) * flick(p, env), 0, 2); const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, rgba(o.color, 0.45 * I)); gr.addColorStop(1, rgba(o.color, 0)); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.beginPath(); if (p.shape === 'cone') { ctx.moveTo(0, 0); const d = U.rad(U.num(p.direction, 0)), a = U.rad(U.num(p.angle, 60)) / 2; ctx.arc(0, 0, r, d - a, d + a); ctx.closePath(); } else ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); break; }
       case 'text': {
         const txt = U.tpl(p.text ?? 'Text', Object.assign({}, env.vars, env.sceneVars)); ctx.font = `${p.bold ? 700 : 400} ${U.num(p.size, 24)}px ${p.font || 'system-ui, sans-serif'}`;
         ctx.textAlign = p.align || 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = o.color || '#ffffff';
@@ -103,11 +118,17 @@
 
   /* ---- sprite animation ---- */
   VXRT.stepAnim = function (g, o, dt) {
+    if (o.type === 'model') { // 3D model pose animation (made in the Model editor → Animate)
+      const as = g.data.assets?.models?.[o.props.model], clip = as && as.anims && as.anims[o.anim.name]; if (!clip || !o.obj3d) return;
+      o.anim.t += dt * (o.anim.speed || 1); const f = VXRT.clipFold(clip, o.anim.t, o.anim.loop === false ? 'once' : clip.loop || 'loop'); const vals = {}; for (const tr of clip.tracks || []) vals[tr.prop] = VXRT.trackValue(tr, f.t);
+      VXRT.poseModel(o.obj3d, vals); if (f.done) { o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); } return;
+    }
     if (o.type !== 'sprite') return; const sp = g.data.assets?.sprites?.[o.props.sprite]; if (!sp || !sp.frames || sp.frames.length < 2) return;
-    const list = (sp.anims && sp.anims[o.anim.name]) || sp.frames.map((_, i) => i); const fps = U.num(o.anim.fps || sp.fps, 8);
-    o.anim.t += dt * fps; let i = Math.floor(o.anim.t);
-    if (!o.anim.loop && i >= list.length) { i = list.length - 1; o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); }
-    o.anim.frame = list[i % list.length];
+    const meta = sp.animMeta && sp.animMeta[o.anim.name]; const list = (sp.anims && sp.anims[o.anim.name]) || sp.frames.map((_, i) => i); const fps = U.num(o.anim.fps || (meta && meta.fps) || sp.fps, 8);
+    o.anim.t += dt * fps; let i = Math.floor(o.anim.t); const n = list.length; const mode = meta && meta.loop ? meta.loop : o.anim.loop ? 'loop' : 'once';
+    if (mode === 'pingpong' && n > 1) { const period = 2 * n - 2, k = i % period; i = k < n ? k : period - k; }
+    else if (mode === 'once' && i >= n) { i = n - 1; if (o.anim.playing) { o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); } }
+    o.anim.frame = list[i % n];
   };
 
   /* ---- particles (shared by 2D and 3D) ---- */
@@ -178,7 +199,7 @@
       for (const o of sorted) if (isBg(o) && o.alive && o.enabled) draw2D.object(bx, o, g); bx.setTransform(1, 0, 0, 1, 0, 0); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); if (!VXRT.fx.layer(g, ctx, 'bg', bc, W, H)) ctx.drawImage(bc, 0, 0); ctx.restore(); rest = sorted.filter((o) => !isBg(o));
     }
     for (const o of rest) if (o.alive && o.enabled) draw2D.object(ctx, o, g);
-    drawParticles2D(ctx, g); if (g.debug) for (const o of g.objects) draw2D.collider(ctx, o);
+    drawParticles2D(ctx, g); VXRT.drawDarkness(ctx, g.objects, g.scene, g); if (g.debug) for (const o of g.objects) draw2D.collider(ctx, o);
     ctx.setTransform(1, 0, 0, 1, 0, 0); VXRT.fx && VXRT.fx.screen(g, g.canvas2d);
   };
   VXRT.camera2dView = (g) => g.camera2d;

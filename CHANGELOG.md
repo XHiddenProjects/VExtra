@@ -2,7 +2,22 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.0.0] — current
+## [3.1.0] — current
+
+### Added
+- **Animation studio for sprites** (new *🎞 Animate* tab in the Sprite editor): named animations, drag-to-reorder timeline, per-frame hold, fps, loop / once / ping-pong, frame bin, large pixel-perfect preview that **starts paused** (the old auto-looping mini preview is gone), Space/←/→ shortcuts.
+- **Animation studio for 3D models** (new *🎞 Animate* tab in the Model editor): keyframe poses for the whole model or any part (move, rotate, scale), live 3D preview. Play with the Animation block (name = animation name).
+- **2D lights**: a Light object for 2D scenes plus *Darkness* and dark colour in Scene settings. Circle or cone, radius, softness, intensity, flicker.
+- 3D light helpers in the editor: reach spheres for point lights, aim lines for directional/spot lights.
+
+### Changed
+- Sprite animations store `animMeta` (fps, loop, timeline) next to the frame lists; older projects are upgraded automatically. The loop mode set in the editor is used by the Animation block.
+- Sprite editor’s draw tab shows the current frame only.
+
+### Security
+- No new permissions. SECURITY.md updated with the supported-versions table for 3.1.x.
+
+## [3.0.0] — previous release
 
 ### Added
 - **Library** tab: install website templates and 2D/3D games from an https URL (zip, `.vxgame`, GitHub repo or `index.json` catalog) with defaults and a confirm step. New native `http_download` command and in-app ZIP reader.
@@ -23,7 +38,7 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 ### Security
 - The Library only downloads over https, caps size at 50 MB and sanitises archive paths. See SECURITY.md.
 
-## [2.0.0] — previous release
+## [2.0.0]
 
 Everything after the first downloadable build (v1.0.0).
 

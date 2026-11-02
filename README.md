@@ -39,7 +39,11 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
-## What's new in 3.0.0
+## What's new in 3.1.0
+- Separate **animation studios** for sprites and 3D models (🎞 Animate tab), with a calm, paused-by-default preview.
+- **2D lights** with scene darkness; clearer 3D light helpers.
+
+## What was new in 3.0.0
 - **Library**: install website templates and 2D/3D games from a URL, GitHub repo or catalog (defaults included).
 - **Animation clips**, **material files** (also in the model editor), a 25-effect **shader** list with modes and custom shader files.
 - Blocks: self-connect, Switch / Toggle switch, Number rounding, Collision side, Cursor *none*, icons on blocks and file types, resizable block settings.

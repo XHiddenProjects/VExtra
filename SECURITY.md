@@ -4,8 +4,12 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 2.0.x   | ✅ security fixes |
+| 3.1.x   | ✅ security fixes (current) |
+| 3.0.x   | ⚠️ please upgrade to 3.1.x |
+| 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
+
+Current version: **3.1.0** (see `VERSION`). This policy was last reviewed for 3.1.0.
 
 ## Reporting a vulnerability
 
@@ -39,6 +43,10 @@ Please **do not** open a public issue for security problems. Email the maintaine
 
 The repository is scanned by GitHub CodeQL. Values embedded in generated inline `<script>` blocks are serialised with `VX.jsLit`, which escapes `<`, `>`, `&`, U+2028 and U+2029, so they cannot terminate the script or inject code.
 
-## v3.0.0 additions
+## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.1.0 notes
+- No new network, file or process permissions. The new animation studios, 2D lights and model poses are pure front-end features that run inside the existing sandboxed game preview.
+- Sprite/model animation data is stored as plain JSON inside the game file and is validated on load (frame indices outside the sprite are dropped; unknown track names are ignored).

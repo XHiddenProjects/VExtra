@@ -5,12 +5,17 @@
 
   class ModelEditor {
     constructor(asset, project, onChange) {
-      this.a = asset; this.project = project; this.onChange = onChange; this.layer = 0; this.N = 16; this.pc = 1; this.sel = 0; this.el = h('div', { class: 'me' }); this.prev = null; this.build();
+      this.a = asset; this.project = project; this.onChange = onChange; this.layer = 0; this.N = 16; this.pc = 1; this.sel = 0; this.paint = h('div', { class: 'me' }); this.el = h('div', { class: 'me-root' }); this.mode = 'build'; this.prev = null; this.build();
+    }
+    mountModes() {
+      const set = (m) => { if (this.mode === m) return; if (this.anim) { this.anim.dispose(); this.anim = null; } this.mode = m; if (m === 'animate') { if (this.prev) { this.prev.dispose(); this.prev = null; } this.anim = new VX.ModelAnimator(this); this.mountModes(); } else this.build(); };
+      const tab = (m, l) => h('button', { class: 'btn sm se-mode' + (this.mode === m ? ' on' : ''), onclick: () => set(m) }, l);
+      this.el.textContent = ''; this.el.append(h('div', { class: 'se-modes' }, tab('build', '🧱 Build'), tab('animate', '🎞 Animate'), h('span', { class: 'sp' }), h('span', { class: 'mini' }, this.mode === 'animate' ? 'Pose the model over time. Play it with the Animation block.' : 'Shape and colour the model. Switch to Animate to bring it to life.')), this.mode === 'animate' && this.anim ? this.anim.el : this.paint);
     }
     ch() { this.onChange && this.onChange(); }
     refresh() { clearTimeout(this._r); this._r = setTimeout(() => this.prev && this.prev.set(this.a, this.project), 60); }
     build() {
-      const a = this.a, el = this.el; el.textContent = ''; if (this.prev) this.prev.dispose();
+      const a = this.a, el = this.paint; el.textContent = ''; if (this.prev) this.prev.dispose(); this.mountModes();
       this.prev = new VX.ModelPreview(340, 300);
       const name = h('input', { value: a.name, oninput: (e) => { a.name = e.target.value; this.ch(); } });
       const side = h('div', { class: 'me-side' }, h('label', { class: 'mini' }, 'Name'), name, h('label', { class: 'mini' }, 'Live preview (drag to orbit, scroll to zoom)'), this.prev.el,
@@ -64,7 +69,7 @@
       } catch (e) { return VX.ui.toast('Export failed: ' + e.message, 'error'); }
       VX.download((this.a.name || 'model') + '.obj', text);
     }
-    dispose() { clearTimeout(this._r); this.prev && this.prev.dispose(); }
+    dispose() { clearTimeout(this._r); this.prev && this.prev.dispose(); this.anim && this.anim.dispose(); }
   }
   VX.ModelEditor = ModelEditor;
 })();

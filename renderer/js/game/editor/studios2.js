@@ -8,8 +8,8 @@
   /* ======================= Animation (timeline) ======================= */
   class AnimEditor {
     constructor(asset, project, onChange) {
-      this.a = asset; this.onChange = onChange; asset.tracks = asset.tracks || []; asset.duration = asset.duration || 1; asset.loop = asset.loop || 'once'; this.t = 0; this.playing = false; this.zoom = 160; this.sel = null; this.fps = 30;
-      this.el = h('div', { class: 'anm' }); this.build();
+      this.a = asset; this.onChange = onChange; asset.tracks = asset.tracks || []; asset.duration = asset.duration || 1; asset.loop = asset.loop || 'once'; this.t = 0; this.playing = false; this.zoom = 160; this.sel = null; this.fps = 30; this.allowVars = true;
+      this.el = h('div', { class: 'anm' }); this.init && this.init(); this.build();
     }
     ch() { this.onChange && this.onChange(); }
     snap(t) { return Math.max(0, Math.min(this.a.duration, Math.round(t * this.fps) / this.fps)); }
@@ -25,13 +25,17 @@
       const zoom = h('input', { type: 'range', min: 60, max: 600, value: this.zoom, oninput: (e) => { this.zoom = +e.target.value; this.drawLanes(); } });
       const presets = h('select', { onchange: (e) => { if (!e.target.value) return; this.applyPreset(e.target.value); e.target.value = ''; } }, h('option', { value: '' }, 'Add from preset…'), ...(VX.defaultAssets ? VX.defaultAssets.catalog('animations').map((c) => h('option', { value: c.key }, c.name)) : []));
       const head = h('div', { class: 'row g6 wrap' }, h('label', { class: 'mini' }, 'Name'), name, h('label', { class: 'mini' }, 'Length (s)'), dur, loop, rel, fps, h('span', { class: 'mini' }, 'Zoom'), zoom, h('span', { class: 'sp' }), presets, this.playBtn, h('button', { class: 'btn', onclick: () => { this.stop(); this.setTime(0); } }, '⏹'));
-      const addSel = h('select', {}, VXRT.CLIP_PROPS.map((p) => h('option', { value: p }, PROP_LABEL[p] || p)), h('option', { value: 'var:' }, 'Object variable…'));
-      const add = h('button', { class: 'btn sm primary', onclick: async () => { let p = addSel.value; if (p === 'var:') { const n = await VX.ui.ask('Object variable name'); if (!n) return; p = 'var:' + n; } if (a.tracks.some((t) => t.prop === p)) return VX.ui.toast('That property already has a track', 'warn'); a.tracks.push({ prop: p, keys: [{ t: 0, v: p === 'color' ? '#ffffff' : p === 'alpha' ? 1 : 0 }] }); this.ch(); this.drawLanes(); } }, '＋ Track');
-      this.stage = h('canvas', { class: 'anm-stage', width: 220, height: 150 });
+      const addSel = h('select', {}, this.propOptions().map(([p, l]) => h('option', { value: p }, l)), this.allowVars ? h('option', { value: 'var:' }, 'Object variable…') : null);
+      const add = h('button', { class: 'btn sm primary', onclick: async () => { let p = addSel.value; if (p === 'var:') { const n = await VX.ui.ask('Object variable name'); if (!n) return; p = 'var:' + n; } if (a.tracks.some((t) => t.prop === p)) return VX.ui.toast('That property already has a track', 'warn'); a.tracks.push({ prop: p, keys: [{ t: 0, v: this.defaultValue(p) }] }); this.ch(); this.drawLanes(); } }, '＋ Track');
+      this.stage = this.makeStage();
       this.lanes = h('div', { class: 'anm-lanes' }); this.keyPane = h('div', { class: 'anm-key' });
       el.append(head, h('div', { class: 'row g6' }, h('b', {}, 'Tracks'), addSel, add, h('span', { class: 'mini' }, 'Double-click a lane to add a key • drag keys to move • click the ruler to scrub')), h('div', { class: 'anm-body' }, this.lanes, h('div', { class: 'anm-side' }, this.stage, this.keyPane)));
       this.drawLanes(); this.drawStage(); this.drawKeyPane();
     }
+    propOptions() { return VXRT.CLIP_PROPS.map((p) => [p, PROP_LABEL[p] || p]); }
+    label(p) { return PROP_LABEL[p] || p; }
+    defaultValue(p) { return p === 'color' ? '#ffffff' : p === 'alpha' ? 1 : 0; }
+    makeStage() { return h('canvas', { class: 'anm-stage', width: 220, height: 150 }); }
     applyPreset(key) { const e = VX.defaultAssets.catalog('animations').find((c) => c.key === key); if (!e) return; const c = e.make(); const a = this.a; a.duration = c.duration; a.loop = c.loop; a.relative = c.relative; a.tracks = c.tracks; this.sel = null; this.build(); this.ch(); }
     drawLanes() {
       const a = this.a, W = Math.max(300, a.duration * this.zoom + 40), box = this.lanes; box.textContent = '';
@@ -39,7 +43,7 @@
       ruler.addEventListener('pointerdown', (e) => { const mv = (ev) => { const r = ruler.getBoundingClientRect(); this.setTime(this.snap((ev.clientX - r.left) / this.zoom)); }; mv(e); ruler.setPointerCapture(e.pointerId); ruler.onpointermove = mv; ruler.onpointerup = () => { ruler.onpointermove = null; }; });
       this.head = h('div', { class: 'anm-head', style: `left:${this.t * this.zoom}px` }); const rows = h('div', { class: 'anm-rows', style: `width:${W}px` }, this.head);
       a.tracks.forEach((tr, ti) => {
-        const lane = h('div', { class: 'anm-lane' }); const label = h('div', { class: 'anm-name' }, h('b', {}, PROP_LABEL[tr.prop] || tr.prop), this.valueInput(tr), h('button', { class: 'btn sm', title: 'Remove track', onclick: () => { a.tracks.splice(ti, 1); this.sel = null; this.ch(); this.drawLanes(); this.drawKeyPane(); } }, '✕'));
+        const lane = h('div', { class: 'anm-lane' }); const label = h('div', { class: 'anm-name' }, h('b', {}, this.label(tr.prop)), this.valueInput(tr), h('button', { class: 'btn sm', title: 'Remove track', onclick: () => { a.tracks.splice(ti, 1); this.sel = null; this.ch(); this.drawLanes(); this.drawKeyPane(); } }, '✕'));
         const strip = h('div', { class: 'anm-strip', style: `width:${W}px` });
         strip.addEventListener('dblclick', (e) => { if (e.target !== strip) return; const r = strip.getBoundingClientRect(); const t = this.snap((e.clientX - r.left) / this.zoom); this.addKey(tr, t, this.value(tr, t)); });
         for (const k of tr.keys) { const kb = h('div', { class: 'anm-k' + (this.sel && this.sel.k === k ? ' on' : ''), style: `left:${k.t * this.zoom}px`, title: `${fmt(k.t)}s = ${fmt(k.v)}` });
@@ -55,7 +59,7 @@
       const t = h('input', { type: 'number', step: 0.01, class: 'n', value: fmt(k.t), onchange: (e) => { k.t = this.snap(parseFloat(e.target.value) || 0); tr.keys.sort((a, b) => a.t - b.t); this.ch(); this.drawLanes(); } });
       const v = h('input', { class: 'n', type: tr.prop === 'color' ? 'color' : 'number', step: 'any', value: tr.prop === 'color' ? k.v : fmt(k.v), onchange: (e) => { k.v = tr.prop === 'color' ? e.target.value : parseFloat(e.target.value) || 0; this.ch(); this.drawStage(); } });
       const ez = h('select', { onchange: (e) => { k.e = e.target.value === 'linear' ? undefined : e.target.value; this.ch(); this.drawStage(); } }, EASES.map((n) => h('option', { value: n, selected: (k.e || 'linear') === n }, n)));
-      p.append(h('b', {}, (PROP_LABEL[tr.prop] || tr.prop) + ' key'), h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'time'), t), h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'value'), v), h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'ease →'), ez), h('button', { class: 'btn sm', onclick: () => { tr.keys.splice(tr.keys.indexOf(k), 1); this.sel = null; this.ch(); this.drawLanes(); this.drawKeyPane(); } }, 'Delete key')); }
+      p.append(h('b', {}, this.label(tr.prop) + ' key'), h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'time'), t), h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'value'), v), h('div', { class: 'row g6' }, h('span', { class: 'mini' }, 'ease →'), ez), h('button', { class: 'btn sm', onclick: () => { tr.keys.splice(tr.keys.indexOf(k), 1); this.sel = null; this.ch(); this.drawLanes(); this.drawKeyPane(); } }, 'Delete key')); }
     /** little 2D stage that shows what the clip does to a box (position, size, rotation, opacity, colour) */
     drawStage() { const c = this.stage.getContext('2d'), W = 220, H = 150; c.clearRect(0, 0, W, H); c.fillStyle = '#10131a'; c.fillRect(0, 0, W, H); c.strokeStyle = '#2a3047'; c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.moveTo(0, H / 2); c.lineTo(W, H / 2); c.stroke();
       const v = {}; for (const tr of this.a.tracks) v[tr.prop] = this.value(tr, this.t); const rel = this.a.relative; const g = (p, d) => (v[p] === undefined ? d : typeof v[p] === 'number' ? (rel ? d + v[p] : v[p]) : v[p]);
@@ -66,7 +70,7 @@
     stop() { this.playing = false; cancelAnimationFrame(this._raf); if (this.playBtn) this.playBtn.textContent = '▶ Play'; }
     dispose() { this.stop(); }
   }
-  VX.AnimEditor = AnimEditor;
+  VX.AnimEditor = AnimEditor; VX.AnimEditorBase = { EASES, fmt, PROP_LABEL };
 
   /* ======================= Material ======================= */
   class MaterialEditor {

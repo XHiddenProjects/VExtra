@@ -16,6 +16,7 @@
   addType({ type: 'triangle', label: 'Triangle', icon: '△', color: '#4cc38a' });
   addType({ type: 'sprite', label: 'Sprite', icon: '🖼', category: 'Visuals', props: { sprite: '', emoji: '' }, schema: [F.sprite(), F.text('emoji', 'Emoji (when no sprite)')] });
   addType({ type: 'text', label: 'Text', icon: 'T', category: 'Visuals', color: '#ffffff', w: 200, h: 50, props: { text: 'Hello {score}', size: 28, bold: true, align: 'center', font: '' }, schema: [F.area('text', 'Text'), F.num('size', 'Size', 6, 200), F.bool('bold', 'Bold'), F.sel('align', 'Align', ['left', 'center', 'right']), F.text('font', 'Font family')] });
+  addType({ type: 'light2d', label: 'Light', icon: '💡', category: 'Scene', w: 40, h: 40, color: '#ffe9a8', props: { radius: 260, intensity: 1, softness: 0.55, flicker: 0, shape: 'circle', angle: 60, direction: 0 }, schema: [F.num('radius', 'Radius', 10, 3000, 10), F.num('intensity', 'Intensity', 0, 2, 0.05), F.num('softness', 'Softness', 0, 1, 0.05), F.num('flicker', 'Flicker', 0, 1, 0.05), F.sel('shape', 'Shape', ['circle', 'cone']), F.num('angle', 'Cone angle', 5, 180), F.num('direction', 'Cone direction °', -360, 360)] });
   addType({ type: 'empty', label: 'Empty', icon: '◌', category: 'Logic', dim: 'both', w: 40, h: 40, d: 1, color: '#888888' });
   /* 3D */
   const P3 = (type, label, icon, extra) => addType(Object.assign({ type, label, icon, dim: '3d', category: 'Primitives', w: 1, h: 1, d: 1, color: '#7aa2ff' }, extra));
