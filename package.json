@@ -1,17 +1,17 @@
 {
   "name": "vextra-studio",
   "productName": "Vextra Studio",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Vextra Studio – professional web development and 2D/3D game creation in one workspace (Tauri v2)",
   "author": "Vextra",
   "license": "MIT",
   "scripts": {
     "postinstall": "node scripts/vendor.js",
     "start": "tauri dev",
-    "build": "tauri build",
-    "build:win": "tauri build --bundles nsis,msi",
-    "build:linux": "tauri build --bundles deb,appimage",
-    "build:mac": "tauri build --bundles app,dmg",
+    "build": "node scripts/build-server.js && tauri build",
+    "build:win": "node scripts/build-server.js --target win && tauri build --bundles nsis,msi",
+    "build:linux": "node scripts/build-server.js --target linux && tauri build --bundles deb,appimage",
+    "build:mac": "node scripts/build-server.js --target mac && tauri build --bundles app,dmg",
     "tauri": "tauri",
     "vendor": "node scripts/vendor.js",
     "web": "node scripts/dev-server.js",
@@ -21,16 +21,31 @@
     "clean": "node scripts/uninstall.js --mode=clean --auto",
     "autoclean": "node scripts/uninstall.js --mode=clean --auto",
     "uninstall": "node scripts/uninstall.js",
-    "uninstall:auto": "node scripts/uninstall.js --mode=full --auto"
+    "uninstall:auto": "node scripts/uninstall.js --mode=full --auto",
+    "build:server": "node scripts/build-server.js"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.12.4",
-    "ace-builds": "^1.45.2",
-    "esbuild": "^0.28.2",
-    "sql.js": "^1.15.2",
-    "three": "^0.186.1"
+    "@tauri-apps/cli": "latest",
+    "ace-builds": "latest",
+    "esbuild": "latest",
+    "postject": "latest",
+    "sql.js": "latest",
+    "three": "latest"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "trustedDependencies": [
+    "esbuild"
+  ],
+  "dependenciesMeta": {
+    "esbuild": {
+      "built": true
+    }
   },
   "allowScripts": {
-    "esbuild@0.28.2": true
+    "esbuild": true
   }
 }

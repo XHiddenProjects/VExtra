@@ -120,14 +120,15 @@
   VXRT.stepAnim = function (g, o, dt) {
     if (o.type === 'model') { // 3D model pose animation (made in the Model editor → Animate)
       const as = g.data.assets?.models?.[o.props.model], clip = as && as.anims && as.anims[o.anim.name]; if (!clip || !o.obj3d) return;
-      o.anim.t += dt * (o.anim.speed || 1); const f = VXRT.clipFold(clip, o.anim.t, o.anim.loop === false ? 'once' : clip.loop || 'loop'); const vals = {}; for (const tr of clip.tracks || []) vals[tr.prop] = VXRT.trackValue(tr, f.t);
-      VXRT.poseModel(o.obj3d, vals); if (f.done) { o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); } return;
+      if (o._poseName !== o.anim.name) { o._poseName = o.anim.name; VXRT.poseReset(o.obj3d); }
+      o.anim.t += dt * (o.anim.speed || 1); const f = VXRT.clipFold(clip, o.anim.t, o.anim.mode || (o.anim.loop === false ? 'once' : clip.loop || 'loop')); const vals = {}; for (const tr of clip.tracks || []) vals[tr.prop] = VXRT.trackValue(tr, f.t);
+      VXRT.poseModel(o.obj3d, vals); if (f.done) { o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); o.anim.onDone && o.anim.onDone(); } return;
     }
     if (o.type !== 'sprite') return; const sp = g.data.assets?.sprites?.[o.props.sprite]; if (!sp || !sp.frames || sp.frames.length < 2) return;
     const meta = sp.animMeta && sp.animMeta[o.anim.name]; const list = (sp.anims && sp.anims[o.anim.name]) || sp.frames.map((_, i) => i); const fps = U.num(o.anim.fps || (meta && meta.fps) || sp.fps, 8);
-    o.anim.t += dt * fps; let i = Math.floor(o.anim.t); const n = list.length; const mode = meta && meta.loop ? meta.loop : o.anim.loop ? 'loop' : 'once';
+    o.anim.t += dt * fps; let i = Math.floor(o.anim.t); const n = list.length; const mode = o.anim.mode || (meta && meta.loop) || (o.anim.loop === false ? 'once' : 'loop');
     if (mode === 'pingpong' && n > 1) { const period = 2 * n - 2, k = i % period; i = k < n ? k : period - k; }
-    else if (mode === 'once' && i >= n) { i = n - 1; if (o.anim.playing) { o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); } }
+    else if (mode === 'once' && i >= n) { i = n - 1; if (o.anim.playing) { o.anim.playing = false; g.emit('animEnd:' + o.id, o.anim.name); o.anim.onDone && o.anim.onDone(); } }
     o.anim.frame = list[i % n];
   };
 

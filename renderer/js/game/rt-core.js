@@ -281,6 +281,7 @@
         for (const n of [...this.updating]) { if (n.dead) { this.updating.delete(n); continue; } try { n.def.update(n, dt, this); } catch (e) { this.nodeError(n, e); } }
         VXRT.stepPhysics(this, dt); VXRT.stepObjects(this, dt);
         if (this.pending.length) { const p = this.pending.splice(0); for (const fn of p) { try { fn(); } catch (e) { this.log('error', e.message); } } }
+        if (this.dim === '3d' && this.input.pressed.has('f3') && VXRT.cycleCamView) VXRT.cycleCamView(this);
         VXRT.input_endFrame(this);
       } catch (e) { this.log('error', 'Runtime error: ' + (e.stack || e.message)); }
       VXRT.render(this);

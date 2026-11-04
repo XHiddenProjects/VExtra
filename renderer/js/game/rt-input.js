@@ -28,7 +28,7 @@
     const I = (g.input = new Input(g)), c = g.container;
     I.listen(window, 'keydown', (e) => {
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-      const k = keyName(e); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'space'].includes(k)) e.preventDefault();
+      const k = keyName(e); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'space', 'f3'].includes(k)) e.preventDefault();
       const code = String(e.code || '').toLowerCase(); if (!I.keys.has(k)) { I.pressed.add(k); if (code) I.pressed.add(code); I.emit('keydown', { key: k, code, repeat: false }); } else I.emit('keydown', { key: k, code, repeat: true });
       I.keys.add(k); if (code) I.keys.add(code);
     });

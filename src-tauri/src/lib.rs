@@ -477,6 +477,7 @@ struct HttpReq {
     url: String,
     headers: Option<HashMap<String, String>>,
     body: Option<String>,
+    timeout_secs: Option<u64>,
 }
 #[derive(Serialize)]
 struct HttpRes {
@@ -507,8 +508,11 @@ async fn http_request(req: HttpReq) -> Res<HttpRes> {
     if !(req.url.starts_with("http://") || req.url.starts_with("https://")) {
         return Err("only http(s) URLs are allowed".into());
     }
+    // this computer is always reached over IPv4 ("localhost" can resolve to ::1 first on Windows, which local servers do not listen on)
+    let req = HttpReq { url: req.url.replacen("://localhost", "://127.0.0.1", 1).replacen("://[::1]", "://127.0.0.1", 1), ..req };
     tauri::async_runtime::spawn_blocking(move || {
-        let mut r = ureq::request(&req.method.to_uppercase(), &req.url).timeout(Duration::from_secs(25));
+        let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(6)).build();
+        let mut r = agent.request(&req.method.to_uppercase(), &req.url).timeout(Duration::from_secs(req.timeout_secs.unwrap_or(25).clamp(5, 300)));
         for (k, v) in req.headers.unwrap_or_default() {
             r = r.set(&k, &v);
         }
@@ -588,7 +592,7 @@ async fn run_start(state: tauri::State<'_, RunState>, cwd: String, program: Stri
     }
     let exe = if cfg!(windows) && program != "node" { format!("{program}.cmd") } else { program.clone() };
     let mut cmd = Command::new(exe);
-    cmd.args(&args).current_dir(&dir).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).env("CI", "1").env("FORCE_COLOR", "0").env("NO_COLOR", "1");
+    cmd.args(&args).current_dir(&dir).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).env("CI", "1").env("CSC_IDENTITY_AUTO_DISCOVERY", "false").env("ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES", "true").env("FORCE_COLOR", "0").env("NO_COLOR", "1");
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -953,14 +957,154 @@ async fn serve_stop(state: tauri::State<'_, ServeState>, root: Option<String>) -
     Ok(())
 }
 
+/* ---------------------------------------------------------------- local Vextra server (started from the Cloud panel, no terminal needed) */
+#[derive(Default)]
+struct ServerState(Mutex<Option<Child>>);
+
+#[derive(Serialize)]
+struct ServerInfo {
+    running: bool,
+    url: String,
+    mode: String,
+    detail: String,
+}
+
+fn port_open(port: u16) -> bool {
+    std::net::TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], port)), Duration::from_millis(250)).is_ok()
+}
+
+/// Looks for the server next to the app: a compiled binary first, then server.js (needs Node.js), then the source tree (development).
+fn find_server(app: &AppHandle) -> Option<(PathBuf, bool)> {
+    let exe = if cfg!(windows) { "vextra-server.exe" } else { "vextra-server" };
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Ok(r) = app.path().resource_dir() {
+        dirs.push(r.join("resources").join("server"));
+        dirs.push(r.join("server"));
+    }
+    if let Ok(e) = std::env::current_exe() {
+        if let Some(d) = e.parent() {
+            dirs.push(d.join("server"));
+            dirs.push(d.join("resources").join("server"));
+        }
+    }
+    dirs.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join("server"));
+    for d in &dirs {
+        let b = d.join(exe);
+        if b.is_file() {
+            return Some((b, true));
+        }
+    }
+    for d in dirs.iter().chain(std::iter::once(&Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("server"))) {
+        let j = d.join("server.js");
+        if j.is_file() {
+            return Some((j, false));
+        }
+    }
+    None
+}
+
+#[tauri::command]
+async fn server_start(app: AppHandle, state: tauri::State<'_, ServerState>, port: Option<u16>) -> Res<ServerInfo> {
+    let port = port.unwrap_or(8787);
+    let url = format!("http://localhost:{port}");
+    {
+        let mut g = state.inner().0.lock().map_err(err)?;
+        if let Some(c) = g.as_mut() {
+            if matches!(c.try_wait(), Ok(None)) && port_open(port) {
+                return Ok(ServerInfo { running: true, url, mode: "started".into(), detail: "already running".into() });
+            }
+            *g = None;
+        }
+    }
+    if port_open(port) {
+        return Ok(ServerInfo { running: true, url, mode: "external".into(), detail: "a server is already listening on this port".into() });
+    }
+    let (path, compiled) = find_server(&app).ok_or("The server files were not found in this build. Run `npm run server` once, or rebuild the app with `npm run build:win` / `build:linux` / `build:mac`.")?;
+    let data = app.path().app_data_dir().map_err(err)?.join("server-data");
+    fs::create_dir_all(&data).map_err(err)?;
+    let mut cmd = if compiled {
+        Command::new(&path)
+    } else {
+        let mut c = Command::new(if cfg!(windows) { "node.exe" } else { "node" });
+        c.arg(&path);
+        c
+    };
+    cmd.env("PORT", port.to_string()).env("HOST", "127.0.0.1").env("DATA_DIR", &data).stdin(Stdio::null());
+    let log_path = data.join("server.log");
+    match fs::File::create(&log_path) {
+        Ok(f) => {
+            cmd.stdout(f.try_clone().map_err(err)?).stderr(f);
+        }
+        Err(_) => {
+            cmd.stdout(Stdio::null()).stderr(Stdio::null());
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd.spawn().map_err(|e| {
+        if compiled {
+            format!("could not start the server: {e}")
+        } else {
+            format!("could not start the server: {e}. Install Node.js (nodejs.org) or use a build that includes the compiled server.")
+        }
+    })?;
+    for _ in 0..40 {
+        std::thread::sleep(Duration::from_millis(150));
+        if port_open(port) {
+            let mode = if compiled { "binary" } else { "node" };
+            *state.inner().0.lock().map_err(err)? = Some(child);
+            return Ok(ServerInfo { running: true, url, mode: mode.into(), detail: format!("data: {}", data.display()) });
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            let msg = fs::read_to_string(&log_path).unwrap_or_default().lines().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" ");
+            return Err(format!("the server stopped right away ({status}). {msg}"));
+        }
+    }
+    let _ = child.kill();
+    Err("the server did not start in time".into())
+}
+
+#[tauri::command]
+async fn server_status(state: tauri::State<'_, ServerState>, port: Option<u16>) -> Res<ServerInfo> {
+    let port = port.unwrap_or(8787);
+    let mut g = state.inner().0.lock().map_err(err)?;
+    let ours = match g.as_mut() {
+        Some(c) => matches!(c.try_wait(), Ok(None)),
+        None => false,
+    };
+    if !ours {
+        *g = None;
+    }
+    Ok(ServerInfo { running: port_open(port), url: format!("http://localhost:{port}"), mode: if ours { "started".into() } else { "external".into() }, detail: String::new() })
+}
+
+#[tauri::command]
+async fn server_stop(state: tauri::State<'_, ServerState>) -> Res<()> {
+    if let Some(mut c) = state.inner().0.lock().map_err(err)?.take() {
+        let _ = c.kill();
+        let _ = c.wait();
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(PhpState::default())
         .manage(ServeState::default())
         .manage(RunState::default())
+        .manage(ServerState::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
+                if let Ok(mut g) = window.app_handle().state::<ServerState>().inner().0.lock() {
+                    if let Some(mut c) = g.take() {
+                        let _ = c.kill();
+                        let _ = c.wait();
+                    }
+                }
                 if let Ok(mut map) = window.app_handle().state::<PhpState>().inner().0.lock() {
                     for (_, mut c) in map.drain() {
                         let _ = c.kill();
@@ -982,7 +1126,7 @@ pub fn run() {
             fs_open_folder, fs_open_file, fs_save_as, fs_pick_files, fs_read_dir, fs_read_file, fs_read_base64, fs_write_file,
             fs_write_base64, fs_create, fs_remove, fs_rename, fs_exists, fs_reveal, fs_list_files, fs_search, ext_list, ext_save,
             ext_remove, ext_import, ext_open_dir, settings_load, settings_save, secret_get, secret_set, app_info, app_clean,
-            http_request, http_download, run_start, run_poll, run_cancel, open_url, php_check, php_start, php_stop, serve_start, serve_stop
+            http_request, http_download, run_start, run_poll, run_cancel, open_url, php_check, php_start, php_stop, serve_start, serve_stop, server_start, server_status, server_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running Vextra Studio");

@@ -29,14 +29,16 @@
   VXRT.ports = (def, params, node) => ({ inputs: portList(def.inputs, params, node), outputs: portList(def.outputs, params, node) });
   VXRT.paramDefaults = (def) => { const o = {}; for (const p of def.params || []) o[p.key] = p.def !== undefined ? p.def : p.type === 'bool' ? false : p.type === 'number' ? 0 : ''; return o; };
 
-  /** Rename blocks that changed meaning (switch/toggleSwitch in v2 -> caseSwitch/stateFlag) so old projects keep working. Safe to call repeatedly. */
+  /** Rename blocks that changed meaning (switch in v2 -> caseSwitch; clip/motionAnim -> animation) so old projects keep working. Safe to call repeatedly. */
   VXRT.migrateGraph = function (graph) {
     if (!graph || graph._mig3) return graph; const nodes = graph.nodes || [], wires = graph.wires || [];
     for (const n of nodes) {
       const p = n.params || {};
       if (n.type === 'switch' && (p.cases !== undefined || p.mode !== undefined || wires.some((w) => w.from === n.id && /^(c\d+|default)$/.test(w.out || '')))) n.type = 'caseSwitch';
-      else if (n.type === 'toggleSwitch' && (p.initial !== undefined || wires.some((w) => (w.from === n.id && /^(on|off)$/.test(w.out || '')) || (w.to === n.id && /^(toggle|on|off|set)$/.test(w.in || ''))))) n.type = 'stateFlag';
       if (n.type === 'shader' && p.mode === undefined && n.params) { n.params.mode = 'object'; if (p.effect === 'custom' && !p.file) n.params.effect = 'custom3d'; }
+      if (n.type === 'clip') { n.type = 'animation'; n.params = { action: 'play', anim: p.clip ? 'clip:' + p.clip : '', mode: p.mode || '', speed: p.speed ?? 1, relative: !!p.relative, target: p.target || 'self' }; }
+      else if (n.type === 'motionAnim') { n.type = 'animation'; n.params = { action: 'auto', target: p.target || 'self', idle: p.idle || '', walk: p.walk || '', jump: p.jump || '', fall: p.fall || '', face: p.face !== false, moveSpeed: p.threshold || 0 }; }
+      else if (n.type === 'animation' && p.loop !== undefined && p.mode === undefined) { n.params = Object.assign({}, p, { mode: p.loop === false ? 'once' : '' }); delete n.params.loop; }
       if (n.graph) VXRT.migrateGraph(n.graph);
     }
     try { Object.defineProperty(graph, '_mig3', { value: true, enumerable: false }); } catch { /* frozen */ } return graph;

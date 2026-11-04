@@ -187,6 +187,8 @@
     const meshes = []; for (const o of g.objects) if (o.obj3d && o.alive && o.visible && !o.isScene) meshes.push(o.obj3d); const hits = g.raycaster3d.intersectObjects(meshes, true); return hits.length ? hits[0].object.userData.vxObj : null;
   };
 
+  /** F3: 1st person → 3rd person (back) → 3rd person (front); called once per frame from the game loop */
+  VXRT.cycleCamView = function (g) { const c = g.cam3d; if (!c || !(c.follow && c.follow.alive) || !(c.mode === 'fps' || c.mode === 'follow')) return; if (g.camView === undefined) g.camView = c.mode === 'fps' ? 0 : 1; g.camView = (g.camView + 1) % 3; g.camViewName = ['1st person', '3rd person – back', '3rd person – front'][g.camView]; g.camViewT = 1.6; g.emit('cameraView', ['first', 'back', 'front'][g.camView]); };
   VXRT.render3D = function (g, dt) {
     const T = g.THREE; if (!g.renderer3d || !g.scene3d) return; const c = g.cam3d, cam = g.camera3d;
     // sync objects
@@ -206,9 +208,16 @@
     }
     // camera
     const fo = c.follow && c.follow.alive ? c.follow : null; const k = c.lerp >= 1 ? 1 : 1 - Math.pow(1 - c.lerp, dt * 60 + 0.0001);
-    if (c.mode === 'follow' && fo) { const yaw = U.rad(c.yaw), pit = U.rad(c.pitch); const dx = Math.sin(yaw) * Math.cos(pit) * c.distance, dz = Math.cos(yaw) * Math.cos(pit) * c.distance, dy = Math.sin(pit) * c.distance + c.height; const tx = fo.x + dx, ty = fo.y + dy, tz = fo.z + dz; c.pos.x += (tx - c.pos.x) * k; c.pos.y += (ty - c.pos.y) * k; c.pos.z += (tz - c.pos.z) * k; c.target = { x: fo.x, y: fo.y + 1, z: fo.z }; }
+    /* F3 cycles the view of the followed object: 1st person → 3rd person (behind) → 3rd person (front) */
+    let cm = c.mode, yo = 0; if (fo && (c.mode === 'fps' || c.mode === 'follow')) {
+      if (g.camView === undefined) g.camView = c.mode === 'fps' ? 0 : 1;
+      cm = g.camView === 0 ? 'fps' : 'follow'; yo = g.camView === 2 ? 180 : 0; if (cm === 'follow' && c.mode === 'fps') { c.distance = c.distance || 6; }
+    }
+    if (g.camViewT > 0) { g.camViewT -= dt; if (g.container && !g._camLbl) { g._camLbl = document.createElement('div'); g._camLbl.style.cssText = 'position:absolute;left:50%;top:12px;transform:translateX(-50%);padding:4px 12px;border-radius:14px;background:rgba(0,0,0,.6);color:#fff;font:600 12px system-ui;pointer-events:none;z-index:5;transition:opacity .3s'; g.container.appendChild(g._camLbl); } if (g._camLbl) { g._camLbl.textContent = '📷 ' + g.camViewName + '  (F3)'; g._camLbl.style.opacity = g.camViewT > 0 ? 1 : 0; } } else if (g._camLbl) g._camLbl.style.opacity = 0;
+    if (fo && fo.obj3d && cm !== 'fps' && fo._fpsHid) { fo.obj3d.visible = true; fo._fpsHid = false; }
+    if (cm === 'follow' && fo) { const yaw = U.rad(c.yaw + yo), pit = U.rad(c.pitch); const dx = Math.sin(yaw) * Math.cos(pit) * c.distance, dz = Math.cos(yaw) * Math.cos(pit) * c.distance, dy = Math.sin(pit) * c.distance + c.height; const tx = fo.x + dx, ty = fo.y + dy, tz = fo.z + dz; c.pos.x += (tx - c.pos.x) * k; c.pos.y += (ty - c.pos.y) * k; c.pos.z += (tz - c.pos.z) * k; c.target = { x: fo.x, y: fo.y + 1, z: fo.z }; }
     else if (c.mode === 'orbit') { const t = fo ? { x: fo.x, y: fo.y, z: fo.z } : c.target; const yaw = U.rad(c.yaw), pit = U.rad(c.pitch); c.pos = { x: t.x + Math.sin(yaw) * Math.cos(pit) * c.distance, y: t.y + Math.sin(pit) * c.distance, z: t.z + Math.cos(yaw) * Math.cos(pit) * c.distance }; c.target = { x: t.x, y: t.y, z: t.z }; }
-    else if (c.mode === 'fps' && fo) { if (fo.obj3d) fo.obj3d.visible = false; c.pos = { x: fo.x, y: fo.y + c.eye, z: fo.z }; const yaw = U.rad(c.yaw), pit = U.rad(c.pitch); c.target = { x: c.pos.x - Math.sin(yaw) * Math.cos(pit), y: c.pos.y + Math.sin(pit), z: c.pos.z - Math.cos(yaw) * Math.cos(pit) }; }
+    else if (cm === 'fps' && fo) { if (fo.obj3d) { fo.obj3d.visible = false; fo._fpsHid = true; } c.pos = { x: fo.x, y: fo.y + c.eye, z: fo.z }; const yaw = U.rad(c.yaw), pit = U.rad(c.pitch); c.target = { x: c.pos.x - Math.sin(yaw) * Math.cos(pit), y: c.pos.y + Math.sin(pit), z: c.pos.z - Math.cos(yaw) * Math.cos(pit) }; }
     cam.fov = c.fov; cam.updateProjectionMatrix(); const sh = c.shake > 0 ? c.shake * 0.05 : 0; if (c.shake > 0) c.shake = Math.max(0, c.shake - dt * 20);
     cam.position.set(c.pos.x + (Math.random() - 0.5) * sh, c.pos.y + (Math.random() - 0.5) * sh, c.pos.z + (Math.random() - 0.5) * sh); cam.lookAt(c.target.x, c.target.y, c.target.z); cam.updateMatrixWorld(); cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
     // particles

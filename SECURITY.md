@@ -4,12 +4,13 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.1.x   | ✅ security fixes (current) |
-| 3.0.x   | ⚠️ please upgrade to 3.1.x |
+| 3.2.x   | ✅ security fixes (current) |
+| 3.1.x   | ⚠️ please upgrade to 3.2.x |
+| 3.0.x   | ❌ please upgrade |
 | 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
 
-Current version: **3.1.0** (see `VERSION`). This policy was last reviewed for 3.1.0.
+Current version: **3.2.0** (see `VERSION`). This policy was last reviewed for 3.2.0.
 
 ## Reporting a vulnerability
 
@@ -47,6 +48,16 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
 
-## v3.1.0 notes
+## v3.1.0 notes (still apply in 3.2.0)
 - No new network, file or process permissions. The new animation studios, 2D lights and model poses are pure front-end features that run inside the existing sandboxed game preview.
 - Sprite/model animation data is stored as plain JSON inside the game file and is validated on load (frame indices outside the sprite are dropped; unknown track names are ignored).
+
+## v3.2.0 notes
+- **Vextra Shield** (built-in plugin, configurable via its ⚙ button) hardens exported games with a Content-Security-Policy (inline scripts pinned by SHA-256, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, network limited to HTTPS/WSS plus hosts you list; `unsafe-eval` stays because the engine and code behaviours need it), signs local saves to detect edits, enforces a password policy and client-side sign-in lockout, signs out idle sessions, warns before sending passwords over `http://` to non-local servers, and scans files for secrets before publishing. These are defence-in-depth measures: client-side checks can be bypassed by someone modifying the app, so the server's own controls (scrypt hashing, rate limiting) remain authoritative.
+- New plugin hooks (`game.export.html`, `account.*`, `publish.before`) let plugins veto or change those actions. Plugins already run with editor privileges, so only install plugins you trust.
+- `package.json` allows install scripts only for `esbuild` (`allowScripts` for npm 11.16+/12, `pnpm.onlyBuiltDependencies`, `trustedDependencies`, `dependenciesMeta`). Review any dependency before adding it to those lists.
+- Fixed: selection outlines left in the 3D editor after scaling (no security impact).
+- **Two-step sign-in** (server): authenticator-app codes (TOTP, SHA-1/6 digits/30 s, ±1 step, a code cannot be reused), 8 one-time recovery codes (stored hashed), and WebAuthn security keys (ES256, attestation `none`, signature-counter check). The second step uses a 5-minute ticket limited to 6 tries, plus the per-IP rate limit. Turning it on/off, adding/removing keys and new recovery codes require the account password. The TOTP secret is stored in the server's `users.json` (protect the data folder like any credential store). Keys only work from the app address they were added from.
+- **Vextra AI** plugin: prompts and anything the AI reads go to the provider you choose (local providers stay on your computer). API keys are stored in Vextra's local settings. Abilities (read, edit open file, create & edit files, delete/move, build & change game) are Deny / Ask / Allow; file deletion and moves have their own permission and never touch `.git`, `node_modules` or secret-looking files; secret-looking files (`.env`, keys, certificates) are never read or written; writes stay inside the open folder. Treat model output as untrusted – review changes you allow automatically (Agent mode).
+- **Local server** started from the desktop app listens on `127.0.0.1` only and keeps its data in the app's data folder. `forge.net.request` only allows `https://` (and `http://localhost`).
+- Store Export projects approve install scripts only for `electron`, `sharp` and `esbuild`.

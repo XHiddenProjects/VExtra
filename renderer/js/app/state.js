@@ -2,7 +2,7 @@
 (function () {
   const DEFAULTS = {
     mode: 'advanced', theme: 'vextra-dark', fontSize: 14, fontFamily: '', tabSize: 2, wrap: false, autosave: false, formatOnSave: false,
-    disabledPlugins: [], plugins: {}, recent: [], updateCheck: true, skipVersion: '', lastUpdateCheck: 0, serverUrl: '', sidebarWidth: 270, bottomHeight: 220, previewDelay: 400, lastView: 'explorer', welcome: true,
+    disabledPlugins: [], plugins: {}, recent: [], updateCheck: true, skipVersion: '', lastUpdateCheck: 0, serverUrl: '', autoServer: false, sidebarWidth: 270, bottomHeight: 220, previewDelay: 400, lastView: 'explorer', welcome: true,
   };
   const S = { root: null, settings: Object.assign({}, DEFAULTS), tabs: [], active: null, view: 'explorer' };
   let t;
@@ -22,7 +22,7 @@
     },
     setRoot(path) { S.root = path; VX.emit('root', path); },
     rel: (p) => (S.root ? VX.path.rel(S.root, p) : VX.path.base(p)),
-    version: '3.1.0',
+    version: '3.2.0',
   });
   /* file classification */
   const IMG = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);

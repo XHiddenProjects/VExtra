@@ -30,13 +30,71 @@
     onInput(n, port, v, g) { const st = port === 'in' ? n.p.state : port; each(n, g, (o) => { const cur = n.p.what === 'active' ? o.enabled : o.visible; const on = st === 'enable' ? true : st === 'disable' ? false : st === 'toggle' ? !cur : U.truthy(v); if (n.p.what !== 'active') o.visible = on; if (n.p.what !== 'visible') o.enabled = on; g.send(n, 'out', on); }); } });
 
   const FX = { bounce: (t, a, g) => ({ y: (is3(g) ? 1 : -1) * Math.sin(t * Math.PI) * a }), pulse: (t, a) => ({ sx: 1 + Math.sin(t * Math.PI) * a * 0.01, sy: 1 + Math.sin(t * Math.PI) * a * 0.01 }), shake: (t, a) => ({ x: Math.sin(t * 70) * a * (1 - t) }), spin: (t) => ({ rot: 360 * VXRT.ease.curves.quadInOut(t) }), fadeOut: (t) => ({ alpha: 1 - t }), fadeIn: (t) => ({ alpha: t }), wobble: (t, a) => ({ rot: Math.sin(t * Math.PI * 6) * a * (1 - t) }), jelly: (t, a) => ({ sx: 1 + Math.sin(t * Math.PI * 4) * a * 0.01 * (1 - t), sy: 1 - Math.sin(t * Math.PI * 4) * a * 0.01 * (1 - t) }) };
-  B({ id: 'animation', cat: 'properties', label: 'Animation', desc: 'Sprite animation (play frames of a Sprite asset, choose a named animation, set a frame) and quick effect presets – bounce, pulse, shake, spin, fade, wobble, jelly – that do not change the object\'s real position.',
-    inputs: ['in', 'stop'], outputs: ['out', 'done'], params: [P.target(), P.sel('action', 'Action', [['play', 'Play sprite animation'], ['pause', 'Pause'], ['resume', 'Resume'], ['frame', 'Show a specific frame'], ['preset', 'Effect preset']]), P.text('anim', 'Animation name (empty = all frames)', ''), P.num('fps', 'Frames per second (0 = asset default)', 0), P.bool('loop', 'Loop', true), P.num('frame', 'Frame', 0), P.sel('preset', 'Preset', Object.keys(FX)), P.num('duration', 'Effect time (s)', 0.5, { step: 0.1 }), P.num('amount', 'Effect amount', 20)],
+  /* ---- the one Animation block: sprite frame animations, 3D model poses, keyframe clips, automatic movement animation and effect presets ---- */
+  const ROLE = { idle: /idle|stand|rest|breath|wait|default/i, walk: /walk|run|move|jog|sprint|step/i, jump: /jump|rise|up|leap|hop/i, fall: /fall|drop|down|land|air/i };
+  const spriteOf = (g, o) => o.type === 'sprite' && g.data.assets?.sprites?.[o.props.sprite], modelOf = (g, o) => o.type === 'model' && g.data.assets?.models?.[o.props.model];
+  /** every animation name this object can play: its sprite's, its model's, and the project's keyframe clips */
+  VXRT.animsOf = function (g, o) {
+    const out = [], sp = spriteOf(g, o), md = modelOf(g, o), cl = (g.data.assets && g.data.assets.animations) || {};
+    if (sp) for (const k of Object.keys(sp.anims || {})) out.push({ name: k, kind: 'sprite' }); if (md) for (const k of Object.keys(md.anims || {})) out.push({ name: k, kind: 'model' });
+    for (const c of Object.values(cl)) out.push({ name: c.name, id: c.id, kind: 'clip' }); return out;
+  };
+  /** find what a name refers to for this object ("clip:<id>" forces a keyframe clip) */
+  VXRT.resolveAnim = function (g, o, name) {
+    const cl = (g.data.assets && g.data.assets.animations) || {}; name = name || '';
+    if (name.startsWith('clip:')) { const c = cl[name.slice(5)]; return c ? { kind: 'clip', clip: c, name: c.name } : null; }
+    const sp = spriteOf(g, o), md = modelOf(g, o);
+    if (!name) return sp && sp.frames && sp.frames.length > 1 ? { kind: 'sprite', name: null } : null;
+    if (sp && sp.anims && sp.anims[name]) return { kind: 'sprite', name }; if (md && md.anims && md.anims[name]) return { kind: 'model', name };
+    const c = Object.values(cl).find((x) => x.name === name || x.id === name); return c ? { kind: 'clip', clip: c, name: c.name } : null;
+  };
+  /** automatic choice for a role (idle / walk / jump / fall) from the names the object actually has */
+  VXRT.pickAnim = function (g, o, role, explicit) {
+    if (explicit) return explicit; const list = VXRT.animsOf(g, o); const own = list.filter((a) => a.kind !== 'clip'), pool = own.length ? own : list;
+    const hit = (r) => pool.find((a) => ROLE[r].test(a.name)); const a = hit(role) || (role === 'fall' ? hit('jump') : null); return a ? (a.kind === 'clip' ? 'clip:' + a.id : a.name) : '';
+  };
+  const stopAll = (o, name) => { o.anim.playing = false; if (o.clips && o.clips.length) o.clips = []; };
+  function playOn(n, g, o, name, restart) {
+    const r = VXRT.resolveAnim(g, o, name); if (!r) { if (name) g.log('warn', `Animation block: “${name}” was not found on ${o.name} (sprite/model animations or keyframe clips).`); return false; }
+    const key = r.kind + ':' + (r.name || ''); if (!restart && o._animKey === key && (o.anim.playing || (o.clips || []).length)) return true; o._animKey = key;
+    const mode = n.p.mode || '', speed = U.num(n.p.speed, 1) || 1, done = () => g.send(n, 'done', o.name);
+    if (r.kind === 'clip') { o.anim.playing = false; VXRT.playClip(g, o, r.clip, { speed, mode, relative: !!n.p.relative, id: r.clip.id, onDone: done }); }
+    else { o.clips = []; Object.assign(o.anim, { name: r.name, t: 0, frame: 0, playing: true, mode, loop: mode !== 'once', speed, fps: U.num(n.p.fps) || undefined, onDone: done }); }
+    return true;
+  }
+  const FXLIST = Object.keys(FX);
+  B({ id: 'animation', cat: 'properties', label: 'Animation', icon: '🎞️', desc: 'The one block for every kind of animation. It looks at its target and offers what that object can play: sprite frame animations, 3D model poses and keyframe clips. Actions: Auto (plays idle / walk / jump / fall by itself from how the object moves – no wiring), Play, Pause, Resume, Stop, Show frame and quick Effect presets. A held key can trigger it every frame: a running animation is never restarted unless "Restart" is on. Outputs: out, done (when it ends), state (Auto: idle / walk / jump / fall).',
+    inputs: ['in', 'stop', 'pause', 'resume', 'speed'], outputs: ['out', 'done', 'state'],
+    params: [P.target(), P.sel('action', 'Action', [['play', 'Play animation'], ['auto', 'Auto (idle / walk / jump from movement)'], ['pause', 'Pause'], ['resume', 'Resume'], ['stop', 'Stop'], ['frame', 'Show a specific frame'], ['preset', 'Effect preset']]),
+      P.anim('anim', 'Animation (synced with the target)'), P.sel('mode', 'When it ends', [['', 'Animation default'], ['loop', 'Loop'], ['once', 'Play once'], ['pingpong', 'Ping-pong']], ''), P.num('speed', 'Speed (×)', 1, { step: 0.1 }), P.num('fps', 'Frames per second (0 = animation default)', 0), P.bool('restart', 'Restart if already playing', false), P.bool('relative', 'Keyframe clips: relative to where the object is', false), P.num('frame', 'Frame', 0),
+      P.text('idle', 'Auto: idle animation (empty = detect)', ''), P.text('walk', 'Auto: walking animation (empty = detect)', ''), P.text('jump', 'Auto: jump animation (empty = detect)', ''), P.text('fall', 'Auto: falling animation (empty = detect)', ''), P.num('moveSpeed', 'Auto: counts as moving above (0 = auto)', 0, { min: 0 }), P.bool('face', 'Auto: face the way it moves', true),
+      P.sel('preset', 'Preset', FXLIST), P.num('duration', 'Effect time (s)', 0.5, { step: 0.1 }), P.num('amount', 'Effect amount', 20)],
     onInput(n, port, v, g) {
-      if (port === 'stop') { each(n, g, (o) => { o.anim.playing = false; o.fxo = null; }); n.st.fx = null; return; }
-      const a = n.p.action; each(n, g, (o) => { if (a === 'play') { Object.assign(o.anim, { name: n.p.anim || null, t: 0, frame: 0, playing: true, loop: !!n.p.loop, fps: U.num(n.p.fps) || undefined }); } else if (a === 'pause') o.anim.playing = false; else if (a === 'resume') o.anim.playing = true; else if (a === 'frame') { o.anim.playing = false; o.anim.frame = U.num(n.p.frame); } });
+      const a = port === 'in' ? n.p.action : port;
+      if (port === 'speed') { each(n, g, (o) => { o.anim.speed = U.num(v, 1); (o.clips || []).forEach((c) => { c.speed = U.num(v, 1); }); }); return; }
+      if (a === 'stop') { each(n, g, (o) => { stopAll(o); o._animKey = null; o.fxo = null; }); n.st.fx = null; return; }
+      if (a === 'auto') { n.st.auto = true; return; }
+      each(n, g, (o) => {
+        if (a === 'play') playOn(n, g, o, n.p.anim, n.p.restart);
+        else if (a === 'pause') { o.anim.playing = false; (o.clips || []).forEach((c) => { c.paused = true; }); }
+        else if (a === 'resume') { if (o.anim.name !== undefined && o._animKey && o._animKey.startsWith('clip:') === false) o.anim.playing = true; (o.clips || []).forEach((c) => { c.paused = false; }); }
+        else if (a === 'frame') { stopAll(o); o.anim.frame = U.num(n.p.frame); }
+      });
       if (a === 'preset') { n.st.fx = { t: 0, dur: Math.max(0.05, U.num(n.p.duration, 0.5)), f: FX[n.p.preset] || FX.bounce }; } g.send(n, 'out', 1); },
-    update(n, dt, g) { const fx = n.st.fx; if (!fx) return; fx.t += dt; const t = Math.min(1, fx.t / fx.dur); const r = fx.f(t, U.num(n.p.amount, 20), g); each(n, g, (o) => { o.fxo = t >= 1 ? null : r; }); if (t >= 1) { n.st.fx = null; g.send(n, 'done', 1); } } });
+    init(n) { if (n.p.action === 'auto') n.st.auto = true; },
+    update(n, dt, g) {
+      const fx = n.st.fx; if (fx) { fx.t += dt; const t = Math.min(1, fx.t / fx.dur); const r = fx.f(t, U.num(n.p.amount, 20), g); each(n, g, (o) => { o.fxo = t >= 1 ? null : r; }); if (t >= 1) { n.st.fx = null; g.send(n, 'done', 1); } }
+      if (!n.st.auto || g.paused) return; const is3 = g.dim === '3d';
+      each(n, g, (o) => {
+        if (!o.alive || !o.anim) return; const thr = U.num(n.p.moveSpeed) || (is3 ? 0.4 : 20), sp = is3 ? Math.hypot(o.vx || 0, o.vz || 0) : Math.abs(o.vx || 0);
+        o.air = o.grounded ? 0 : (o.air || 0) + dt; const air = o.air > 0.08, vy = o.vy || 0, rising = is3 ? vy > 0.5 : vy < -30;
+        const st = air ? (rising ? 'jump' : 'fall') : sp > thr ? 'walk' : 'idle';
+        if (n.p.face && sp > thr) { if (is3) o.ry = (Math.atan2(o.vx || 0, o.vz || 0) * 180) / Math.PI; else o.flipX = (o.vx || 0) < 0; }
+        if (o._maState === st) return; o._maState = st;
+        const name = VXRT.pickAnim(g, o, st, n.p[st]) || (st === 'fall' ? VXRT.pickAnim(g, o, 'jump', n.p.jump) : '') || VXRT.pickAnim(g, o, 'idle', n.p.idle);
+        if (name) playOn(n, g, o, name, true); g.send(n, 'state', st);
+      });
+    } });
 
   B({ id: 'velocity', cat: 'properties', label: 'Velocity', desc: 'Sets, adds to, scales or stops an object\'s velocity (units per second). Use "Facing" to move along the way the object points, "Camera" for first-person movement in 3D.',
     inputs: ['in'], outputs: ['out'], params: [P.target(), P.sel('mode', 'Mode', [['set', 'Set to'], ['add', 'Add'], ['multiply', 'Multiply by'], ['stop', 'Stop (all zero)']]), P.text('x', 'X', ''), P.text('y', 'Y', ''), P.text('z', 'Z (3D)', ''), P.sel('space', 'Directions are', [['world', 'World'], ['facing', 'Relative to facing'], ['camera', 'Relative to camera (3D)']]), SRC([['signalX', 'Signal → X'], ['signalY', 'Signal → Y'], ['signalZ', 'Signal → Z']])],
@@ -75,14 +133,6 @@
     inputs: ['in'], outputs: ['out'], params: [P.target(), P.sel('mode', 'Mode', [['set', 'Set colour'], ['lerp', 'Blend toward colour'], ['hue', 'Hue from number'], ['random', 'Random colour']]), P.color('color', 'Colour', '#ff5577'), P.num('amount', 'Blend amount 0–1', 0.5, { min: 0, max: 1, step: 0.05 }), SRC([['signalColor', 'Signal is a colour / hue number']])],
     onInput(n, port, v, g) { each(n, g, (o) => { const m = n.p.mode; let c; if (m === 'random') c = U.hsl(Math.random() * 360); else if (m === 'hue' || (n.p.source === 'signalColor' && typeof v === 'number')) c = U.hsl(U.num(v)); else { c = n.p.source === 'signalColor' && typeof v === 'string' ? v : n.p.color; if (m === 'lerp') { const a = toRGB(o.color), b = toRGB(c), k = U.num(n.p.amount, 0.5); c = fromRGB(a.map((x, i) => x + (b[i] - x) * k)); } }
       if (/^hsl/.test(c)) { const t = document.createElement('canvas').getContext('2d'); t.fillStyle = c; c = t.fillStyle; } o.color = c; if (o.material) o.material.color = c; g.send(n, 'out', c); }); } });
-
-  B({ id: 'clip', cat: 'properties', label: 'Animation Clip', desc: 'Plays a keyframe animation clip made in Assets → Animations on an object (2D or 3D): position, rotation, size, opacity, colour and sprite frame over time. "play" starts it, "stop" ends it, "pause"/"resume" freeze it and "speed" changes its speed. "done" fires when a Once clip ends.',
-    inputs: ['play', 'stop', 'pause', 'resume', 'speed'], outputs: ['out', 'done'], params: [P.target(), P.clip('clip', 'Clip'), P.sel('mode', 'Playback', [['', 'Clip default'], ['once', 'Once'], ['loop', 'Loop'], ['pingpong', 'Ping-pong']], ''), P.num('speed', 'Speed', 1, { step: 0.1 }), P.bool('relative', 'Relative (offset from where the object is now)', false)],
-    onInput(n, port, v, g) {
-      const A = (g.data.assets && g.data.assets.animations) || {}; const clip = A[n.p.clip];
-      each(n, g, (o) => { if (port === 'stop') VXRT.stopClip(o, n.p.clip); else if (port === 'pause' || port === 'resume') (o.clips || []).forEach((c) => { if (c.id === n.p.clip) c.paused = port === 'pause'; }); else if (port === 'speed') (o.clips || []).forEach((c) => { if (c.id === n.p.clip) c.speed = U.num(v, 1); });
-        else { if (!clip) return g.log('warn', 'Animation Clip block: pick a clip (Assets → Animations).'); VXRT.playClip(g, o, clip, { speed: U.num(n.p.speed, 1), mode: n.p.mode, relative: n.p.relative, id: n.p.clip, onDone: () => g.send(n, 'done', o.name) }); g.send(n, 'out', o.name); } });
-    } });
 
   /* Shader: post-process effects (see rt-fx.js). The Type list is generated from VXRT.FX so docs and editor always match. */
   const CLASSIC = [['sepia', 'Sepia (classic)', '2D warm brown tone – This object only'], ['tint', 'Tint (classic)', '2D multiply colour – This object only'], ['brightness', 'Brightness (classic)', '2D brighten / darken – This object only'], ['pixelate', 'Pixelate (classic)', '2D coarse blocks – This object only'], ['glow', 'Glow (classic)', '2D soft halo – This object only'], ['outline', 'Outline (classic)', '2D coloured outline – This object only'], ['shadow', 'Shadow (classic)', '2D drop shadow – This object only'],

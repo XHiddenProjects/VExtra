@@ -30,6 +30,11 @@
       if (p === 'x' || p === 'y' || p === 'z') t.position[p] = b[p] + v; else if (p[0] === 'r') t.rotation[p[1]] = b[p] + U.rad(v); else t.scale[p[1]] = b[p] * v;
     }
   };
+  /** Put every posed part back to its resting transform (done when a different animation starts). */
+  VXRT.poseReset = function (root) {
+    const G = root && root.children && root.children[0]; if (!G) return;
+    const back = (t) => { const b = t.userData && t.userData.base; if (b) { t.position.set(b.x, b.y, b.z); t.rotation.set(b.rx, b.ry, b.rz); t.scale.set(b.sx, b.sy, b.sz); } }; back(G); G.children.forEach(back);
+  };
   const APPLY = (g, o, prop, v, rel, base) => {
     if (v === undefined) return;
     if (prop === 'color') { o.color = v; if (o.material) o.material.color = v; return; }

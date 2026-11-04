@@ -35,7 +35,7 @@
     const t = VX.tabs.active(); if (t && t.kind === 'code') { r.append(item(`Ln ${cur.l}, Col ${cur.c}`), item(t.lang || 'text', null, '', true), item('Spaces: ' + app.settings.tabSize, null, '', true)); }
     const u = VX.cloud && VX.cloud.user; r.append(item([VX.icon('user', 12), u ? u.username : 'Sign in'], () => VX.sidebar.show('cloud'), 'Account'), item(app.settings.mode === 'simple' ? 'Simple mode' : 'Advanced mode', () => { const m = app.settings.mode === 'simple' ? 'advanced' : 'simple'; app.set('mode', m); document.body.dataset.mode = m; renderStatus(); }, 'Toggle simple / advanced mode'), ...(() => { const U = VX.update, l = U && U.last; const txt = U && U.busy ? '⟳ Checking…' : U && U.pending() ? '⬆ Update v' + l.latest : null; return txt ? [h('span', { class: 'sb-item click upd-badge', title: U.message(), onclick: () => U.dialog() }, txt)] : []; })(), item('v' + app.version, () => VX.update.dialog(), 'Version ' + app.version + ' – click to check for updates'));
   }
-  VX.on('cursor', (l, c) => { cur = { l, c }; renderStatus(); }); VX.on('status', renderStatus); VX.on('update', renderStatus); VX.on('tabChange', renderStatus); VX.on('registry', renderStatus); VX.on('root', renderStatus); VX.on('cloud', renderStatus);
+  VX.on('cursor', (l, c) => { cur = { l, c }; renderStatus(); }); VX.on('status', renderStatus); VX.on('update', renderStatus); VX.on('tabChange', renderStatus); VX.on('registry', renderStatus); VX.on('root', renderStatus); VX.on('cloud', renderStatus); VX.on('modeChanged', renderStatus);
 
   /* ---------- command palette & quick open ---------- */
   function commands() {
@@ -94,7 +94,8 @@
   function drag(el, onMove) { el.addEventListener('mousedown', (e) => { e.preventDefault(); el.classList.add('drag'); const mv = (ev) => onMove(ev); const up = () => { el.classList.remove('drag'); removeEventListener('mousemove', mv); removeEventListener('mouseup', up); }; addEventListener('mousemove', mv); addEventListener('mouseup', up); }); }
 
   /* ---------- host API for plugins ---------- */
-  Object.assign(Forge.host, { get settings() { return app.settings; }, saveSettings: () => app.saveSettings(), applyTheme: (id) => { app.set('theme', id); VX.theme.apply(id); }, openDocs: (id) => VX.docs.open(id), account: () => (VX.cloud ? VX.cloud.user : null), root: () => S.root, setPluginSetting(pid, k, v) { (app.settings.plugins[pid] ||= {})[k] = v; app.saveSettings(); } });
+  Object.defineProperty(Forge.host, 'settings', { get: () => app.settings, configurable: true, enumerable: true }); // a live getter: Object.assign would copy the value once and go stale after settings load
+  Object.assign(Forge.host, { saveSettings: () => app.saveSettings(), applyTheme: (id) => { app.set('theme', id); VX.theme.apply(id); }, openDocs: (id) => VX.docs.open(id), account: () => (VX.cloud ? VX.cloud.user : null), root: () => S.root, setPluginSetting(pid, k, v) { const st = app.settings; st.plugins = st.plugins || {}; (st.plugins[pid] ||= {})[k] = v; app.saveSettings(); Forge.emit('pluginSetting', pid, k, v); } });
 
   /* ---------- boot ---------- */
   async function boot() {

@@ -26,7 +26,7 @@
       const e = scene.env || {}; this.three.background = new this.T.Color(e.sky || scene.bg || '#1a2233');
     }
     rebuild() {
-      const T = this.T; for (const rec of this.map.values()) { this.three.remove(rec.root); if (rec.gizmo) this.three.remove(rec.gizmo); } this.map.clear(); this.tc.detach();
+      const T = this.T; for (const rec of this.map.values()) this._drop(rec); this.map.clear(); this.tc.detach();
       for (const l of [...this.three.children]) if (l.userData.vxEnv) this.three.remove(l);
       const e = this.scene.env || {}; const amb = new T.AmbientLight(e.ambientColor || '#ffffff', e.ambientIntensity ?? 0.45); amb.userData.vxEnv = true; this.three.add(amb);
       if (e.fog) { this.three.fog = new T.Fog(e.fogColor || e.sky || '#1a2233', e.fogNear ?? 20, e.fogFar ?? 120); } else this.three.fog = null;
@@ -48,11 +48,13 @@
     _aimGizmo(rec) { const gz = rec.gizmo; if (!gz || !gz.userData.aim) return; const o = rec.o; const L = Math.hypot(o.x, o.y, o.z) || 1; for (const c of gz.children) if (c.userData.aimLine) c.geometry.setFromPoints([new this.T.Vector3(), new this.T.Vector3(-o.x, -o.y, -o.z)]); gz.rotation.set(0, 0, 0); }
     _place(rec) { const o = rec.o, r = rec.root; r.position.set(o.x, o.y, o.z); r.rotation.set(rad(o.rx || 0), rad(o.ry || 0), rad(o.rz || 0), 'YXZ'); if (!r.userData.isLight && o.type !== 'camera') r.scale.set((o.w || 1) * (o.flipX ? -1 : 1), (o.h || 1) * (o.flipY ? -1 : 1), o.d || 1); }
     _placeGizmo(rec) { if (!rec.gizmo) return; rec.gizmo.position.set(rec.o.x, rec.o.y, rec.o.z); rec.gizmo.rotation.set(rad(rec.o.rx || 0), rad(rec.o.ry || 0), rad(rec.o.rz || 0), 'YXZ'); this._aimGizmo(rec); }
-    refreshObject(id) { const rec = this.map.get(id); const o = this.scene.objects.find((x) => x.id === id); if (!o) return; if (rec) { this.three.remove(rec.root); if (rec.gizmo) this.three.remove(rec.gizmo); this.map.delete(id); } this._add(o); if (this.sel.includes(id)) this.syncSel(); this.render(); }
+    refreshObject(id) { const rec = this.map.get(id); const o = this.scene.objects.find((x) => x.id === id); if (!o) return; if (rec) { this._drop(rec); this.map.delete(id); } this._add(o); if (this.sel.includes(id)) this.syncSel(); this.render(); }
     refreshAll() { this.rebuild(); }
     syncPositions() { for (const rec of this.map.values()) { this._place(rec); this._placeGizmo(rec); } this.render(); }
     select(ids) { this.sel = ids; this.syncSel(); this.ctx.onSelect && this.ctx.onSelect(ids); }
     syncSel() { const rec = this.sel.length === 1 ? this.map.get(this.sel[0]) : null; this.tc.detach(); if (rec && !rec.o.locked) { this.tc.attach(rec.gizmo || rec.root); this.tc.setMode(this.tool); this._applySnap(); } for (const r of this.map.values()) this._outline(r, this.sel.includes(r.o.id)); this.render(); }
+    /** remove everything an object put in the scene: its mesh, editor gizmo and selection outline (a leftover outline looked like a ghost of the old size) */
+    _drop(rec) { this.three.remove(rec.root); if (rec.gizmo) this.three.remove(rec.gizmo); if (rec._box) { this.three.remove(rec._box); rec._box.geometry && rec._box.geometry.dispose && rec._box.geometry.dispose(); rec._box = null; } }
     _outline(rec, on) { if (rec._box) { this.three.remove(rec._box); rec._box = null; } if (on) { const b = new this.T.Box3().setFromObject(rec.root); if (!b.isEmpty()) { rec._box = new this.T.Box3Helper(b, 0x6c8cff); this.three.add(rec._box); } } }
     setTool(t) { this.tool = t; this.tc.setMode(t); this.render(); }
     _applySnap() { this.tc.setTranslationSnap(this.snap ? 0.5 : null); this.tc.setRotationSnap(this.snap ? rad(15) : null); this.tc.setScaleSnap(this.snap ? 0.25 : null); }
@@ -62,7 +64,7 @@
       const rec = this.map.get(this.sel[0]); if (!rec) return; const g = this.tc.object, o = rec.o, r = (v) => Math.round(v * 1000) / 1000;
       o.x = r(g.position.x); o.y = r(g.position.y); o.z = r(g.position.z); o.rx = r(deg(g.rotation.x)); o.ry = r(deg(g.rotation.y)); o.rz = r(deg(g.rotation.z));
       if (rec.gizmo) { rec.root.position.copy(g.position); rec.root.rotation.copy(g.rotation); } else if (!rec.root.userData.isLight && o.type !== 'camera') { o.w = r(Math.abs(g.scale.x)); o.h = r(Math.abs(g.scale.y)); o.d = r(Math.abs(g.scale.z)); }
-      if (rec._box) { this.three.remove(rec._box); const b = new this.T.Box3().setFromObject(rec.root); rec._box = new this.T.Box3Helper(b, 0x6c8cff); this.three.add(rec._box); }
+      if (rec._box) { const b = new this.T.Box3().setFromObject(rec.root); rec._box.box.copy(b); }
       this.ctx.onLiveChange && this.ctx.onLiveChange();
     }
     pick(cx, cy) { const T = this.T, r = this.canvas.getBoundingClientRect(); this.ray.setFromCamera(new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.cam); const objs = []; for (const rec of this.map.values()) { if (rec.root.visible) objs.push(rec.root); if (rec.gizmo) objs.push(rec.gizmo); } const hits = this.ray.intersectObjects(objs, true); for (const hit of hits) { const o = hit.object.userData.vxObj; if (o && !o.locked) return o; } return null; }

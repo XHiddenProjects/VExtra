@@ -153,8 +153,9 @@
           h('h4', {}, h('span', {}, m.name, ' ', h('small', { style: 'color:var(--muted);font-weight:400' }, 'v' + m.version)), VX.ui.sw(rec.enabled, (on) => { Forge.plugins_.setEnabled(m.id, on); SB.refresh(); })),
           h('p', {}, m.description || 'No description'),
           rec.error ? h('p', { style: 'color:var(--danger)' }, '⚠ ' + rec.error) : null,
-          h('div', { class: 'row' }, h('span', { class: 'tag' + (rec.source === 'builtin' ? '' : ' acc') }, rec.source === 'builtin' ? 'built-in' : 'yours'), ...contribs.map((x) => h('span', { class: 'tag' }, x)),
-            h('span', { class: 'spacer' }),
+          h('div', { class: 'row' }, h('span', { class: 'tag' + (rec.source === 'builtin' ? '' : ' acc') }, rec.source === 'builtin' ? 'built-in' : 'yours'), ...contribs.map((x) => h('span', { class: 'tag' }, x))),
+          h('div', { class: 'row card-actions' },
+            Forge.configs.has(m.id) && rec.enabled ? h('button', { class: 'btn sm primary', title: 'Plugin settings', onclick: () => Forge.openConfig(m.id) }, VX.icon('settings', 13), 'Configure') : null,
             h('button', { class: 'btn sm', onclick: () => VX.docs.open('plugin:' + m.id) }, VX.icon('docs', 13), 'Docs'),
             rec.source === 'user' ? h('button', { class: 'btn sm', title: 'Edit source', onclick: () => VX.tabs.open({ kind: 'code', key: 'plugin:' + m.id, title: rec.file, path: rec.path || undefined, text: rec.code, lang: 'javascript' }) }, 'Edit') : h('button', { class: 'btn sm', title: 'Copy to your plugins to modify', onclick: () => copyPlugin(rec) }, 'Copy'),
             rec.source === 'user' ? h('button', { class: 'btn sm danger', onclick: async () => { if (await VX.ui.confirm(`Remove plugin “${m.name}”?`, 'Remove', { danger: true })) { await window.native.ext.remove('plugins', rec.file); await Forge.plugins_.loadAll(); SB.refresh(); } } }, VX.icon('trash', 13)) : null)));

@@ -107,7 +107,7 @@
   /* form building blocks used by the inspectors */
   const field = (label, input, hint) => h('div', { class: 'field' }, h('label', { title: hint || '' }, label), input);
   const sw = (on, fn) => { const b = h('button', { class: 'switch' + (on ? ' on' : ''), onclick: () => { on = !on; b.classList.toggle('on', on); fn(on); } }); return b; };
-  const segmented = (opts, val, fn) => { const wrap = h('div', { class: 'seg' }); const draw = () => { wrap.textContent = ''; for (const [v, l, t] of opts) wrap.append(h('button', { class: v === val ? 'on' : '', title: t || '', onclick: () => { val = v; draw(); fn(v); } }, l)); }; draw(); return wrap; };
+  const segmented = (opts, val, fn) => { const wrap = h('div', { class: 'seg' }); const draw = () => { wrap.textContent = ''; for (const [v, l, t] of opts) wrap.append(h('button', { class: v === val ? 'on' : '', title: t || '', onclick: () => { val = v; draw(); fn(v); } }, l)); }; draw(); wrap.set = (v) => { if (v !== val) { val = v; draw(); } }; return wrap; };
 
   VX.ui = { toast, modal, ask, confirm, form, menu, preview, layer, field, sw, segmented };
 })();

@@ -8,11 +8,21 @@
   const C = (VX.cloud = {
     user: null, token: null, status: 'unknown', link: null, online: [], syncing: false, lastSync: 0, error: null,
     base() { return (VX.app.settings.serverUrl || 'http://localhost:8787').replace(/\/+$/, ''); },
+    /** true when the configured server address is this computer */
+    isLocal() { try { return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(new URL(C.base()).hostname); } catch { return false; } },
+    localPort() { try { return +new URL(C.base()).port || 8787; } catch { return 8787; } },
+    /** Starts the Vextra server bundled with the desktop app (no terminal needed). */
+    async startLocalServer(quiet) {
+      if (!window.__TAURI__) throw new Error('Starting the server from here needs the desktop app. In a browser run: npm run server');
+      const r = await window.native.server.start(C.localPort()); C._autoTried = true; await C.init(); if (!quiet) VX.ui.toast(r.mode === 'external' ? 'A server was already running – connected' : 'Local server started', 'ok'); return r;
+    },
+    async stopLocalServer() { await window.native.server.stop(); await C.init(); },
     configure() { C.token = null; C.user = null; C.init(); },
     async init() {
       try { C.token = await window.native.secret.get('cloudToken:' + C.base()); } catch { C.token = null; }
       if (C.token) { try { const r = await C.request('GET', '/api/me'); C.user = r.user; C.status = 'online'; } catch (e) { if (e.status === 401) { C.token = null; await window.native.secret.set('cloudToken:' + C.base(), null); } C.status = e.status ? 'online' : 'offline'; } }
       else { try { await C.request('GET', '/api/health', null, false); C.status = 'online'; } catch { C.status = 'offline'; } }
+      if (C.status === 'offline' && VX.app.settings.autoServer && C.isLocal() && !C._autoTried) { C._autoTried = true; try { await C.startLocalServer(true); return; } catch { /* the Cloud panel shows the Start button and the reason */ } }
       VX.emit('cloud'); C.loadLink();
     },
     async request(method, path, body, auth = true) {
@@ -22,17 +32,54 @@
       if (r.status >= 400) { const er = new Error(j.error || 'Server error ' + r.status); er.status = r.status; throw er; } return j;
     },
     async _session(j) { C.token = j.token; C.user = j.user; C.status = 'online'; await window.native.secret.set('cloudToken:' + C.base(), j.token); VX.emit('cloud'); C.loadLink(); return j.user; },
-    async register(username, password, displayName) { return C._session(await C.request('POST', '/api/register', { username, password, displayName }, false)); },
-    async login(username, password) { return C._session(await C.request('POST', '/api/login', { username, password }, false)); },
+    async register(username, password, displayName) { await VX.hooks.run('account.register', { username, password, displayName, server: C.base() }); return C._session(await C.request('POST', '/api/register', { username, password, displayName }, false)); },
+    async login(username, password) {
+      await VX.hooks.run('account.login', { username, server: C.base() });
+      try {
+        let j = await C.request('POST', '/api/login', { username, password }, false);
+        if (j.mfa) j = await C._secondStep(j); // two-step sign-in: authenticator code, recovery code or security key
+        const r = await C._session(j); VX.hooks.notify('account.loginOk', { username }); return r;
+      } catch (e) { VX.hooks.notify('account.loginFailed', { username, error: e.message, status: e.status }); throw e; }
+    },
+    /** The sign-in dialog sets C.mfaPrompt(challenge) → { code } | { recovery } | { key: true }. Wrong codes can be retried until the ticket runs out. */
+    async _secondStep(ch) {
+      for (let tries = 0; tries < 6; tries++) {
+        const a = C.mfaPrompt ? await C.mfaPrompt(ch, tries ? 'That code was not accepted – try again.' : '') : null; if (!a) throw Object.assign(new Error('Sign-in cancelled'), { status: 0 });
+        const body = { ticket: ch.ticket };
+        if (a.key) { try { body.assertion = await C._keyAssertion(ch); } catch (e) { if (tries >= 5) throw e; ch.__msg = e.message; continue; } } else if (a.recovery) body.recovery = a.recovery; else body.code = a.code;
+        try { return await C.request('POST', '/api/login/mfa', body, false); } catch (e) { if (e.status === 401 && /expired|again/i.test(e.message) === false) { if (tries >= 5) throw e; continue; } throw e; }
+      }
+      throw new Error('Too many wrong codes');
+    },
+    _b64u: { enc: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''), dec: (s) => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)) },
+    async _keyAssertion(ch) {
+      if (!navigator.credentials || !window.PublicKeyCredential) throw new Error('This app window cannot use security keys – use an authenticator code instead.');
+      const B = C._b64u, ids = ch.keys.filter((k) => k.rpId === location.hostname); if (!ids.length) throw new Error('None of your keys were added from this app/address (' + location.hostname + ') – use an authenticator or recovery code.');
+      const cred = await navigator.credentials.get({ publicKey: { challenge: B.dec(ch.challenge), rpId: location.hostname, allowCredentials: ids.map((k) => ({ type: 'public-key', id: B.dec(k.id) })), userVerification: 'discouraged', timeout: 60000 } });
+      const r = cred.response; return { id: B.enc(cred.rawId), authenticatorData: B.enc(r.authenticatorData), clientDataJSON: B.enc(r.clientDataJSON), signature: B.enc(r.signature) };
+    },
+    /* ----- account security (profile) ----- */
+    security: () => C.request('GET', '/api/me/security'),
+    mfaSetup: (password) => C.request('POST', '/api/me/mfa/setup', { password }),
+    mfaEnable: (password, code) => C.request('POST', '/api/me/mfa/enable', { password, code }),
+    mfaDisable: (password) => C.request('POST', '/api/me/mfa/disable', { password }),
+    mfaRecovery: (password) => C.request('POST', '/api/me/mfa/recovery', { password }),
+    removeKey: (password, id) => C.request('POST', '/api/me/keys/remove', { password, id }),
+    async addKey(password, name) {
+      if (!navigator.credentials || !window.PublicKeyCredential) throw new Error('This app window cannot use security keys. Use an authenticator app instead.');
+      const B = C._b64u, o = await C.request('POST', '/api/me/keys/options', { password });
+      const cred = await navigator.credentials.create({ publicKey: { challenge: B.dec(o.challenge), rp: { id: location.hostname, name: 'Vextra Studio' }, user: { id: B.dec(o.user.id), name: o.user.name, displayName: o.user.displayName }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { userVerification: 'discouraged' }, attestation: 'none', excludeCredentials: o.exclude.map((id) => ({ type: 'public-key', id: B.dec(id) })), timeout: 60000 } });
+      const r = cred.response; return C.request('POST', '/api/me/keys/register', { password, name, origin: location.origin, rpId: location.hostname, credentialId: B.enc(cred.rawId), attestationObject: B.enc(r.attestationObject), clientDataJSON: B.enc(r.clientDataJSON) });
+    },
     async logout() { try { await C.request('POST', '/api/logout'); } catch { /* ignore */ } C.stopSync(); C.token = null; C.user = null; await window.native.secret.set('cloudToken:' + C.base(), null); VX.emit('cloud'); },
-    async changePassword(o, n) { return C.request('POST', '/api/me/password', { old: o, new: n }); },
+    async changePassword(o, n) { await VX.hooks.run('account.password', { password: n, username: C.user && C.user.username }); return C.request('POST', '/api/me/password', { old: o, new: n }); },
     async logoutOthers() { return C.request('POST', '/api/me/logout-all'); },
     async updateProfile(displayName) { const r = await C.request('PATCH', '/api/me', { displayName }); C.user = r.user; VX.emit('cloud'); return r.user; },
     async deleteAccount(password) { await C.request('DELETE', '/api/me', { password }); C.stopSync(); C.token = null; C.user = null; await window.native.secret.set('cloudToken:' + C.base(), null); VX.emit('cloud'); },
 
     /* ----- sites ----- */
     sites: async () => (await C.request('GET', '/api/publish')).sites,
-    async publish(slug, { kind, title, files, gameId }) { return C.request('PUT', '/api/publish/' + encodeURIComponent(slug), { kind, title, files, gameId }); },
+    async publish(slug, { kind, title, files, gameId }) { await VX.hooks.run('publish.before', { slug, kind, title, files }); return C.request('PUT', '/api/publish/' + encodeURIComponent(slug), { kind, title, files, gameId }); },
     unpublish: (slug) => C.request('DELETE', '/api/publish/' + encodeURIComponent(slug)),
     /** Collect a folder's files for upload (text as string, binary as {b64}). */
     async collect(root, { max = 1500, maxBytes = 70 * 1024 * 1024 } = {}) {

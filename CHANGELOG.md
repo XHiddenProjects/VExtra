@@ -2,7 +2,58 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.1.0] — current
+## [3.2.0] — current
+
+### Added
+- **Vextra Shield** plugin (`plugins/vextra-shield.js`): CSP with script hashes and signed saves for exported games, password policy, sign-in lockout, idle sign-out, plain-http warning, secret scan before publishing and a **Security audit** command (writes `SECURITY-AUDIT.md`). Configurable with a ⚙ button.
+- **Plugin API**: `forge.config.register` (⚙ **Configure** button on plugin cards), `forge.hooks` (`game.export.html`, `account.register/login/password`, `account.loginOk/loginFailed`, `publish.before`), `forge.onUnload`, `forge.fs.list`, `forge.account.signOut`.
+- **One Animation block** does everything: sprite animations, 3D model poses, keyframe clips, **Auto** mode (idle / walk / jump / fall from movement, with facing) and effect presets. Its animation list **syncs with the target** (dropdown of what that object can play). The separate *Animation clip* and *Movement Animator* blocks are removed; old projects are converted automatically.
+- **F3** in 3D games cycles 1st person → 3rd person (behind) → 3rd person (front) for the followed object.
+- **Vextra AI builds for you**: ask for a game or website and it plans, then builds — opens a game, adds scenes, objects, pixel-art sprites and ready-made assets, writes block-coded behaviours (after looking up the real blocks, ports and params), attaches them, checks the result and fixes errors; for web projects it creates, edits, moves and deletes files and folders in the open folder. Each game change is one undo step. New **Builder** preset and a separate *Delete / move* permission. New plugin APIs: `forge.fs.remove/rename/mkdir/open`, `forge.game.kit()`, `forge.game.newGame()`.
+- **Vextra AI** plugin (`plugins/vextra-ai.js`): chat with Claude, OpenAI, Gemini, Groq, OpenRouter, Ollama, LM Studio or any OpenAI-compatible server. Per-ability Deny / Ask / Allow permissions (read project, edit open file, write files, change game); secret files are never read. New `forge.net.request` and `forge.game.editor()` plugin APIs.
+- **Account security** (Vextra Shield section in *Your account*): authenticator-app two-step sign-in (TOTP), one-time recovery codes and security keys / passkeys (WebAuthn). The server asks for the second step at sign-in and rate-limits attempts.
+- **Local server button**: the desktop builds (`build:win`, `build:linux`, `build:mac`) bundle the Vextra server (compiled into one executable with Node's built-in single-executable support (needs Node 20+ and the small `postject` helper; ~120 MB), otherwise run with Node.js). *Cloud → Start local server* (and Settings, plus optional auto-start) starts it on 127.0.0.1 — no terminal.
+- Plugin settings open as a roomy editor tab named `plugin:<name>`; the plugin card shows its buttons in a separate row under the tags.
+- Every field that names an object (Target, Spawn → Object to spawn, Look at, Collides with, Send to, Only hit, HUD follow…) is now a dropdown of the project's objects and tags (with “Custom…” for expressions).
+- Demos: the 2D demo robot now has idle, walk and jump animations; the 3D demo has a third-person animated robot model (walk, idle, jump) and stops when keys are released.
+
+### Removed
+- *State Flag* block (use a Variable or Toggle Switch).
+
+### Fixed
+- Vextra AI: **Ollama and LM Studio are local-only**. Ollama now uses its own local API (`/api/chat`, `/api/tags` on `http://localhost:11434`, whatever of `/api` or `/v1` you typed is ignored); any non-local address (such as ollama.com cloud) is refused with a clear message – pick the separate **Ollama Cloud** provider (API key) to use ollama.com, or *Custom* for another remote server. No API key is ever sent to a local provider.
+- npm warning `prebuild-install@7.1.3: No longer maintained`: it came from the `@yao-pkg/pkg` dev dependency, which is removed. The local server is now compiled with Node's built-in single-executable feature (`postject`), so `npm install` has no deprecated packages.
+- Local connections (AI/Ollama, local Vextra server) always use IPv4 (`127.0.0.1`), never `[::1]`.
+- Vextra AI: a server URL without `/v1` (e.g. `http://localhost:11434`) now works for chat and the model list (404 fixed; `/v1` is added automatically, with a fallback). Local/small models are asked for a strict JSON reply (`response_format`) so they actually perform the build instead of describing it. The AI now sees what is open (the current game with its scenes/objects/behaviours, or the open file) and builds into it. Chats are saved: a history list, New and Delete in the AI panel.
+- Vextra AI: new permission **Build & change site** (Deny / Ask / Allow, part of every preset). Website files (html, css, js, ts, vue, svelte, json, svg, md…) are written under it; *Create & edit other files* covers the rest. New actions `new_site` (scaffolds index.html + style.css + script.js without overwriting) and `preview_site` (shows the page with its css/js inlined).
+- Vextra AI settings: changing the provider no longer carries the previous model over or auto-fills one (no more `llama3.2:latest` default). The model list starts at “— select a model —” (“— none found —” when the server returns nothing); each provider remembers the model you saved for it.
+- Vextra AI: the **Context window** setting now applies to every provider – older messages are dropped to fit it and the answer length is capped to half of it (Ollama also gets it as `num_ctx`).
+- Vextra AI: the token bar no longer goes backwards. It showed the size of the *latest* request, which can shrink (older messages are trimmed, Ollama reports only uncached prompt tokens, estimates vary); the context fill now only grows within a chat.
+- Vextra AI: the chat always matches the Settings – the panel shows the current provider · model, and changing the model, provider or permissions updates the chat (model label, permission preset, usage window) immediately.
+- Simple / Advanced mode: the status-bar toggle, the Settings page and the command palette stay in sync (changing it in one updates the others).
+- Vextra AI: the **Stop** button now works immediately – it ends a waiting request or a pending action instead of only stopping between steps.
+- Vextra AI: after a time-out the box is locked and a banner shows when you can run it again (30 s, doubling to 5 min on repeated time-outs).
+- Vextra AI: **checkpoints** – when a run is stopped, times out, errors or hits the step limit, a Continue button picks up where it left off (saved with the chat, survives restarts).
+- Vextra AI works with more models: adapts to what a server accepts (drops `response_format`, `temperature` or the system role, uses `max_completion_tokens` when asked), strips `<think>…</think>` reasoning, handles array-style replies, and adds Mistral, DeepSeek, xAI (Grok), Together AI and a custom Anthropic-compatible provider.
+- Vextra AI: deleting a chat removes it right away, and if none are left a fresh empty chat is inserted. The internal `data-tag` attribute on chat bubbles is gone.
+- Vextra AI: new **token usage bar** under the chat (context used vs. the model's window, amber above 70 %, red above 90 %, plus per-chat in/out totals; real counts from the provider, estimated otherwise). New *Context window* setting.
+- Vextra AI: network failures now just say “⏱ The AI has timed out.”. Cloud providers get a **Reconnect** button that waits for the internet and then auto-reconnects after a 3-second countdown, resuming the request; local models get **Retry**.
+- Vextra AI only described the build instead of doing it with smaller/local models: it now accepts sloppy action formats (```vx, ```json, bare JSON, game operations written as actions), folds them into one undoable game edit, and re-prompts the model once or twice when it describes steps without performing them.
+- Plugin settings did not save or apply in the desktop app: the plugin host kept a stale copy of the settings object created before settings were loaded. It now reads the live settings.
+- Vextra AI: the model is a dropdown (installed models for Ollama / LM Studio, models your key can use for cloud providers, “Other…” to type one), the provider is detected from the API key, and the panel icon is a bot.
+- Store Export: the progress dialog no longer floods or hangs on long/failed builds; failed steps show a plain-language hint; generated projects approve the install scripts they need (`electron`, `sharp`, `esbuild`) and skip Windows code-signing tools that need admin rights.
+- Checkboxes in forms were squeezed into a dot.
+- Animation block restarted every frame while a key was held, so walking animations never advanced. A running animation is no longer restarted (new *Restart if already playing* option).
+- 3D model animations leaked the previous pose into the next animation; poses now reset on change.
+- Selection outlines were left behind (“ghost outline”) after scaling/editing 3D objects.
+
+### Changed
+- `package.json` allows the `esbuild` install script by default (`allowScripts` for npm 11.16+/12, plus pnpm, Bun and Yarn), so `npm install` no longer warns about it.
+
+### Security
+- See SECURITY.md (3.2.x). New hooks run with editor privileges like any plugin; Vextra Shield adds no network access.
+
+## [3.1.0]
 
 ### Added
 - **Animation studio for sprites** (new *🎞 Animate* tab in the Sprite editor): named animations, drag-to-reorder timeline, per-frame hold, fps, loop / once / ping-pong, frame bin, large pixel-perfect preview that **starts paused** (the old auto-looping mini preview is gone), Space/←/→ shortcuts.

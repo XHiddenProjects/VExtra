@@ -39,7 +39,14 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
-## What's new in 3.1.0
+## What's new in 3.2.0
+- **Vextra Shield** security plugin with a ⚙ Configure button; plugin hooks and `forge.config`.
+- **One Animation block** for everything (sprite/model/clip, Auto walk-idle-jump), synced with its target; **F3** cycles 1st / 3rd-back / 3rd-front camera in 3D.
+- **Vextra AI** plugin (Claude, OpenAI, Gemini, Groq, Ollama… with Deny/Ask/Allow permissions) and **account security** (authenticator app, recovery codes, security keys).
+- **Start local server** button in the desktop app (bundled server, no terminal); every object/target field is a dropdown; settings open as `plugin:<name>` tabs.
+- Fixed leftover outlines when scaling 3D objects. `esbuild` install script allowed by default.
+
+## What was new in 3.1.0
 - Separate **animation studios** for sprites and 3D models (🎞 Animate tab), with a calm, paused-by-default preview.
 - **2D lights** with scene darkness; clearer 3D light helpers.
 

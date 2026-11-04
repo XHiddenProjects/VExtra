@@ -467,6 +467,13 @@ Only install things from people you trust: a website template can contain script
 
   A('anim', 'Making games', 'Animation, materials & shaders', `# Animation, materials & shaders
 
+## The Animation block (one block for everything)
+There is a single **Animation** block. Pick its **Target** and the **Animation** list fills itself with what that object can play – its sprite animations, its 3D model poses and the project's keyframe clips – so there is nothing to type or guess.
+- **Play animation** – plays the chosen one. A held key fires every frame, so a running animation is *not* restarted unless **Restart if already playing** is on. *When it ends*: animation default, loop, once or ping-pong. Speed and fps can be changed. The **done** output fires when it ends.
+- **Auto (idle / walk / jump from movement)** – needs no wires. It watches how the target moves and plays idle, walk, jump or fall, turning it to face the way it moves (2D flip, 3D turn). Leave the four name boxes empty and it finds animations called idle/walk/jump/fall (or similar) by itself. Output **state** reports what it chose.
+- **Pause / Resume / Stop**, **Show a specific frame**, and **Effect preset** (bounce, pulse, shake, spin, fade, wobble, jelly…).
+Old projects that used the separate *Animation clip* and *Movement Animator* blocks are converted automatically.
+
 ## Sprite animation studio
 In the Sprite editor press **🎞 Animate**. Make a named animation (idle, walk…), click pictures in the **frame bin** to add them to the timeline, drag cards to reorder, use **− / +** to hold a frame longer, and set **fps** and **When it ends** (loop, once, ping-pong). The preview starts paused; press Play or Space. In the **Animation** block use *Play* with the animation's name.
 
@@ -477,7 +484,7 @@ In the Model editor press **🎞 Animate**. Add an animation, then add tracks fo
 **3D**: add a 💡 Light (point, directional, spot, ambient, hemisphere). Lights need something to shine on; lower the scene's *Ambient* to see them clearly. The editor draws a reach sphere (point) or an aim line (directional/spot). **2D**: add a 💡 Light, then raise **Darkness** in the Scene settings; each light cuts a soft glow (circle or cone) out of the dark.
 
 ## Animation clips
-**Assets → Animations** holds keyframe clips. Each clip has a duration, a loop mode (once, loop, ping-pong), optional *relative* values and tracks for properties such as x, y, z, rotation, scale, opacity and colour. Click on a track to add keys, pick an easing per key, and press Play to preview. Run a clip from a block with **Play animation** (the *clip* block). Works for 2D and 3D objects.
+**Assets → Animations** holds keyframe clips. Each clip has a duration, a loop mode (once, loop, ping-pong), optional *relative* values and tracks for properties such as x, y, z, rotation, scale, opacity and colour. Click on a track to add keys, pick an easing per key, and press Play to preview. Run a clip with the **Animation** block (pick it from the Animation list). Works for 2D and 3D objects.
 
 ## Material files
 **Assets → Materials** creates reusable materials (colour, pattern, texture, bump, metalness, roughness, emissive, opacity, wireframe, flat shading, double-sided, repeat). Assign one to a 3D object (**Material file** in the inspector), to a whole model or to a single model part in the Model editor. Import \`.vxmat\` (JSON) or \`.mtl\` files.
@@ -508,6 +515,57 @@ Steam install/build steps are required; mobile steps after install are optional,
 
 ## Building Vextra itself
 \`npm run build:win\`, \`npm run build:linux\`, \`npm run build:mac\` (each builds installers for that OS; build on the target OS).`);
+
+  A('shield', 'Share & publish', 'Security & Vextra Shield', `# Security & Vextra Shield
+
+The built-in **Vextra Shield** plugin adds protection for games, accounts and publishing. Open **Plugins → Vextra Shield → ⚙ Configure** to choose what is on.
+
+- **Exported games** get a strict Content-Security-Policy (only the game's own scripts, pinned by hash), a no-referrer policy and optional right-click/embedding blocks. The editor's *Play* preview is never restricted.
+- **Saves** are signed: a save changed outside the game is ignored.
+- **Accounts**: password policy, sign-in lockout after repeated failures, idle sign-out, and a warning before a password goes over \`http://\`.
+- **Publishing**: files are scanned for API keys, tokens and private keys (and \`.env\`-style files) before upload.
+- **Shield: Audit project** (Command Palette) reviews your folder and game for risky patterns and can save \`SECURITY-AUDIT.md\`.
+
+**Account security**: with Shield on, *Your account* shows a security section: authenticator-app two-step sign-in (type the setup key into Google Authenticator, Aegis, 1Password…), recovery codes, and security keys/passkeys. After turning it on, sign-in asks for the code (or key) after the password.
+
+Limits: code running on a player's computer can always be changed by a determined player, so verify scores and purchases on a server you control.
+
+## Dependency scripts
+\`package.json\` already allows the \`esbuild\` install script for pnpm (\`pnpm.onlyBuiltDependencies\`), Bun (\`trustedDependencies\`) and Yarn (\`dependenciesMeta\`). No other dependency is allowed to run install scripts.`);
+
+  A('ai', 'Plugins', 'Vextra AI', `# Vextra AI
+
+Open the **AI** panel (sidebar) and chat with the model you choose in **Plugins → Vextra AI → ⚙ Configure**: Claude, OpenAI, Gemini, Groq, OpenRouter, Ollama, LM Studio or any OpenAI-compatible server (Mistral, DeepSeek, xAI, Together…). Local models need no key. A bar under the chat shows how much of the model's context window is used; if the AI cannot be reached it says it timed out and offers Reconnect (internet providers wait for the connection, then reconnect after a 3-second countdown) or Retry (local). After a time-out a banner shows when you can send the next request. Stopped or interrupted runs leave a checkpoint with a Continue button. Permissions: read project, edit open file, create & edit other files, build & change site (web files, new_site, preview_site), delete / move, build & change game.
+
+Each ability has its own **Deny / Ask / Allow**: *Read project*, *Edit open file*, *Write files*, *Change game*. The panel has presets – **Chat only**, **Assist** (asks before changing anything), **Agent** (changes without asking, asks before deleting) and **Builder** (everything allowed, up to 30 steps).
+
+**Build things by asking**: *“Build me a 2D platformer with coins and enemies”* or *“Create a portfolio website”*. The AI plans, opens a game, adds scenes, objects, sprites and ready-made assets, writes block logic, attaches it, checks the result and fixes problems – each game change is one undo step. For websites it creates, edits, moves and deletes files and folders in your open folder. Secret-looking files (\`.env\`, keys) are never read. Everything you send and everything the AI reads goes to the provider you picked.`);
+
+  A('plugin-hooks', 'Plugins', 'Plugin hooks & settings button', `# Plugin hooks and the Configure button
+
+## Configure button
+\`\`\`js
+forge.config.register({
+  title: 'My plugin – settings',
+  fields: [{ key: 'greeting', label: 'Greeting', value: 'Hello' }, { key: 'loud', label: 'Shout', type: 'checkbox' }],
+  // optional: validate(values) → error text, load() → values, save(values)
+});
+const greeting = forge.settings.get('greeting', 'Hello');
+\`\`\`
+The plugin card shows **⚙ Configure** while the plugin is enabled. Without \`load/save\` the values are kept with \`forge.settings\`. \`forge.config.open()\` opens it from code.
+
+## Hooks
+\`forge.hooks.on(name, fn)\`:
+
+| Hook | What you get | What you can do |
+|---|---|---|
+| \`game.export.html\` | \`(html, {play, publish, project})\` | return a changed HTML string |
+| \`account.register\`, \`account.password\` | \`{username, password, server}\` | \`throw forge.hooks.block('why')\` to stop it |
+| \`account.login\` | \`{username, server}\` | throw \`forge.hooks.block\` (e.g. lockout) |
+| \`account.loginOk\`, \`account.loginFailed\` | \`{username, error, status}\` | notification only |
+| \`publish.before\` | \`{slug, kind, title, files}\` | throw \`forge.hooks.block\` to cancel |
+
+Also: \`forge.onUnload(fn)\`, \`forge.fs.list()\`, \`forge.account.signOut()\`.`);
 
   A('mobile', 'Making games', 'Mobile & device features', `# Mobile & device features
 

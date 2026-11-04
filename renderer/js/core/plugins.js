@@ -2,10 +2,11 @@
 (function () {
   const listeners = {};
   const Forge = {
-    version: '3.1.0',
+    version: '3.2.0',
     host: {},                 // filled in by app.js
     commands: new Map(),      // id -> {id,title,run,plugin}
     statusItems: new Map(),   // id -> {id,text,align,onClick,plugin}
+    configs: new Map(),       // pluginId -> {title,intro,fields,load,save,validate}
     panels: new Map(),        // id -> {id,title,icon,render,plugin}
     toolbarItems: new Map(),  // id -> {id,label,run,plugin}
     docs: new Map(),          // id -> {id,title,markdown,plugin}
@@ -20,6 +21,11 @@
     const track = (fn) => { disposers.push(fn); };
     const note = (kind, text) => { (contrib[kind] ||= []).push(text); };
     const H = () => Forge.host;
+    /** Absolute path of p when it is inside the open folder (relative paths are relative to it), otherwise null. Never returns the folder itself. */
+    const inRoot = (p) => {
+      const root = String(H().root?.() || '').replace(/\\/g, '/').replace(/\/+$/, ''); if (!root) return null; let q = String(p || '').replace(/\\/g, '/');
+      if (!q.startsWith(root + '/') && !/^([a-z]:)?\//i.test(q)) q = root + '/' + q.replace(/^\.\//, ''); if (!q.startsWith(root + '/') || q.split('/').some((x) => x === '..') || q.length <= root.length + 1) return null; return q;
+    };
     return {
       id: pluginId,
       version: Forge.version,
@@ -88,6 +94,12 @@
         /** Add a placeable object type to the game editor (2D: draw(ctx,obj); 3D: build(THREE,obj) → Object3D). */
         registerObjectType(def) { return VX.game.registerObjectType(def, pluginId, track, note); },
         current: () => VX.game.currentProject?.() ?? null,
+        /** Building blocks for plugins that edit games: the project helpers and the logic-block registry. */
+        kit: () => ({ GP: VX.GameProject, blocks: window.VXRT && VXRT.blocks, ports: VXRT.ports, paramDefaults: VXRT.paramDefaults }),
+        /** Opens a new empty game tab ('2d' | '3d') and resolves to its editor. */
+        newGame: async (dim) => { await VX.app.newGame(dim === '3d' ? '3d' : '2d'); await new Promise((r) => setTimeout(r, 300)); const t = VX.tabs.active && VX.tabs.active(); return t && t.kind === 'game' && t.ctl ? t.ctl : null; },
+        /** The editor controller of the open game tab (addObject, scene, project…) or null. */
+        editor: () => { const t = VX.tabs && VX.tabs.active && VX.tabs.active(); return t && t.kind === 'game' && t.ctl ? t.ctl : null; },
         /** Resolves to the exported single-file HTML of a project (default: the open game). */
         exportHTML: (project) => VX.gameExport.toHTML(project || VX.game.currentProject?.()),
       },
@@ -119,12 +131,23 @@
           const cancel = h('button', { class: 'btn', onclick: () => { api.cancelled = true; cancel.disabled = true; st.textContent = 'Cancelling…'; cb && cb(); } }, 'Cancel');
           const m = VX.ui.modal({ title, dismissable: false, body: h('div', { class: 'prog' }, h('div', { class: 'prog-row' }, st, pct), h('div', { class: 'prog-bar' }, bar), log), actions: [cancel] });
           api.set = (p, s) => { const v = Math.max(0, Math.min(100, Math.round(p))); bar.style.width = v + '%'; pct.textContent = v + '%'; if (s != null) st.textContent = s; };
-          api.log = (l) => { log.textContent += l + '\n'; if (log.textContent.length > 20000) log.textContent = log.textContent.slice(-12000); log.scrollTop = log.scrollHeight; };
+          let buf = [], tm = 0; const flush = () => { tm = 0; log.textContent += buf.join('\n') + '\n'; buf = []; if (log.textContent.length > 20000) log.textContent = log.textContent.slice(-12000); log.scrollTop = log.scrollHeight; };
+          api.log = (l) => { buf.push(String(l)); if (!tm) tm = setTimeout(flush, 80); }; api.flush = flush;
           api.onCancel = (f) => { cb = f; };
           api.done = (label) => { cancel.textContent = label || 'Close'; cancel.disabled = false; cancel.onclick = () => m.close(); };
           api.close = () => m.close();
           return api;
         },
+      },
+      hooks: {
+        /** React to app actions: 'game.export.html' (filter: return changed html), 'account.register' / 'account.login' / 'account.password' / 'publish.before' (throw forge.hooks.block('why') to stop it), 'account.loginOk' / 'account.loginFailed' (notifications). */
+        on(name, fn) { track(VX.hooks.on(name, fn)); },
+        block(message) { const e = new Error(message); e.vxBlock = true; return e; },
+      },
+      config: {
+        /** Adds a ⚙ Configure button to the plugin card. def: { title, intro, fields:[forge.ui.form fields without value], validate(values), load()→values, save(values) }.  Without load/save the values live in forge.settings. */
+        register(def) { Forge.configs.set(pluginId, def); note('config', def.title || 'Configure'); track(() => { Forge.configs.delete(pluginId); Forge.changed(); }); Forge.changed(); },
+        open: () => Forge.openConfig(pluginId),
       },
       proc: {
         /** Run npm / npx / node in a folder under store-export/. Returns a promise of the exit code with .cancel(). */
@@ -145,12 +168,38 @@
         },
         available: () => !!window.__TAURI__,
       },
-      account: { current: () => H().account?.() ?? null },
+      net: {
+        /** HTTP request through the desktop app (no CORS limits). { method, url, headers, body, timeout } → { status, body }. Plain http:// is only allowed for localhost. */
+        async request({ method = 'GET', url, headers, body, timeout }) {
+          let u; try { u = new URL(url); } catch { throw new Error('Invalid URL'); }
+          const local = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(u.hostname);
+          if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) throw new Error('Only https:// (or http://localhost) URLs are allowed');
+          /* Always IPv4 for this computer: "localhost" can resolve to IPv6 (::1) first on Windows, while servers such as Ollama listen on 127.0.0.1 only. */
+          const t = new URL(url); if (t.hostname === 'localhost' || t.hostname === '[::1]') t.hostname = '127.0.0.1';
+          return window.native.http({ method, url: t.toString(), headers, body, timeout_secs: timeout });
+        },
+      },
+      account: { /** Adds a section to Your account (profile). render(container, { user }). */
+        addSection(sec) { VX.accountSections = VX.accountSections || []; const e = { id: pluginId + '.' + (sec.id || 'sec'), render: sec.render }; VX.accountSections.push(e); track(() => { VX.accountSections = (VX.accountSections || []).filter((x) => x !== e); }); },
+        /** Sign-in security calls: security(), mfaSetup(pw), mfaEnable(pw, code), mfaDisable(pw), mfaRecovery(pw), addKey(pw, name), removeKey(pw, id). */
+        get security() { return VX.cloud; },
+        current: () => H().account?.() ?? null, signOut: () => (VX.cloud ? VX.cloud.logout() : Promise.resolve()) },
+      onUnload(fn) { track(fn); },
       fs: {
         readFile: (p) => window.native.readFile(p),
         writeFile: (p, c) => window.native.writeFile(p, c),
         writeBase64: (p, b64) => window.native.writeBase64(p, b64),
         exists: (p) => window.native.exists(p),
+        /** Delete a file or folder inside the open folder (never the folder itself). */
+        remove: async (p) => { const r = inRoot(p); if (!r) throw new Error('Outside the open folder'); return window.native.remove(r); },
+        /** Rename a file/folder (same parent). */
+        rename: async (p, newName) => { const r = inRoot(p); if (!r) throw new Error('Outside the open folder'); return window.native.rename(r, newName); },
+        /** Create a folder (and parents) inside the open folder. */
+        mkdir: async (p) => { const r = inRoot(p); if (!r) throw new Error('Outside the open folder'); const root = (H().root?.() || '').replace(/[\\/]+$/, ''); return window.native.create(root, r.slice(root.length + 1), true).catch((e) => { if (!/already exists/.test(e.message || e)) throw e; }); },
+        /** Open a file of the folder in an editor tab. */
+        open: (p) => H().openPath?.(inRoot(p) || p),
+        /** Relative paths of the files in the open folder (skips node_modules/.git). */
+        list: (limit = 3000) => { const r = H().root?.(); return r ? window.native.listFiles(r, limit) : Promise.resolve([]); },
         root: () => H().root?.() ?? null,
       },
       settings: {
@@ -270,6 +319,56 @@ forge.editor.onSave(() => status.update('${id}: saved'));
     },
   };
 
+  Forge._makeApi = makeApi;
+  /** Opens a plugin's settings as an editor tab named plugin:<name> (roomy page instead of a small dialog). */
+  Forge.openConfig = async function (id) {
+    const def = Forge.configs.get(id); if (!def) return; const rec = Forge.plugins.get(id); const name = rec ? rec.manifest.name : id;
+    if (!VX.tabs || !VX.tabs.open) return;
+    return VX.tabs.open({ kind: 'page', key: 'plugin-config:' + id, title: 'plugin:' + name, icon: 'settings', render: (c) => Forge.renderConfigPage(c, id) });
+  };
+  Forge.renderConfigPage = async function (container, id) {
+    const h = VX.h, def = Forge.configs.get(id), rec = Forge.plugins.get(id); if (!def) return container.append(h('div', { class: 'empty' }, 'This plugin has no settings.'));
+    const m = rec ? rec.manifest : { name: id, version: '', description: '' };
+    const cur = def.load ? await def.load() : Object.fromEntries(def.fields.map((f) => [f.key, Forge.host.settings?.plugins?.[id]?.[f.key]]));
+    const inputs = {}, dyn = []; const err = h('div', { class: 'form-error hidden' }); let dirty = false;
+    const mark = () => { if (!dirty) { dirty = true; save.disabled = false; state.textContent = 'Unsaved changes'; } };
+    const fieldEl = (f) => {
+      const v = cur && cur[f.key] !== undefined && cur[f.key] !== null ? cur[f.key] : def.defaults && def.defaults[f.key] !== undefined ? def.defaults[f.key] : f.value; let input;
+      if (f.type === 'select') { input = h('select', {}, (f.options || []).map((o) => { const [val, l] = Array.isArray(o) ? o : [o, o]; return h('option', { value: val }, l); })); input.value = v ?? ''; }
+      else if (f.type === 'textarea') input = h('textarea', { rows: f.rows || 4, placeholder: f.placeholder || '' }, v ?? '');
+      else if (f.type === 'checkbox') { input = h('input', { type: 'checkbox' }); input.checked = !!v; }
+      else if (f.type === 'dynamic') {
+        /* a dropdown filled by f.loadOptions(values) → [[value,label]]; reloads when the fields in f.refreshOn change; “Other…” lets you type a value */
+        const sel = h('select', {}), txt = h('input', { placeholder: f.placeholder || 'type a value', style: 'margin-top:4px;display:none' }), info = h('small', {}, ''), rf = h('button', { class: 'btn sm', type: 'button', title: 'Reload the list' }, '↻ Refresh');
+        const box = h('div', {}, h('div', { style: 'display:flex;gap:6px' }, sel, rf), txt, info); let cur0 = v ?? '';
+        const ctlv = { get value() { return sel.value === '__other' ? txt.value : sel.value; }, set value(x) { cur0 = x ?? ''; fill(lastList); }, addEventListener() {} }; let lastList = [];
+        const fill = (list) => { lastList = list; const want = cur0; sel.textContent = ''; if (!list.length) sel.append(h('option', { value: '' }, '— none found —')); else sel.append(h('option', { value: '' }, '— select a model —')); for (const [val, l] of list) sel.append(h('option', { value: val }, l || val)); sel.append(h('option', { value: '__other' }, 'Other… (type a name)')); if (want && !list.some(([val]) => val === want)) { sel.value = '__other'; txt.style.display = ''; txt.value = want; } else { sel.value = want || ''; txt.style.display = 'none'; } };
+        const load = async () => { info.textContent = 'Loading…'; try { const cv = {}; for (const k of Object.keys(inputs)) cv[k] = inputs[k].type === 'checkbox' ? inputs[k].checked : inputs[k].value; cur0 = ctlv.value || cur0; const r = await f.loadOptions(cv); fill(r.options || r); info.textContent = r.note || (r.length ?? r.options.length) + ' found'; } catch (e) { fill([]); info.textContent = e.message || String(e); } };
+        sel.onchange = () => { txt.style.display = sel.value === '__other' ? '' : 'none'; if (sel.value === '__other') txt.focus(); mark(); }; txt.oninput = mark; rf.onclick = load; fill([]); ctlv.reload = load; dyn.push({ f, load, clear: () => { cur0 = ctlv.value || cur0; fill([]); info.textContent = ''; } }); setTimeout(load, 0);
+        inputs[f.key] = ctlv; return h('label', { class: 'cfgp-field' }, h('b', {}, f.label), box, f.hint ? h('small', {}, f.hint) : null);
+      }
+      else input = h('input', { type: f.type || 'text', value: v ?? '', placeholder: f.placeholder || '', autocomplete: 'off' });
+      input.addEventListener('input', mark); input.addEventListener('change', mark); inputs[f.key] = input;
+      { let tm = 0; const changed = () => { const vals = {}; for (const k of Object.keys(inputs)) vals[k] = inputs[k].type === 'checkbox' ? inputs[k].checked : inputs[k].value; if (def.onChange) { try { def.onChange(f.key, vals, { set: (k, x) => { if (inputs[k]) { inputs[k].value = x; mark(); } } }); } catch (e) { /* ignore */ } } dyn.filter((d) => (d.f.refreshOn || []).includes(f.key) && d.clear).forEach((d) => d.clear()); clearTimeout(tm); tm = setTimeout(() => dyn.filter((d) => (d.f.refreshOn || []).includes(f.key)).forEach((d) => d.load()), 600); }; input.addEventListener(f.type === 'select' || f.type === 'checkbox' ? 'change' : 'input', changed); }
+      return f.type === 'checkbox' ? h('label', { class: 'cfgp-field cfgp-check' }, input, h('span', {}, h('b', {}, f.label), f.hint ? h('small', {}, f.hint) : null)) : h('label', { class: 'cfgp-field' }, h('b', {}, f.label), input, f.hint ? h('small', {}, f.hint) : null);
+    };
+    const groups = []; for (const f of def.fields) { const g = f.group || 'Settings'; let e = groups.find((x) => x.name === g); if (!e) groups.push((e = { name: g, fields: [] })); e.fields.push(f); }
+    const values = () => Object.fromEntries(def.fields.map((f) => [f.key, f.type === 'checkbox' ? inputs[f.key].checked : f.type === 'number' ? parseFloat(inputs[f.key].value) : inputs[f.key].value]));
+    const state = h('span', { class: 'cfgp-state' }, 'All changes saved');
+    const doSave = async () => {
+      const v = values(); err.classList.add('hidden');
+      for (const f of def.fields) if (f.required && !String(v[f.key] ?? '').trim()) { err.textContent = f.label + ' is required'; err.classList.remove('hidden'); return; }
+      if (def.validate) { const msg = await def.validate(v); if (msg) { err.textContent = msg; err.classList.remove('hidden'); return; } }
+      if (def.save) await def.save(v); else for (const f of def.fields) Forge.host.setPluginSetting?.(id, f.key, v[f.key]);
+      dirty = false; save.disabled = true; state.textContent = 'Saved'; VX.ui.toast('Settings saved', 'ok'); Forge.emit('configSaved', id, v);
+    };
+    const save = h('button', { class: 'btn primary', disabled: true, onclick: doSave }, 'Save');
+    const reset = h('button', { class: 'btn', onclick: async () => { for (const f of def.fields) { const inp = inputs[f.key]; const d = def.defaults && def.defaults[f.key]; if (d === undefined) continue; if (f.type === 'checkbox') inp.checked = !!d; else inp.value = d; } mark(); } }, 'Reset to defaults');
+    const extra = h('div', { class: 'cfgp-extra' }); def.extra && def.extra(extra);
+    container.append(h('div', { class: 'cfgp page' },
+      h('div', { class: 'cfgp-head' }, h('div', {}, h('h2', {}, m.name, ' ', h('small', {}, m.version ? 'v' + m.version : '')), h('p', {}, def.intro || m.description || '')), h('div', { class: 'cfgp-actions' }, state, def.defaults ? reset : null, save)),
+      err, ...groups.map((g) => h('section', { class: 'cfgp-group' }, h('h3', {}, g.name), h('div', { class: 'cfgp-grid' }, g.fields.map(fieldEl)))), extra));
+  };
   Forge._makeApi = makeApi;
   window.Forge = Forge;
 })();

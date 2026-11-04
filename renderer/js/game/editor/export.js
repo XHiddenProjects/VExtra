@@ -20,7 +20,9 @@
     return { customBlocks, customTypes, warn };
   }
 
-  async function toHTML(project, opts = {}) {
+  /** Builds the page, then lets plugins (e.g. Vextra Shield) transform it: hook "game.export.html". ctx.play = editor preview, ctx.publish = cloud publish. */
+  async function toHTML(project, opts = {}) { const html = await build(project, opts); return VX.hooks.filter('game.export.html', html, { play: !!opts.channel, publish: !!opts.cloudUrl, project }); }
+  async function build(project, opts = {}) {
     const data = VX.clone(project); const c = collectCustom(); if (c.customBlocks.length) data.customBlocks = c.customBlocks; if (c.customTypes.length) data.customTypes = c.customTypes;
     data.settings = Object.assign({}, data.settings, opts.cloudUrl ? { cloudUrl: opts.cloudUrl } : {});
     const has3d = data.scenes.some((s) => s.dim === '3d'); const base = opts.base || '';

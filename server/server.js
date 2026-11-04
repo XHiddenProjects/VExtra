@@ -59,7 +59,13 @@ setInterval(() => { const now = Date.now(); for (const [k, a] of hits) if (!a.so
 function hashPw(pw, salt) { return crypto.scryptSync(pw, salt, 64).toString('hex'); }
 function newSession(user, ua) { const token = rid(32); store.sessions[sha(token)] = { user, created: Date.now(), ua: String(ua || '').slice(0, 120) }; dirty('sessions'); return token; }
 function authUser(req) { const h = req.headers.authorization || ''; const m = /^Bearer\s+(\S+)/.exec(h); if (!m) return null; const s = store.sessions[sha(m[1])]; if (!s) return null; const u = store.users[s.user]; return u ? u : null; }
-const pub = (u) => ({ id: u.id, username: u.username, displayName: u.display || u.username, created: u.created });
+const pub = (u) => ({ id: u.id, username: u.username, displayName: u.display || u.username, created: u.created, mfa: !!(u.mfa && u.mfa.enabled), keys: (u.keys || []).length });
+const MFA = require('./mfa');
+const tickets = new Map(); // two-step sign-in tickets: id -> { user, exp, tries, challenge }
+const regChallenges = new Map(); // security-key registration challenges: user -> { challenge, exp }
+setInterval(() => { const now = Date.now(); for (const [k, t] of tickets) if (t.exp < now) tickets.delete(k); for (const [k, t] of regChallenges) if (t.exp < now) regChallenges.delete(k); }, 60e3).unref();
+const needsStep2 = (u) => !!((u.mfa && u.mfa.enabled) || (u.keys && u.keys.length));
+const pwOk = (u, pw) => crypto.timingSafeEqual(Buffer.from(hashPw(String(pw || ''), u.salt), 'hex'), Buffer.from(u.hash, 'hex'));
 function need(req, res) { const u = authUser(req); if (!u) { fail(res, 401, 'Please sign in'); return null; } return u; }
 function role(p, user) { return p.owner === user ? 'owner' : p.members[user] || null; }
 
@@ -75,7 +81,7 @@ const presence = {}; // pid -> user -> {file, at}
 /* ------------------------------------------------------------------ routes */
 async function api(req, res, url, ip) {
   const m = req.method, p = url.pathname, seg = p.split('/').filter(Boolean); // ['api', ...]
-  if (p === '/api/health') return send(res, 200, { ok: true, name: 'vextra-server', version: '3.1.0', time: Date.now(), register: ALLOW_REGISTER });
+  if (p === '/api/health') return send(res, 200, { ok: true, name: 'vextra-server', version: '3.2.0', time: Date.now(), register: ALLOW_REGISTER });
 
   /* --- accounts --- */
   if (p === '/api/register' && m === 'POST') {
@@ -90,7 +96,29 @@ async function api(req, res, url, ip) {
     if (limited(ip, 'login', 20, 600e3)) return fail(res, 429, 'Too many attempts, wait a few minutes');
     const b = await readJson(req); const u = store.users[String(b.username || '').toLowerCase().trim()]; const pw = String(b.password || '');
     const ok = u && crypto.timingSafeEqual(Buffer.from(hashPw(pw, u.salt), 'hex'), Buffer.from(u.hash, 'hex')); if (!ok) return fail(res, 401, 'Wrong username or password');
+    if (needsStep2(u)) { const id = rid(24), challenge = crypto.randomBytes(32).toString('base64url'); tickets.set(id, { user: u.username, exp: Date.now() + 5 * 60e3, tries: 0, challenge }); return send(res, 200, { mfa: true, ticket: id, methods: [...(u.mfa && u.mfa.enabled ? ['totp', 'recovery'] : []), ...((u.keys || []).length ? ['key'] : [])], keys: (u.keys || []).map((k) => ({ id: k.id, rpId: k.rpId })), challenge }); }
     return send(res, 200, { token: newSession(u.username, req.headers['user-agent']), user: pub(u) });
+  }
+  if (p === '/api/login/mfa' && m === 'POST') {
+    if (limited(ip, 'mfa', 30, 600e3)) return fail(res, 429, 'Too many attempts, wait a few minutes'); const b = await readJson(req); const t = tickets.get(String(b.ticket || '')); if (!t || t.exp < Date.now()) return fail(res, 401, 'This sign-in expired – start again');
+    if (++t.tries > 6) { tickets.delete(b.ticket); return fail(res, 429, 'Too many wrong codes – sign in again'); } const u = store.users[t.user]; if (!u) return fail(res, 401, 'Sign in again'); let ok = false;
+    if (b.code && u.mfa && u.mfa.enabled) { const st = MFA.checkTotp(u.mfa.secret, b.code, u.mfa.last ?? -1); if (st >= 0) { u.mfa.last = st; ok = true; dirty('users'); } }
+    else if (b.recovery && u.mfa && u.mfa.enabled) { const h = MFA.sha(String(b.recovery).trim().toLowerCase()); const i = (u.mfa.recovery || []).indexOf(h); if (i >= 0) { u.mfa.recovery.splice(i, 1); ok = true; dirty('users'); } }
+    else if (b.assertion) { const a = b.assertion, k = (u.keys || []).find((x) => x.id === a.id); try { if (!k) throw new Error('Unknown key'); k.counter = MFA.verifyAssertion(a, k, { challenge: t.challenge, origin: k.origin, rpId: k.rpId }); dirty('users'); ok = true; } catch (e) { return fail(res, 401, 'Security key rejected: ' + e.message); } }
+    if (!ok) return fail(res, 401, 'That code is not valid'); tickets.delete(b.ticket); return send(res, 200, { token: newSession(u.username, req.headers['user-agent']), user: pub(u) });
+  }
+  if (p.startsWith('/api/me/mfa') || p.startsWith('/api/me/keys') || p === '/api/me/security') {
+    const u = need(req, res); if (!u) return; const b = m === 'GET' ? {} : await readJson(req); u.mfa = u.mfa || { enabled: false, recovery: [] }; u.keys = u.keys || [];
+    if (p === '/api/me/security' && m === 'GET') return send(res, 200, { mfa: !!u.mfa.enabled, recoveryLeft: (u.mfa.recovery || []).length, keys: u.keys.map((k) => ({ id: k.id, name: k.name, created: k.created })) });
+    if (limited(ip, 'sec', 30, 600e3)) return fail(res, 429, 'Too many attempts, wait a few minutes'); if (!pwOk(u, b.password)) return fail(res, 403, 'Password is incorrect');
+    if (p === '/api/me/mfa/setup' && m === 'POST') { if (u.mfa.enabled) return fail(res, 409, 'Two-step sign-in is already on'); u.mfa.pending = MFA.newSecret(); dirty('users'); return send(res, 200, { secret: u.mfa.pending, uri: MFA.otpUri(u.username, u.mfa.pending) }); }
+    if (p === '/api/me/mfa/enable' && m === 'POST') { if (!u.mfa.pending) return fail(res, 400, 'Start setup first'); const st = MFA.checkTotp(u.mfa.pending, b.code); if (st < 0) return fail(res, 400, 'That code is not right – check the clock on your phone'); const rec = MFA.newRecovery(); u.mfa = { enabled: true, secret: u.mfa.pending, last: st, recovery: rec.map((r) => MFA.sha(r)) }; dirty('users'); return send(res, 200, { ok: true, recovery: rec }); }
+    if (p === '/api/me/mfa/disable' && m === 'POST') { u.mfa = { enabled: false, recovery: [] }; dirty('users'); return send(res, 200, { ok: true }); }
+    if (p === '/api/me/mfa/recovery' && m === 'POST') { if (!u.mfa.enabled) return fail(res, 400, 'Two-step sign-in is off'); const rec = MFA.newRecovery(); u.mfa.recovery = rec.map((r) => MFA.sha(r)); dirty('users'); return send(res, 200, { recovery: rec }); }
+    if (p === '/api/me/keys/options' && m === 'POST') { const challenge = crypto.randomBytes(32).toString('base64url'); regChallenges.set(u.username, { challenge, exp: Date.now() + 5 * 60e3 }); return send(res, 200, { challenge, user: { id: Buffer.from(u.id).toString('base64url'), name: u.username, displayName: u.display || u.username }, exclude: u.keys.map((k) => k.id) }); }
+    if (p === '/api/me/keys/register' && m === 'POST') { const c = regChallenges.get(u.username); if (!c || c.exp < Date.now()) return fail(res, 400, 'Start again'); regChallenges.delete(u.username); if (u.keys.length >= 8) return fail(res, 400, 'At most 8 security keys per account'); const origin = String(b.origin || ''), rpId = String(b.rpId || ''); if (!origin || !rpId) return fail(res, 400, 'Missing origin');
+      try { const k = MFA.verifyRegistration(b, { challenge: c.challenge, origin, rpId }); if (u.keys.some((x) => x.id === k.id)) return fail(res, 409, 'That key is already added'); u.keys.push({ id: k.id, pub: k.pub, counter: k.counter, rpId, origin, name: String(b.name || 'Security key').slice(0, 40), created: Date.now() }); dirty('users'); return send(res, 200, { ok: true }); } catch (e) { return fail(res, 400, 'Could not add the key: ' + e.message); } }
+    if (p === '/api/me/keys/remove' && m === 'POST') { u.keys = u.keys.filter((k) => k.id !== b.id); dirty('users'); return send(res, 200, { ok: true }); }
   }
   if (p === '/api/logout' && m === 'POST') { const h = /^Bearer\s+(\S+)/.exec(req.headers.authorization || ''); if (h) { delete store.sessions[sha(h[1])]; dirty('sessions'); } return send(res, 200, { ok: true }); }
   if (p === '/api/me') {
@@ -221,5 +249,6 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, 'Not found');
   } catch (e) { if (!res.headersSent) fail(res, e.status || 500, e.status ? e.message : 'Server error'); if (!e.status) console.error('[error]', e); }
 });
-server.listen(PORT, () => console.log(`Vextra server listening on http://localhost:${PORT}\n  data: ${DATA}\n  sign-ups: ${ALLOW_REGISTER ? 'open' : 'closed'}`));
+const HOST = process.env.HOST || undefined; // the desktop app starts it with HOST=127.0.0.1 so only this computer can reach it
+server.listen(PORT, HOST, () => console.log(`Vextra server listening on http://${HOST || 'localhost'}:${PORT}\n  data: ${DATA}\n  sign-ups: ${ALLOW_REGISTER ? 'open' : 'closed'}`));
 module.exports = { server };

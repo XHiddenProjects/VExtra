@@ -90,9 +90,15 @@
   };
   GP.sample2d = function (p) {
     p.settings.title = p.settings.title || 'My 2D game';
-    const robot = GP.spriteFromRows(['..XXXXXX..', '.XBBBBBBX.', 'XBWWBBWWBX', 'XBWKBBKWBX', 'XBBBBBBBBX', 'XBBRRRRBBX', '.XBBBBBBX.', '..XXXXXX..', '.X.X..X.X.', '.X.X..X.X.'], { X: '#1b2a63', B: '#6c8cff', W: '#ffffff', K: '#10131a', R: '#ff7a8a' }, 8);
+    const PAL = { X: '#1b2a63', B: '#6c8cff', W: '#ffffff', K: '#10131a', R: '#ff7a8a' };
+    const body = ['..XXXXXX..', '.XBBBBBBX.', 'XBWWBBWWBX', 'XBWKBBKWBX', 'XBBBBBBBBX', 'XBBRRRRBBX', '.XBBBBBBX.', '..XXXXXX..'];
+    const bot = (legs, eyes) => GP.spriteFromRows(body.map((r, i) => (i === 3 && eyes ? 'XBXXBBXXBX' : r)).concat(legs), PAL, 8);
+    const frames = [bot(['.X.X..X.X.', '.X.X..X.X.']), bot(['.X.X..X.X.', '.X.X..X.X.'], true), bot(['X..X..X..X', '.X..XX..X.']), bot(['..XX..XX..', '..XX..XX..']), bot(['..........', '..XX..XX..'])];
     const coin = GP.spriteFromRows(['..YYYY..', '.YOOOOY.', 'YOOYYOOY', 'YOYOOYOY', 'YOYOOYOY', 'YOOYYOOY', '.YOOOOY.', '..YYYY..'], { Y: '#ffe27a', O: '#f5a623' }, 8);
-    p.assets.sprites.spr_robot = { id: 'spr_robot', name: 'robot', w: 80, h: 100, frames: [robot], fps: 8, anims: {} };
+    const seq = (list) => list.map(([f, hold]) => ({ f, hold: hold || 1 })), A = (fps, loop, list) => ({ fps, loop, seq: seq(list) });
+    const animMeta = { idle: A(6, 'loop', [[0, 6], [1, 1]]), walk: A(10, 'loop', [[2], [0], [3], [0]]), jump: A(8, 'once', [[4]]) };
+    const anims = {}; for (const k of Object.keys(animMeta)) anims[k] = animMeta[k].seq.flatMap((s) => Array(s.hold).fill(s.f));
+    p.assets.sprites.spr_robot = { id: 'spr_robot', name: 'robot', w: 80, h: 100, frames, fps: 8, anims, animMeta };
     p.assets.sprites.spr_coin = { id: 'spr_coin', name: 'coin', w: 64, h: 64, frames: [coin], fps: 8, anims: {} };
     Object.assign(p.assets.sounds, { snd_coin: SND.coin, snd_jump: SND.jump, snd_hit: SND.hit });
     p.behaviors.b_player = { id: 'b_player', name: 'Player controls', mode: 'graph', graph: { nodes: [
@@ -100,9 +106,8 @@
       N('vl', 'velocity', { mode: 'set', x: '-240', y: '' }, 330, 90), N('vr', 'velocity', { mode: 'set', x: '240', y: '' }, 330, 310),
       N('kul', 'keyboard', { key: 'left', mode: 'up' }, 40, 480), N('kur', 'keyboard', { key: 'right', mode: 'up' }, 40, 580), N('vs', 'velocity', { mode: 'set', x: '0', y: '' }, 330, 530),
       N('kj', 'keyboard', { key: 'space', mode: 'down' }, 40, 700), N('ku', 'keyboard', { key: 'up', mode: 'down' }, 40, 800), N('im', 'impulse', { force: 560, direction: 'up', mode: 'set', axisOnly: 'y', onlyGrounded: true }, 330, 750), N('sj', 'sound', { sound: 'snd_jump', action: 'play' }, 620, 750),
-      N('fl', 'flip', { }, 620, 90),
+      N('ma', 'animation', { action: 'auto', face: true }, 620, 90),
     ], wires: [W('kl', 'vl'), W('ka', 'vl'), W('kr', 'vr'), W('kd', 'vr'), W('kul', 'vs'), W('kur', 'vs'), W('kj', 'im'), W('ku', 'im'), W('im', 'sj')] } };
-    p.behaviors.b_player.graph.nodes = p.behaviors.b_player.graph.nodes.filter((n) => n.type !== 'flip');
     p.behaviors.b_coin = { id: 'b_coin', name: 'Collectable coin', mode: 'graph', graph: { nodes: [
       N('c', 'collision', { with: 'tag:player', phase: 'enter' }, 40, 80), N('v', 'globalVariable', { name: 'score', op: 'add', amount: 1 }, 320, 80),
       N('s', 'sound', { sound: 'snd_coin', action: 'play' }, 320, 230), N('e', 'emit', { count: 14, color: '#ffe27a', speed: 160, life: 0.6 }, 320, 360), N('d', 'destroyer', { delay: 0 }, 600, 300),
@@ -128,19 +133,30 @@
     p.settings.bg = '#1a2233';
     Object.assign(p.assets.sounds, { snd_coin: SND.coin, snd_jump: SND.jump });
     p.assets.models.mdl_tree = { id: 'mdl_tree', name: 'tree', kind: 'group', parts: [{ type: 'cylinder', x: 0, y: -0.25, z: 0, w: 0.2, h: 0.5, d: 0.2, color: '#8a5a2b' }, { type: 'cone', x: 0, y: 0.35, z: 0, w: 0.7, h: 0.8, d: 0.7, color: '#2e9e5b' }, { type: 'cone', x: 0, y: 0.7, z: 0, w: 0.5, h: 0.6, d: 0.5, color: '#3fbf72' }] };
+    const K = (...a) => a.map(([t, v]) => ({ t, v })), T = (prop, ...k) => ({ prop, keys: K(...k) });
+    p.assets.models.mdl_robot = { id: 'mdl_robot', name: 'robot', kind: 'group', parts: [
+      { type: 'cube', x: 0, y: 0.9, z: 0, w: 0.8, h: 1, d: 0.5, color: '#6c8cff' }, { type: 'sphere', x: 0, y: 1.7, z: 0, w: 0.6, h: 0.6, d: 0.6, color: '#ff7a8a' },
+      { type: 'cube', x: -0.58, y: 0.95, z: 0, w: 0.2, h: 0.8, d: 0.2, color: '#1b2a63' }, { type: 'cube', x: 0.58, y: 0.95, z: 0, w: 0.2, h: 0.8, d: 0.2, color: '#1b2a63' },
+      { type: 'cube', x: -0.2, y: 0.2, z: 0, w: 0.3, h: 0.8, d: 0.3, color: '#1b2a63' }, { type: 'cube', x: 0.2, y: 0.2, z: 0, w: 0.3, h: 0.8, d: 0.3, color: '#1b2a63' }],
+      anims: {
+        idle: { id: 'an_idle', name: 'idle', duration: 2, loop: 'loop', tracks: [T('w.y', [0, 0], [1, 0.02], [2, 0]), T('p1.y', [0, 0], [1, 0.015], [2, 0]), T('p2.rz', [0, 0], [1, 4], [2, 0]), T('p3.rz', [0, 0], [1, -4], [2, 0])] },
+        walk: { id: 'an_walk', name: 'walk', duration: 0.6, loop: 'loop', tracks: [T('p4.rx', [0, 0], [0.15, 35], [0.45, -35], [0.6, 0]), T('p5.rx', [0, 0], [0.15, -35], [0.45, 35], [0.6, 0]), T('p2.rx', [0, 0], [0.15, -30], [0.45, 30], [0.6, 0]), T('p3.rx', [0, 0], [0.15, 30], [0.45, -30], [0.6, 0]), T('w.y', [0, 0], [0.15, 0.03], [0.3, 0], [0.45, 0.03], [0.6, 0])] },
+        jump: { id: 'an_jump', name: 'jump', duration: 0.5, loop: 'once', tracks: [T('p2.rz', [0, 0], [0.25, 150]), T('p3.rz', [0, 0], [0.25, -150]), T('p4.rx', [0, 0], [0.25, 25]), T('p5.rx', [0, 0], [0.25, -15]), T('w.sy', [0, 1], [0.25, 1.08])] },
+      } };
     const move = (id, key, ax, val) => [N('k' + id, 'keyboard', { key, mode: 'held' }, 40, 40), N('v' + id, 'velocity', Object.assign({ mode: 'set', x: '', y: '', z: '', space: 'camera' }, { [ax]: String(val) }), 320, 40)];
     const nodes = [], wires = [];
     [['w', 'z', -6], ['up', 'z', -6], ['s', 'z', 6], ['down', 'z', 6], ['a', 'x', -6], ['left', 'x', -6], ['d', 'x', 6], ['right', 'x', 6]].forEach(([k, ax, val], i) => { const [a, b] = move(i, k, ax, val); a.y = 20 + i * 90; b.y = 20 + i * 90; nodes.push(a, b); wires.push(W(a.id, b.id)); });
-    nodes.push(N('kj', 'keyboard', { key: 'space', mode: 'down' }, 40, 780), N('imp', 'impulse', { force: 11, direction: 'up', mode: 'set', axisOnly: 'y', onlyGrounded: true }, 320, 780), N('sj', 'sound', { sound: 'snd_jump', action: 'play' }, 600, 780)); wires.push(W('kj', 'imp'), W('imp', 'sj'));
+    nodes.push(N('vstop', 'velocity', { mode: 'set', x: '0', y: '', z: '0', space: 'world' }, 320, 740)); ['w', 'up', 's', 'down', 'a', 'left', 'd', 'right'].forEach((k, i) => { nodes.push(N('ku' + i, 'keyboard', { key: k, mode: 'up' }, 40, 900 + i * 70)); wires.push(W('ku' + i, 'vstop')); });
+    nodes.push(N('ma', 'animation', { action: 'auto', face: true }, 600, 20), N('kj', 'keyboard', { key: 'space', mode: 'down' }, 40, 780), N('imp', 'impulse', { force: 11, direction: 'up', mode: 'set', axisOnly: 'y', onlyGrounded: true }, 320, 780), N('sj', 'sound', { sound: 'snd_jump', action: 'play' }, 600, 780)); wires.push(W('kj', 'imp'), W('imp', 'sj'));
     p.behaviors.b_player = { id: 'b_player', name: 'Player controls (WASD)', mode: 'graph', graph: { nodes, wires } };
     p.behaviors.b_gem = { id: 'b_gem', name: 'Spinning gem', mode: 'graph', graph: { nodes: [N('a', 'always', {}, 40, 40), N('sp', 'rotation', { mode: 'add', speed: 0, angle: 2, axis: 'y' }, 320, 40), N('c', 'collision', { with: 'tag:player', phase: 'enter' }, 40, 200), N('v', 'globalVariable', { name: 'gems', op: 'add', amount: 1 }, 320, 200), N('s', 'sound', { sound: 'snd_coin', action: 'play' }, 320, 330), N('d', 'destroyer', {}, 600, 330)], wires: [W('a', 'sp'), W('c', 'v'), W('c', 's'), W('c', 'd')] } };
-    p.behaviors.b_world = { id: 'b_world', name: 'Game rules', mode: 'graph', graph: { nodes: [N('t', 'timer', { interval: 0.05, repeat: false }, 40, 60), N('g', 'globalVariable', { name: 'gems', op: 'set', amount: 0, initial: 0 }, 320, 40), N('l', 'label', { id: 'hud', text: 'Gems: {gems}', anchor: 'topLeft', size: 26 }, 600, 40), N('cam', 'camera', { action: 'mode3d', mode: 'fps', target: 'Player', eye: 0.7, lerp: 1 }, 320, 200), N('h', 'label', { id: 'hint', text: 'Click to look around · WASD move · Space jump · Esc releases mouse', anchor: 'bottom', size: 18, color: '#cbd5e1' }, 600, 200), N('ml', 'lockedMouse', { sensitivity: 1, lockOnClick: true }, 40, 360), N('lk', 'camera', { action: 'look', target: 'Player', sensitivity: 0.15 }, 320, 360), N('cr', 'label', { id: 'cross', text: '+', anchor: 'center', size: 30, color: '#ffffff', x: 0, y: 0 }, 600, 360)], wires: [W('t', 'g'), W('g', 'l'), W('t', 'cam'), W('t', 'h'), W('t', 'cr'), W('ml', 'lk')] } };
-    const sc = GP.blankScene('3d', '3D Level 1'); sc.behaviors = ['b_world']; sc.camera3d = { mode: 'fps', fov: 75, pos: { x: 0, y: 1.7, z: 0 }, target: { x: 0, y: 1.7, z: -5 } };
+    p.behaviors.b_world = { id: 'b_world', name: 'Game rules', mode: 'graph', graph: { nodes: [N('t', 'timer', { interval: 0.05, repeat: false }, 40, 60), N('g', 'globalVariable', { name: 'gems', op: 'set', amount: 0, initial: 0 }, 320, 40), N('l', 'label', { id: 'hud', text: 'Gems: {gems}', anchor: 'topLeft', size: 26 }, 600, 40), N('cam', 'camera', { action: 'mode3d', mode: 'follow', target: 'Player', distance: 9, height: 3, lerp: 0.12 }, 320, 200), N('h', 'label', { id: 'hint', text: 'WASD move · Space jump · click to turn the camera with the mouse (Esc releases it) · the robot animates itself', anchor: 'bottom', size: 18, color: '#cbd5e1' }, 600, 200), N('ml', 'lockedMouse', { sensitivity: 1, lockOnClick: true }, 40, 360), N('lk', 'camera', { action: 'look', target: 'Player', sensitivity: 0.15 }, 320, 360)], wires: [W('t', 'g'), W('g', 'l'), W('t', 'cam'), W('t', 'h'), W('ml', 'lk')] } };
+    const sc = GP.blankScene('3d', '3D Level 1'); sc.behaviors = ['b_world']; sc.camera3d = { mode: 'follow', fov: 65, pos: { x: 0, y: 4, z: 9 }, target: { x: 0, y: 1, z: 0 } };
     const mk = (type, name, x, y, z, w, h, d, color, extra) => Object.assign(GP.newObject(type, '3d', x, y, z), { name, w, h, d, color }, extra || {});
     const stat = { physics: { body: 'static', shape: 'box', bounce: 0, friction: 0.4, gravityScale: 1, mass: 1 } };
     const sun = Object.assign(GP.newObject('light', '3d', 6, 10, 4), { name: 'Sun', props: { kind: 'directional', intensity: 1.2, shadows: true, angle: 40, range: 0 } }); const fill = Object.assign(GP.newObject('light', '3d', 0, 5, 0), { name: 'Sky light', props: { kind: 'hemisphere', intensity: 0.6, shadows: false, angle: 40, range: 0 } });
     const ground = mk('cube', 'Ground', 0, -0.5, 0, 40, 1, 40, '#3b4a63', stat);
-    const player = mk('cube', 'Player', 0, 1, 0, 1, 1, 1, '#ff7a8a', { tags: ['player'], behaviors: ['b_player'], physics: { body: 'dynamic', shape: 'box', bounce: 0, friction: 0.1, gravityScale: 1, mass: 1, fixedRotation: true } });
+    const player = mk('model', 'Player', 0, 1, 0, 1.6, 1.6, 1.6, '#ffffff', { props: { model: 'mdl_robot' }, tags: ['player'], behaviors: ['b_player'], physics: { body: 'dynamic', shape: 'box', bounce: 0, friction: 0.1, gravityScale: 1, mass: 1, fixedRotation: true } });
     const gem = (i, x, z) => mk('sphere', 'Gem ' + i, x, 1, z, 0.6, 0.6, 0.6, '#5be4ff', { behaviors: ['b_gem'], physics: { body: 'static', shape: 'circle', sensor: true, bounce: 0, friction: 0, gravityScale: 1, mass: 1 }, material: { emissive: '#1b8ea8', metalness: 0.4, roughness: 0.2 } });
     const crate = (i, x, z, s) => mk('cube', 'Crate ' + i, x, s / 2, z, s, s, s, '#b9894f', stat);
     const tree = (i, x, z) => Object.assign(mk('model', 'Tree ' + i, x, 1, z, 2, 2, 2, '#ffffff'), { props: { model: 'mdl_tree' } });

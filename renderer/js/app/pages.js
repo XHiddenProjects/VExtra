@@ -62,13 +62,14 @@
     const num = (k, min, max) => { const i = h('input', { type: 'number', value: s[k], min, max }); i.onchange = () => app.set(k, VX.clamp(parseFloat(i.value) || s[k], min, max)); return i; };
     const txt = (k, ph) => { const i = h('input', { value: s[k] || '', placeholder: ph || '' }); i.onchange = () => app.set(k, i.value.trim()); return i; };
     const themeSel = h('select', {}, VX.theme.list().map((t) => h('option', { value: t.id }, t.name))); themeSel.value = s.theme; themeSel.onchange = () => { app.set('theme', themeSel.value); VX.theme.apply(themeSel.value); };
+    const modeSeg = VX.ui.segmented([['simple', 'Simple'], ['advanced', 'Advanced']], s.mode, (v) => { app.set('mode', v); document.body.dataset.mode = v; }); const syncMode = (m) => { if (modeSeg.isConnected) modeSeg.set(m); else offMode(); }; const offMode = VX.on('modeChanged', syncMode);
     const info = h('div', { style: 'color:var(--muted);font-size:12px;line-height:1.7' }, 'Loading…');
     window.native.info().then((i) => { info.innerHTML = `<b>${VX.esc(i.name)}</b> ${VX.esc(i.version)} · ${VX.esc(i.platform)}/${VX.esc(i.arch)}<br>Your data lives in <code>${VX.esc(i.userDir)}</code>`; });
     const clean = (what, label) => h('button', { class: 'btn sm danger', onclick: async () => { if (!(await VX.ui.confirm(`Delete ${label}? This cannot be undone.`, 'Delete', { danger: true }))) return; try { const r = await window.native.clean(what); VX.ui.toast(`Removed: ${r.length ? r.map((x) => VX.path.base(x)).join(', ') : 'nothing to remove'}`, 'ok'); if (what.includes('all') || what.includes('settings')) setTimeout(() => location.reload(), 900); else { await Forge.plugins_.loadAll(); await VX.theme.load(); VX.sidebar.refresh(); } } catch (e) { VX.ui.toast(e.message, 'error'); } } }, label);
     c.append(h('div', { class: 'page', style: 'max-width:760px' },
       h('h1', { style: 'margin:0 0 18px' }, 'Settings'),
       h('div', { class: 'settings-sec' }, h('h3', {}, 'Interface'),
-        row('Mode', 'Simple hides advanced tools (code views, problems, raw JSON). Advanced shows everything.', VX.ui.segmented([['simple', 'Simple'], ['advanced', 'Advanced']], s.mode, (v) => { app.set('mode', v); document.body.dataset.mode = v; })),
+        row('Mode', 'Simple hides advanced tools (code views, problems, raw JSON). Advanced shows everything.', modeSeg),
         row('Theme', '', themeSel),
         row('Check for updates', 'Reads the VERSION file of the Vextra Studio GitHub repository on start-up (one small request, nothing is sent about you).', h('div', { style: 'display:flex;gap:8px;align-items:center' }, h('button', { class: 'btn sm', onclick: () => VX.update.check({}).then(() => VX.update.dialog()) }, 'Check now'), VX.ui.sw(s.updateCheck !== false, (v) => app.set('updateCheck', v))))),
       h('div', { class: 'settings-sec' }, h('h3', {}, 'Code editor'),
@@ -77,6 +78,8 @@
         row('Live preview delay', 'Milliseconds to wait before refreshing the preview while typing', num('previewDelay', 100, 3000))),
       h('div', { class: 'settings-sec' }, h('h3', {}, 'Cloud, sharing & publishing'),
         row('Server address', 'The Vextra server used for accounts, collaboration and publishing. Run your own with “npm run server”.', (() => { const i = txt('serverUrl', 'http://localhost:8787'); i.addEventListener('change', () => VX.cloud && VX.cloud.configure()); return i; })()),
+        row('Local server', 'Start or stop the Vextra server that comes with the desktop app (no terminal needed).', h('div', { style: 'display:flex;gap:6px' }, h('button', { class: 'btn sm', onclick: async () => { try { await VX.cloud.startLocalServer(); } catch (e) { VX.ui.toast(e.message, 'error'); } } }, 'Start'), h('button', { class: 'btn sm', onclick: async () => { try { await VX.cloud.stopLocalServer(); VX.ui.toast('Local server stopped', 'ok'); } catch (e) { VX.ui.toast(e.message, 'error'); } } }, 'Stop'))),
+        row('Auto-start local server', 'Start it when Vextra opens, if the server address is this computer and nothing is running.', VX.ui.sw(!!VX.app.settings.autoServer, (v) => { VX.app.set('autoServer', v); })),
         row('Connection', '', h('button', { class: 'btn sm', onclick: () => VX.cloudUI.testConnection() }, 'Test connection'))),
       h('div', { class: 'settings-sec' }, h('h3', {}, 'About & maintenance'), info,
         h('div', { class: 'srow' }, h('div', { class: 'l' }, h('b', {}, 'Clean up app data'), h('span', {}, 'Removes data Vextra stored on this computer. Your projects are never touched.')), h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end' }, clean(['plugins'], 'my plugins'), clean(['themes'], 'my themes'), clean(['secrets'], 'sign-in data'), clean(['all'], 'everything'))),

@@ -41,7 +41,7 @@ async function makeCanvases(project, o) {
 function mobileFiles(o, slug) {
   const land = o.orientation === 'landscape', port = o.orientation === 'portrait';
   const f = {};
-  f['package.json'] = JSONF({ name: slug + '-mobile', version: o.version, private: true, description: o.name, scripts: { setup: 'npx cap add android && npx cap add ios && npm run assets && npm run patch', assets: 'npx capacitor-assets generate --iconBackgroundColor ' + o.color + ' --splashBackgroundColor ' + o.color, patch: 'node scripts/patch-native.js', sync: 'npx cap sync', 'open:android': 'npx cap open android', 'open:ios': 'npx cap open ios', 'build:android': 'node scripts/build-android.js' }, dependencies: { '@capacitor/core': '^7.0.0', '@capacitor/android': '^7.0.0', '@capacitor/ios': '^7.0.0' }, devDependencies: { '@capacitor/cli': '^7.0.0', '@capacitor/assets': '^3.0.5' } });
+  f['package.json'] = JSONF({ name: slug + '-mobile', version: o.version, private: true, description: o.name, scripts: { setup: 'npx cap add android && npx cap add ios && npm run assets && npm run patch', assets: 'npx capacitor-assets generate --iconBackgroundColor ' + o.color + ' --splashBackgroundColor ' + o.color, patch: 'node scripts/patch-native.js', sync: 'npx cap sync', 'open:android': 'npx cap open android', 'open:ios': 'npx cap open ios', 'build:android': 'node scripts/build-android.js' }, dependencies: { '@capacitor/core': '^7.0.0', '@capacitor/android': '^7.0.0', '@capacitor/ios': '^7.0.0' }, devDependencies: { '@capacitor/cli': '^7.0.0', '@capacitor/assets': '^3.0.5' }, allowScripts: { sharp: true, esbuild: true } });
   f['capacitor.config.json'] = JSONF({ appId: o.id, appName: o.name, webDir: 'www', backgroundColor: o.color, android: { allowMixedContent: false }, ios: { contentInset: 'never' } });
   f['scripts/patch-native.js'] = [
     "// Best-effort patches after `cap add`: orientation + version numbers. Safe to run repeatedly.",
@@ -102,8 +102,8 @@ function steamFiles(o, slug) {
   const f = {}; const d = o.depotBase;
   f['package.json'] = JSONF({ name: slug, productName: o.name, version: o.version, description: o.name, author: o.publisher, main: 'main.js', private: true,
     scripts: { start: 'electron .', 'build:win': 'electron-builder --win --dir', 'build:mac': 'electron-builder --mac --dir', 'build:linux': 'electron-builder --linux --dir', 'build:all': 'electron-builder -wml --dir', upload: 'node scripts/upload.js' },
-    devDependencies: { electron: '^33.0.0', 'electron-builder': '^25.0.0' }, optionalDependencies: { 'steamworks.js': '^0.4.0' },
-    build: { appId: o.id, productName: o.name, directories: { output: 'dist', buildResources: 'build' }, files: ['main.js', 'preload.js', 'www/**/*', 'package.json'], asar: true, win: { target: 'dir', icon: 'build/icon.png' }, mac: { target: 'dir', icon: 'build/icon.png', category: 'public.app-category.games' }, linux: { target: 'dir', icon: 'build/icon.png', category: 'Game' } } });
+    devDependencies: { electron: '^33.0.0', 'electron-builder': '^25.0.0' }, optionalDependencies: { 'steamworks.js': '^0.4.0' }, allowScripts: { electron: true, esbuild: true, sharp: true },
+    build: { appId: o.id, productName: o.name, directories: { output: 'dist', buildResources: 'build' }, files: ['main.js', 'preload.js', 'www/**/*', 'package.json'], asar: true, win: { target: 'dir', icon: 'build/icon.png', signAndEditExecutable: false }, mac: { target: 'dir', icon: 'build/icon.png', category: 'public.app-category.games' }, linux: { target: 'dir', icon: 'build/icon.png', category: 'Game' } } });
   f['main.js'] = [
     "const { app, BrowserWindow, Menu, globalShortcut } = require('electron');",
     "const path = require('path');",
@@ -199,28 +199,32 @@ function checklist(o) { return `# Store checklist – ${o.name}
 async function autoBuild(o, out) {
   const host = { win32: 'win', windows: 'win', darwin: 'mac', macos: 'mac', linux: 'linux' }[String((await window.native.info()).platform || '').toLowerCase()] || 'linux';
   const steps = [];
-  if (o.steam) { const d = out + '/steam'; steps.push({ t: 'Steam: installing packages (npm install)', cwd: d, p: 'npm', a: ['install'], w: 5 }, { t: 'Steam: building for ' + host, cwd: d, p: 'npm', a: ['run', 'build:' + host], w: 4 }); }
+  if (o.steam) { const d = out + '/steam'; steps.push({ t: 'Steam: installing packages (npm install)', cwd: d, p: 'npm', a: ['install', '--no-audit', '--no-fund', '--loglevel=error'], w: 5 }, { t: 'Steam: building for ' + host, cwd: d, p: 'npm', a: ['run', 'build:' + host], w: 4 }); }
   if (o.android) {
     const d = out + '/mobile';
-    steps.push({ t: 'Mobile: installing packages (npm install)', cwd: d, p: 'npm', a: ['install'], w: 4 }, { t: 'Mobile: adding Android project', cwd: d, p: 'npx', a: ['cap', 'add', 'android'], w: 3, opt: true });
+    steps.push({ t: 'Mobile: installing packages (npm install)', cwd: d, p: 'npm', a: ['install', '--no-audit', '--no-fund', '--loglevel=error'], w: 4 }, { t: 'Mobile: adding Android project', cwd: d, p: 'npx', a: ['cap', 'add', 'android'], w: 3, opt: true });
     if (host === 'mac') steps.push({ t: 'Mobile: adding iOS project', cwd: d, p: 'npx', a: ['cap', 'add', 'ios'], w: 3, opt: true });
     steps.push({ t: 'Mobile: generating icons and splash', cwd: d, p: 'npm', a: ['run', 'assets'], w: 2, opt: true }, { t: 'Mobile: applying orientation and version', cwd: d, p: 'npm', a: ['run', 'patch'], w: 1, opt: true }, { t: 'Mobile: syncing web assets', cwd: d, p: 'npx', a: ['cap', 'sync'], w: 1, opt: true }, { t: 'Mobile: building Android debug APK', cwd: d, p: 'npm', a: ['run', 'build:android'], w: 4, opt: true });
   }
   const total = steps.reduce((n, x) => n + x.w, 0); let doneW = 0; const issues = [];
   const ui = forge.ui.progress('Exporting ' + o.name); let cur = null; ui.onCancel(() => cur && cur.cancel());
-  for (const st of steps) {
-    if (ui.cancelled) break;
-    ui.set(doneW / total * 100, st.t); ui.log('\n$ ' + st.p + ' ' + st.a.join(' '));
-    let code = -1;
-    try { cur = forge.proc.run({ cwd: st.cwd, program: st.p, args: st.a, onLine: ui.log }); code = await cur; } catch (e) { ui.log('! ' + e.message); }
-    if (ui.cancelled) break;
-    if (code !== 0) { issues.push(st.t + ' (exit ' + code + ')'); if (!st.opt) { ui.log('Stopped: a required step failed.'); break; } }
-    doneW += st.w;
-  }
-  const ok = !ui.cancelled && !issues.length;
-  ui.set(ui.cancelled || issues.some((x) => !/^Mobile: (?!installing)/.test(x)) ? doneW / total * 100 : 100, ui.cancelled ? 'Cancelled' : ok ? 'Done – builds are in the dist/ and android/ folders' : 'Finished with problems');
-  if (issues.length) ui.log('\nProblems:\n- ' + issues.join('\n- ') + '\nOpen the README in the folder for the manual steps (Android SDK, Xcode, signing).');
-  ui.done('Close'); forge.ui.toast(ok ? 'Store export finished' : ui.cancelled ? 'Store export cancelled' : 'Store export finished with problems', ok ? 'ok' : 'warn');
+  const clean = (l) => String(l).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').slice(0, 400);
+  const hint = (txt) => /could not start|ENOENT|not recognized|is Node/i.test(txt) ? 'Node.js was not found – install it from nodejs.org and restart Vextra.' : /EACCES|EPERM|operation not permitted/i.test(txt) ? 'A file was locked or permission was denied – close programs using the folder (or run as administrator) and try again.' : /ENOTFOUND|ETIMEDOUT|ECONNRESET|EAI_AGAIN|network/i.test(txt) ? 'The network request failed – check the internet connection / proxy and try again.' : /ANDROID_HOME|ANDROID_SDK|SDK location/i.test(txt) ? 'The Android SDK is not set up – open the project in Android Studio once.' : '';
+  try {
+    for (const st of steps) {
+      if (ui.cancelled) break;
+      ui.set(doneW / total * 100, st.t); ui.log('\n$ ' + st.p + ' ' + st.a.join(' '));
+      let code = -1, tail = '';
+      try { cur = forge.proc.run({ cwd: st.cwd, program: st.p, args: st.a, onLine: (l) => { const c = clean(l); if (!c.trim()) return; tail = (tail + '\n' + c).slice(-800); ui.log(c); } }); code = await cur; } catch (e) { tail = String(e && e.message || e); ui.log('! ' + tail); }
+      if (ui.cancelled) break;
+      if (code !== 0) { const hh = hint(tail); issues.push(st.t + ' (exit ' + code + ')' + (hh ? ' – ' + hh : '')); if (hh) ui.log('→ ' + hh); if (!st.opt) { ui.log('Stopped: a required step failed.'); break; } }
+      doneW += st.w;
+    }
+  } catch (e) { issues.push('Unexpected error: ' + (e && e.message || e)); ui.log('! ' + (e && e.stack || e)); }
+  const ok = !ui.cancelled && !issues.length, fatal = issues.some((x) => !/^Mobile: (?!installing)/.test(x));
+  ui.set(ui.cancelled || fatal ? doneW / total * 100 : 100, ui.cancelled ? 'Cancelled' : ok ? 'Done – builds are in the dist/ and android/ folders' : fatal ? 'Stopped – see the problems below' : 'Finished – optional steps need manual setup');
+  if (issues.length) ui.log('\nProblems:\n- ' + issues.join('\n- ') + '\nThe project files were still written. Open the README in the folder for the manual steps (Android SDK, Xcode, signing).');
+  ui.done('Close'); forge.ui.toast(ok ? 'Store export finished' : ui.cancelled ? 'Store export cancelled' : fatal ? 'Store export stopped – see the log' : 'Store export finished with optional steps skipped', ok ? 'ok' : 'warn');
 }
 
 async function run() {

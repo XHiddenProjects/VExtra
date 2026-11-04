@@ -2,6 +2,18 @@
 (function () {
   const VX = (window.VX = window.VX || {});
 
+  /** Hooks let plugins react to / veto app actions. run(): listeners may throw an error made with forge.hooks.block(msg) to stop the action. filter(): each listener may return a changed value. */
+  VX.hooks = (() => {
+    const map = new Map(); const list = (n) => map.get(n) || [];
+    return {
+      on(name, fn) { const l = list(name); l.push(fn); map.set(name, l); return () => map.set(name, list(name).filter((x) => x !== fn)); },
+      async run(name, payload) { for (const fn of [...list(name)]) { try { await fn(payload); } catch (e) { if (e && e.vxBlock) throw new Error(e.message); console.error('[hook ' + name + ']', e); } } },
+      async notify(name, payload) { for (const fn of [...list(name)]) { try { await fn(payload); } catch (e) { console.error('[hook ' + name + ']', e); } } },
+      async filter(name, value, ctx) { for (const fn of [...list(name)]) { try { const r = await fn(value, ctx); if (r !== undefined) value = r; } catch (e) { if (e && e.vxBlock) throw new Error(e.message); console.error('[hook ' + name + ']', e); } } return value; },
+      count: (name) => list(name).length,
+    };
+  })();
+
   /** Tiny hyperscript: h('div', {class:'x', onclick: fn}, child, 'text', [more]) */
   VX.h = function h(tag, attrs, ...kids) {
     const e = document.createElement(tag);
@@ -68,6 +80,7 @@
     game: '<rect x="2.5" y="7" width="19" height="11" rx="5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.5" cy="11.5" r=".9"/><circle cx="18" cy="13.5" r=".9"/>',
     cube: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12v9M12 12 4 7.5M12 12l8-4.5"/>',
     docs: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M8 8h6M8 11.5h6M8 15h3"/>',
+    bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3.2" r="1"/><circle cx="9" cy="13" r="1.2"/><circle cx="15" cy="13" r="1.2"/><path d="M9.5 17h5M2 13v3M22 13v3"/>',
     plugin: '<path d="M10 3h4v3a2 2 0 0 0 2 2h3v4h-3a2 2 0 0 0-2 2v3h-4v-3a2 2 0 0 0-2-2H5V8h3a2 2 0 0 0 2-2z"/>',
     theme: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-3.9-4-7.2-9-7.2z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
     library: '<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16 6l3.8-1 3.2 14.5-3.8 1z" transform="translate(-2 0)"/>',

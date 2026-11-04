@@ -10,12 +10,26 @@
   U.testConnection = async () => { try { const r = await VX.cloud.request('GET', '/api/health', null, false); VX.ui.toast(`Connected to ${VX.cloud.base()} (v${r.version}${r.register ? '' : ', sign-ups closed'})`, 'ok'); } catch (e) { err(e); } };
 
   let authMode = 'login';
+  /** Second step of sign-in: ask for an authenticator code, a recovery code or a security key. */
+  VX.cloud.mfaPrompt = (ch, note) => new Promise((resolve) => {
+    const code = h('input', { placeholder: '6-digit code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 24, style: 'font-size:18px;letter-spacing:3px;text-align:center' }); const msg = h('div', { class: 'form-error' + ((note || ch.__msg) ? '' : ' hidden') }, note || ch.__msg || ''); let done = false, mode = 'code';
+    const fin = (v) => { if (!done) { done = true; m.close(); resolve(v); } };
+    const submit = () => { const v = code.value.trim(); if (!v) return; fin(mode === 'recovery' ? { recovery: v } : { code: v }); };
+    code.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+    const toggle = h('button', { class: 'btn sm ghost', onclick: () => { mode = mode === 'code' ? 'recovery' : 'code'; code.placeholder = mode === 'code' ? '6-digit code' : 'recovery code (xxxxx-xxxxx)'; toggle.textContent = mode === 'code' ? 'Use a recovery code' : 'Use the authenticator code'; code.focus(); } }, 'Use a recovery code');
+    const hasCode = (ch.methods || []).includes('totp');
+    const m = VX.ui.modal({ title: 'Two-step sign-in', size: 'small', dismissable: false, body: h('div', {}, h('p', { style: 'color:var(--muted);margin-top:0' }, hasCode ? 'Enter the code from your authenticator app.' : 'This account is protected with a security key.'), msg, hasCode ? code : null, hasCode ? h('div', { style: 'margin-top:6px' }, toggle) : null,
+      (ch.methods || []).includes('key') ? h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: () => fin({ key: true }) }, '🔑 Use a security key')) : null), actions: [h('button', { class: 'btn', onclick: () => fin(null) }, 'Cancel'), hasCode ? h('button', { class: 'btn primary', onclick: submit }, 'Verify') : null] });
+    setTimeout(() => code.focus(), 50);
+  });
   U.renderPanel = function (c) {
     const C = VX.cloud;
     const redraw = () => { const body = document.getElementById('side-body'); if (body && c.isConnected) { body.textContent = ''; U.renderPanel(body); } };
     const stat = h('div', { class: 'tag ' + (C.status === 'online' ? 'ok' : C.status === 'offline' ? 'err' : '') , style: 'margin:6px 4px;display:inline-block' }, C.status === 'online' ? 'Server: ' + C.base() : C.status === 'offline' ? 'Server unreachable: ' + C.base() : 'Checking server…');
     c.append(stat, h('button', { class: 'btn sm ghost', title: 'Change server address', onclick: () => VX.app.openSettings() }, VX.icon('settings', 13)));
-    if (C.status === 'offline') c.append(h('div', { class: 'card' }, h('p', {}, 'Start a Vextra server on this computer with ', h('code', {}, 'npm run server'), ' or set the address of one you have access to in Settings.'), h('button', { class: 'btn sm', onclick: async () => { await C.init(); redraw(); } }, 'Retry')));
+    if (C.status === 'offline') { const sm = h('div', { class: 'form-error hidden', style: 'margin-top:6px' }); const local = C.isLocal(); c.append(h('div', { class: 'card' }, h('p', {}, local ? 'No Vextra server is running on this computer. Start one with a click – it only accepts connections from this computer and keeps its data in the app folder.' : 'Cannot reach ' + C.base() + '. Check the address in Settings, or start a server on this computer.'),
+      h('div', { class: 'row', style: 'display:flex;gap:6px;flex-wrap:wrap' }, local ? h('button', { class: 'btn sm primary', onclick: async (e) => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Starting…'; try { await C.startLocalServer(); redraw(); return; } catch (er) { sm.textContent = er.message; sm.classList.remove('hidden'); } b.disabled = false; b.textContent = '▶ Start local server'; } }, '▶ Start local server') : null, h('button', { class: 'btn sm', onclick: async () => { await C.init(); redraw(); } }, 'Retry')), sm,
+      local ? h('label', { class: 'cfgp-check', style: 'display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px' }, (() => { const i = h('input', { type: 'checkbox' }); i.checked = !!VX.app.settings.autoServer; i.onchange = () => { VX.app.set('autoServer', i.checked); }; return i; })(), 'Start it automatically when Vextra opens') : null)); }
     if (!C.user) {
       const user = h('input', { placeholder: 'Username', autocomplete: 'username' }), pass = h('input', { type: 'password', placeholder: 'Password (min 8 characters)', autocomplete: authMode === 'login' ? 'current-password' : 'new-password' }), disp = h('input', { placeholder: 'Display name (optional)' }), msg = h('div', { class: 'form-error hidden' });
       const go = async () => { msg.classList.add('hidden'); try { if (authMode === 'login') await C.login(user.value, pass.value); else await C.register(user.value, pass.value, disp.value || undefined); VX.ui.toast('Signed in as ' + C.user.username, 'ok'); redraw(); } catch (e) { msg.textContent = e.message; msg.classList.remove('hidden'); } };
@@ -61,6 +75,7 @@
         h('button', { class: 'btn', onclick: async () => { const v = await VX.ui.form({ title: 'Change password', fields: [{ key: 'old', label: 'Current password', type: 'password', required: true }, { key: 'n1', label: 'New password', type: 'password', required: true, hint: 'At least 8 characters' }, { key: 'n2', label: 'Repeat new password', type: 'password', required: true }], validate: (x) => (x.n1 !== x.n2 ? 'The new passwords do not match' : x.n1.length < 8 ? 'Use at least 8 characters' : null), submit: 'Change password' }); if (!v) return; try { await C.changePassword(v.old, v.n1); VX.ui.toast('Password changed', 'ok'); } catch (e) { err(e); } } }, 'Change password…'),
         h('button', { class: 'btn', onclick: async () => { try { await C.logoutOthers(); VX.ui.toast('Signed out of all other devices', 'ok'); } catch (e) { err(e); } } }, 'Sign out other devices')),
       h('div', { class: 'group-title' }, 'Danger zone'), h('button', { class: 'btn danger', onclick: async () => { const v = await VX.ui.form({ title: 'Delete account', danger: true, submit: 'Delete my account', intro: 'This permanently deletes your account, your cloud projects, published sites and cloud saves. Local files on this computer are not affected.', fields: [{ key: 'pw', label: 'Enter your password to confirm', type: 'password', required: true }] }); if (!v) return; try { await C.deleteAccount(v.pw); VX.ui.toast('Account deleted', 'ok'); } catch (e) { err(e); } } }, VX.icon('trash', 14), 'Delete account…'));
+    for (const sec of VX.accountSections || []) { try { const box = h('div', { class: 'acc-sec' }); body.insertBefore(box, body.querySelector('.group-title')); sec.render(box, { user: u }); } catch (e) { console.warn('account section', e); } }
     VX.ui.modal({ title: 'Your account', size: 'small', body });
   }
 

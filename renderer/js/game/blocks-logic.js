@@ -78,10 +78,6 @@
     params: [P.text('cases', 'Cases (comma separated)', 'a, b, c'), P.sel('mode', 'Match by', [['value', 'Value equals case'], ['index', 'Number = output index (0-based)']])],
     onInput(n, port, v, g) { const cases = String(n.p.cases || '').split(',').map((c) => c.trim()); let i = -1; if (n.p.mode === 'index') i = Math.floor(U.num(v, -1)); else i = cases.findIndex((c) => c === String(v) || (isNum(c) && isNum(v) && +c === +v)); g.send(n, i >= 0 && i < cases.length ? 'c' + i : 'default', v); } });
 
-  B({ id: 'stateFlag', cat: 'logic', label: 'State Flag', desc: 'Remembers on/off. "toggle" flips it, "on" / "off" set it, "set" uses the truthiness of the incoming value. Emits the new state.',
-    inputs: ['toggle', 'on', 'off', 'set'], outputs: ['out', 'on', 'off'], params: [P.bool('initial', 'Starts on', false)],
-    init(n) { n.st.on = !!n.p.initial; }, onInput(n, port, v, g) { const s = n.st; if (port === 'toggle') s.on = !s.on; else if (port === 'on') s.on = true; else if (port === 'off') s.on = false; else s.on = U.truthy(v); g.send(n, s.on ? 'on' : 'off', 1); g.send(n, 'out', s.on); } });
-
   B({ id: 'router', cat: 'logic', label: 'Router', desc: 'Sends one input to one of several outputs: chosen by the "select" input, round-robin, random, or to all.',
     inputs: ['in', 'select'], outputs: (p) => Array.from({ length: Math.max(2, Math.min(10, U.num(p.outputs, 3))) }, (_, i) => ({ id: 'o' + i, label: 'out ' + (i + 1) })),
     params: [P.num('outputs', 'Number of outputs', 3, { min: 2, max: 10 }), P.sel('mode', 'Mode', [['select', 'Use "select" input'], ['roundRobin', 'Round robin'], ['random', 'Random'], ['all', 'All outputs']])],
