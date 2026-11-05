@@ -4,13 +4,14 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.2.x   | ✅ security fixes (current) |
-| 3.1.x   | ⚠️ please upgrade to 3.2.x |
+| 3.3.x   | ✅ security fixes (current) |
+| 3.2.x   | ⚠️ please upgrade to 3.3.x |
+| 3.1.x   | ⚠️ please upgrade to 3.3.x |
 | 3.0.x   | ❌ please upgrade |
 | 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
 
-Current version: **3.2.0** (see `VERSION`). This policy was last reviewed for 3.2.0.
+Current version: **3.3.0** (see `VERSION`). This policy was last reviewed for 3.3.0.
 
 ## Reporting a vulnerability
 
@@ -48,7 +49,14 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
 
-## v3.1.0 notes (still apply in 3.2.0)
+## v3.3.0 notes
+- **CodeQL findings fixed** (`plugins/vextra-shield.js`): *Improper code sanitization* (×3) – the exported-game scripts (save guard, embed guard) are now fixed text and read their settings from escaped `data-` attributes instead of having JSON spliced into JavaScript; *Bad HTML filtering regexp* – script-tag matching now also handles end tags such as `</script foo>`. The same regular expression was corrected in the AI site preview and the web tools.
+- **Repository hygiene**: the generated server binary (`vextra-server[.exe]`) and installers are git-ignored; they are build outputs and should be published as release assets, not committed. Verify downloaded builds against the checksums you publish.
+- **Vextra AI**: new *Build & change site* permission (Deny / Ask / Allow); website files are written only under it, and `new_site` never overwrites existing files. Stop now aborts a pending request or approval immediately. The *Context window* limit trims what is sent to the provider.
+- Dependencies were updated to their latest releases (`npm audit`: 0 known vulnerabilities).
+- Drag-to-reorder uses the pointer only and moves no data outside the window.
+
+## v3.1.0 notes (still apply in 3.3.0)
 - No new network, file or process permissions. The new animation studios, 2D lights and model poses are pure front-end features that run inside the existing sandboxed game preview.
 - Sprite/model animation data is stored as plain JSON inside the game file and is validated on load (frame indices outside the sprite are dropped; unknown track names are ignored).
 

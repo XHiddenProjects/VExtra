@@ -251,3 +251,9 @@ input[type=checkbox], input[type=radio] { flex: 0 0 auto; width: 18px; height: 1
 .cfgp-check { align-items: flex-start; } .cfgp-check input { margin-top: 2px; }
 
 .card .row.card-actions { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); gap: 6px; flex-wrap: wrap; } .card .row.card-actions .btn { flex: 0 0 auto; }
+
+/* drag-to-reorder (tabs, panel tabs, activity icons) */
+.sorting { opacity: .35; } body.dnd-active { cursor: grabbing; user-select: none; }
+.tab.drop-before, .bp-tab.drop-before { box-shadow: inset 3px 0 0 var(--accent); } .tab.drop-after, .bp-tab.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
+.act.drop-before { box-shadow: inset 0 3px 0 var(--accent); } .act.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+#tabbar .tab, #bp-tabs .bp-tab, #activity .act { user-select: none; }

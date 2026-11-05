@@ -2,7 +2,36 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.2.0] — current
+## [3.3.0] — current
+
+### Added
+- **Drag to reorder**: editor tabs, bottom-panel tabs (Console / Problems / Output) and the sidebar icons can now be moved by clicking and dragging them (a line shows where they will land; the order is remembered). Works with the pointer, so it also works inside the desktop webview.
+- Vextra AI: **Build & change site** permission with `new_site` / `preview_site`, **checkpoints** with a Continue button, a **token usage bar**, a *Context window* setting that applies to every provider, a time-out lock banner, **Reconnect** with a 3-second auto-reconnect countdown, and more providers (Mistral, DeepSeek, xAI, Together AI, custom Anthropic-compatible).
+
+### Changed
+- `package.json` now lists every dependency as `"latest"` (so `npm install` always takes the newest release; `package-lock.json` records what was installed). `three` is 0.187.
+- Vextra AI: the model list starts empty (“— select a model —” / “— none found —”) instead of auto-filling a default model; every provider remembers its own saved model.
+
+### Fixed
+- **Security (CodeQL)**: Vextra Shield no longer builds script code from strings – its scripts are fixed text and the settings (game id, allowed sites) travel as escaped HTML attributes (fixes “Improper code sanitization” ×3); the script-tag regular expressions now also match `</script foo>` (fixes “Bad HTML filtering regexp”, also in the AI preview and the web tools).
+- **GitHub upload blocked by `vextra-server.exe`**: the bundled server binary is more than GitHub's 100 MB file limit. It is a build output, so it (and the other generated binaries) are now in `.gitignore`; see the README for removing it from an existing commit.
+- Tabs and panels can be rearranged by dragging (before, they could not be moved at all).
+- Vextra AI: new permission **Build & change site** (Deny / Ask / Allow, part of every preset). Website files (html, css, js, ts, vue, svelte, json, svg, md…) are written under it; *Create & edit other files* covers the rest. New actions `new_site` (scaffolds index.html + style.css + script.js without overwriting) and `preview_site` (shows the page with its css/js inlined).
+- Vextra AI settings: changing the provider no longer carries the previous model over or auto-fills one (no more `llama3.2:latest` default). The model list starts at “— select a model —” (“— none found —” when the server returns nothing); each provider remembers the model you saved for it.
+- Vextra AI: the request timeout now defaults to **1 hour** (3600 s, also the maximum; was 120 s, max 300 s) so slow local models can finish long answers. If you saved a different value in Settings it is kept.
+- Vextra AI: the **Context window** setting now applies to every provider – older messages are dropped to fit it and the answer length is capped to half of it (Ollama also gets it as `num_ctx`).
+- Vextra AI: the token bar no longer goes backwards. It showed the size of the *latest* request, which can shrink (older messages are trimmed, Ollama reports only uncached prompt tokens, estimates vary); the context fill now only grows within a chat.
+- Vextra AI: the chat always matches the Settings – the panel shows the current provider · model, and changing the model, provider or permissions updates the chat (model label, permission preset, usage window) immediately.
+- Simple / Advanced mode: the status-bar toggle, the Settings page and the command palette stay in sync (changing it in one updates the others).
+- Vextra AI: the **Stop** button now works immediately – it ends a waiting request or a pending action instead of only stopping between steps.
+- Vextra AI: after a time-out the box is locked and a banner shows when you can run it again (30 s, doubling to 5 min on repeated time-outs).
+- Vextra AI: **checkpoints** – when a run is stopped, times out, errors or hits the step limit, a Continue button picks up where it left off (saved with the chat, survives restarts).
+- Vextra AI works with more models: adapts to what a server accepts (drops `response_format`, `temperature` or the system role, uses `max_completion_tokens` when asked), strips `<think>…</think>` reasoning, handles array-style replies, and adds Mistral, DeepSeek, xAI (Grok), Together AI and a custom Anthropic-compatible provider.
+- Vextra AI: deleting a chat removes it right away, and if none are left a fresh empty chat is inserted. The internal `data-tag` attribute on chat bubbles is gone.
+- Vextra AI: new **token usage bar** under the chat (context used vs. the model's window, amber above 70 %, red above 90 %, plus per-chat in/out totals; real counts from the provider, estimated otherwise). New *Context window* setting.
+- Vextra AI: network failures now just say “⏱ The AI has timed out.”. Cloud providers get a **Reconnect** button that waits for the internet and then auto-reconnects after a 3-second countdown, resuming the request; local models get **Retry**.
+
+## [3.2.0]
 
 ### Added
 - **Vextra Shield** plugin (`plugins/vextra-shield.js`): CSP with script hashes and signed saves for exported games, password policy, sign-in lockout, idle sign-out, plain-http warning, secret scan before publishing and a **Security audit** command (writes `SECURITY-AUDIT.md`). Configurable with a ⚙ button.
@@ -25,19 +54,6 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - npm warning `prebuild-install@7.1.3: No longer maintained`: it came from the `@yao-pkg/pkg` dev dependency, which is removed. The local server is now compiled with Node's built-in single-executable feature (`postject`), so `npm install` has no deprecated packages.
 - Local connections (AI/Ollama, local Vextra server) always use IPv4 (`127.0.0.1`), never `[::1]`.
 - Vextra AI: a server URL without `/v1` (e.g. `http://localhost:11434`) now works for chat and the model list (404 fixed; `/v1` is added automatically, with a fallback). Local/small models are asked for a strict JSON reply (`response_format`) so they actually perform the build instead of describing it. The AI now sees what is open (the current game with its scenes/objects/behaviours, or the open file) and builds into it. Chats are saved: a history list, New and Delete in the AI panel.
-- Vextra AI: new permission **Build & change site** (Deny / Ask / Allow, part of every preset). Website files (html, css, js, ts, vue, svelte, json, svg, md…) are written under it; *Create & edit other files* covers the rest. New actions `new_site` (scaffolds index.html + style.css + script.js without overwriting) and `preview_site` (shows the page with its css/js inlined).
-- Vextra AI settings: changing the provider no longer carries the previous model over or auto-fills one (no more `llama3.2:latest` default). The model list starts at “— select a model —” (“— none found —” when the server returns nothing); each provider remembers the model you saved for it.
-- Vextra AI: the **Context window** setting now applies to every provider – older messages are dropped to fit it and the answer length is capped to half of it (Ollama also gets it as `num_ctx`).
-- Vextra AI: the token bar no longer goes backwards. It showed the size of the *latest* request, which can shrink (older messages are trimmed, Ollama reports only uncached prompt tokens, estimates vary); the context fill now only grows within a chat.
-- Vextra AI: the chat always matches the Settings – the panel shows the current provider · model, and changing the model, provider or permissions updates the chat (model label, permission preset, usage window) immediately.
-- Simple / Advanced mode: the status-bar toggle, the Settings page and the command palette stay in sync (changing it in one updates the others).
-- Vextra AI: the **Stop** button now works immediately – it ends a waiting request or a pending action instead of only stopping between steps.
-- Vextra AI: after a time-out the box is locked and a banner shows when you can run it again (30 s, doubling to 5 min on repeated time-outs).
-- Vextra AI: **checkpoints** – when a run is stopped, times out, errors or hits the step limit, a Continue button picks up where it left off (saved with the chat, survives restarts).
-- Vextra AI works with more models: adapts to what a server accepts (drops `response_format`, `temperature` or the system role, uses `max_completion_tokens` when asked), strips `<think>…</think>` reasoning, handles array-style replies, and adds Mistral, DeepSeek, xAI (Grok), Together AI and a custom Anthropic-compatible provider.
-- Vextra AI: deleting a chat removes it right away, and if none are left a fresh empty chat is inserted. The internal `data-tag` attribute on chat bubbles is gone.
-- Vextra AI: new **token usage bar** under the chat (context used vs. the model's window, amber above 70 %, red above 90 %, plus per-chat in/out totals; real counts from the provider, estimated otherwise). New *Context window* setting.
-- Vextra AI: network failures now just say “⏱ The AI has timed out.”. Cloud providers get a **Reconnect** button that waits for the internet and then auto-reconnects after a 3-second countdown, resuming the request; local models get **Retry**.
 - Vextra AI only described the build instead of doing it with smaller/local models: it now accepts sloppy action formats (```vx, ```json, bare JSON, game operations written as actions), folds them into one undoable game edit, and re-prompts the model once or twice when it describes steps without performing them.
 - Plugin settings did not save or apply in the desktop app: the plugin host kept a stale copy of the settings object created before settings were loaded. It now reads the live settings.
 - Vextra AI: the model is a dropdown (installed models for Ollama / LM Studio, models your key can use for cloud providers, “Other…” to type one), the provider is detected from the API key, and the panel icon is a bot.

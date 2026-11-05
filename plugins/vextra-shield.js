@@ -22,27 +22,29 @@ const isLocal = (host) => /^(localhost|127\.\d+\.\d+\.\d+|\[?::1\]?)$/i.test(hos
 
 /* ------------------------------------------------------------------ game export hardening */
 function secretKey() { let k = forge.settings.get('saveSecret'); if (!k) { const a = new Uint32Array(4); crypto.getRandomValues(a); k = [...a].map((n) => n.toString(36)).join(''); forge.settings.set('saveSecret', k); } return k; }
-function saveGuardScript(gameId) {
-  return `(function(){try{var S=${JSON.stringify(secretKey() + ':' + gameId)},P='vx:'+${JSON.stringify(gameId)}+':';
+function saveGuardScript() {
+  return `(function(){try{var D=document.currentScript.dataset,S=D.vxKey+':'+D.vxId,P='vx:'+D.vxId+':';
 function h(s){var a=0xdeadbeef,b=0x41c6ce57;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677)}a=Math.imul(a^(a>>>16),2246822507)^Math.imul(b^(b>>>13),3266489909);b=Math.imul(b^(b>>>16),2246822507)^Math.imul(a^(a>>>13),3266489909);return(4294967296*(2097151&b)+(a>>>0)).toString(36)}
 var g=Storage.prototype.getItem,s=Storage.prototype.setItem,r=Storage.prototype.removeItem;
 Storage.prototype.setItem=function(k,v){s.call(this,k,v);if(this===localStorage&&String(k).indexOf(P)===0)s.call(this,'__vxsig:'+k,h(S+k+v))};
 Storage.prototype.removeItem=function(k){r.call(this,k);if(this===localStorage)r.call(this,'__vxsig:'+k)};
 Storage.prototype.getItem=function(k){var v=g.call(this,k);if(this===localStorage&&v!==null&&String(k).indexOf(P)===0){var sg=g.call(this,'__vxsig:'+k);if(sg===null){s.call(this,'__vxsig:'+k,h(S+k+v))}else if(sg!==h(S+k+v)){console.warn('[Vextra Shield] a saved value was changed outside the game and was ignored: '+k);return null}}return v}}catch(e){}})();`;
 }
-const embedScript = (hosts) => `(function(){try{if(window.top!==window&&!window.__VX_CH){var ok=${JSON.stringify(hosts)};var o=(location.ancestorOrigins&&location.ancestorOrigins[0])||document.referrer||'';if(!ok.some(function(h){return o.indexOf('//'+h)>-1})){document.documentElement.innerHTML='<p style="font:16px system-ui;padding:24px">This game can only be played on its own page.</p>';throw 0}}}catch(e){if(e===0)throw e}})();`;
+const embedScript = () => `(function(){try{if(window.top!==window&&!window.__VX_CH){var ok=String(document.currentScript.dataset.vxHosts||'').split(',').filter(Boolean);var o=(location.ancestorOrigins&&location.ancestorOrigins[0])||document.referrer||'';if(!ok.some(function(h){return o.indexOf('//'+h)>-1})){document.documentElement.innerHTML='<p style="font:16px system-ui;padding:24px">This game can only be played on its own page.</p>';throw 0}}}catch(e){if(e===0)throw e}})();`;
 
 forge.hooks.on('game.export.html', async (html, ctx) => {
   if (ctx.play) return html; // the editor preview is left alone so debugging keeps working
   const c = cfg(); const m = html.match(/<head[^>]*>/i); if (!m) return html;
+  /* The scripts are fixed text. Their settings travel as HTML attributes (escaped), never spliced into code. */
+  const attr = (v) => String(v).replace(/[&<>"'`]/g, (ch) => '&#' + ch.charCodeAt(0) + ';');
   const inject = [];
-  if (c.saveGuard) inject.push(saveGuardScript(ctx.project?.settings?.id || 'game'));
-  if (c.blockEmbed) inject.push(embedScript(String(c.embedHosts).split(/[\s,]+/).filter(Boolean)));
-  if (c.noContext) inject.push("addEventListener('contextmenu',function(e){e.preventDefault()});addEventListener('dragstart',function(e){e.preventDefault()});");
+  if (c.saveGuard) inject.push(`<script data-vx-key="${attr(secretKey())}" data-vx-id="${attr(ctx.project?.settings?.id || 'game')}">${saveGuardScript()}</script>`);
+  if (c.blockEmbed) inject.push(`<script data-vx-hosts="${attr(String(c.embedHosts).split(/[\s,]+/).filter(Boolean).join(','))}">${embedScript()}</script>`);
+  if (c.noContext) inject.push("<script>addEventListener('contextmenu',function(e){e.preventDefault()});addEventListener('dragstart',function(e){e.preventDefault()});</script>");
   let out = html;
-  if (inject.length) out = out.replace(m[0], m[0] + inject.map((s) => `<script>${s}</script>`).join(''));
+  if (inject.length) out = out.replace(m[0], () => m[0] + inject.join(''));
   if (c.csp) {
-    const hashes = []; out.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (all, attrs, body) => { if (!/\bsrc\s*=/.test(attrs)) hashes.push(body); return all; });
+    const hashes = []; out.replace(/<script\b([^>]*)>([\s\S]*?)<\/script[^>]*>/gi, (all, attrs, body) => { if (!/\bsrc\s*=/.test(attrs)) hashes.push(body); return all; });
     const sums = []; for (const b of hashes) sums.push("'sha256-" + (await b64sha(b)) + "'");
     const connect = ['https:', 'wss:', 'data:', 'blob:'];
     const cloud = forge.game.current()?.settings?.cloudUrl; try { if (cloud) connect.push(new URL(cloud).origin); } catch (e) { /* ignore */ }

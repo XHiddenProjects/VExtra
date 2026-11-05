@@ -512,7 +512,7 @@ async fn http_request(req: HttpReq) -> Res<HttpRes> {
     let req = HttpReq { url: req.url.replacen("://localhost", "://127.0.0.1", 1).replacen("://[::1]", "://127.0.0.1", 1), ..req };
     tauri::async_runtime::spawn_blocking(move || {
         let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(6)).build();
-        let mut r = agent.request(&req.method.to_uppercase(), &req.url).timeout(Duration::from_secs(req.timeout_secs.unwrap_or(25).clamp(5, 300)));
+        let mut r = agent.request(&req.method.to_uppercase(), &req.url).timeout(Duration::from_secs(req.timeout_secs.unwrap_or(25).clamp(5, 3600)));
         for (k, v) in req.headers.unwrap_or_default() {
             r = r.set(&k, &v);
         }

@@ -13,8 +13,8 @@
   BP.render = () => {
     const tabs = $('#bp-tabs'), body = $('#bp-body'); if ($('#bottom').classList.contains('collapsed')) return;
     const probs = [...VX.tabs.problems.entries()].flatMap(([id, l]) => l.map((p) => ({ ...p, tab: id })));
-    const defs = [['console', 'Console', BP.logs.length], ['problems', 'Problems', probs.length], ['output', 'Output', 0]];
-    tabs.textContent = ''; for (const [id, l, n] of defs) tabs.append(h('button', { class: 'bp-tab' + (id !== 'console' ? ' adv' : '') + (BP.tab === id ? ' on' : ''), onclick: () => { BP.tab = id; BP.render(); } }, l, n ? h('span', { class: 'tag' }, n) : null));
+    let defs = [['console', 'Console', BP.logs.length], ['problems', 'Problems', probs.length], ['output', 'Output', 0]]; const ord = app.settings.bpOrder || []; defs.sort((x, y) => (ord.indexOf(x[0]) + 9) % 9 - (ord.indexOf(y[0]) + 9) % 9 || 0); VX.dnd.sortable(tabs, { item: '.bp-tab', id: (el) => el.dataset.id, onMove: (f, t, after) => { const ids = [...tabs.querySelectorAll('.bp-tab')].map((n) => n.dataset.id).filter((x) => x !== f); ids.splice(ids.indexOf(t) + (after ? 1 : 0), 0, f); app.set('bpOrder', ids); BP.render(); } });
+    tabs.textContent = ''; for (const [id, l, n] of defs) tabs.append(h('button', { class: 'bp-tab' + (id !== 'console' ? ' adv' : '') + (BP.tab === id ? ' on' : ''), 'data-id': id, onclick: () => { BP.tab = id; BP.render(); } }, l, n ? h('span', { class: 'tag' }, n) : null));
     tabs.append(h('span', { class: 'spacer' }), h('button', { class: 'iconbtn', title: 'Clear', onclick: BP.clear }, VX.icon('trash', 14)), h('button', { class: 'iconbtn', title: 'Close panel', onclick: BP.toggle }, VX.icon('x', 14)));
     const stick = body.scrollTop + body.clientHeight >= body.scrollHeight - 30; body.textContent = '';
     if (BP.tab === 'console') { if (!BP.logs.length) body.append(h('div', { class: 'empty' }, 'Console output from live previews and games appears here.')); for (const l of BP.logs) body.append(h('div', { class: 'log ' + l.level }, h('small', {}, l.t.toLocaleTimeString()), l.src ? h('small', {}, '[' + l.src + ']') : null, l.text)); }

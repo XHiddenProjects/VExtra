@@ -154,11 +154,12 @@
   T.reloadFromDisk = async (path) => { const t = S.tabs.find((x) => x.path === path && x.kind === 'code'); if (t && !t.dirty) { try { code.setValue && 0; const txt = await window.native.readFile(path); if (txt !== code.text(t.doc)) { const c = ensureCode(); const cur = S.active === t.id; t.doc.session.setValue(txt); t.dirty = false; renderTabs(); void cur; } } catch { /* ignore */ } } };
 
   /* ---------- rendering ---------- */
+  T.move = (fromId, toId, after) => { const f = byId(fromId), t = byId(toId); if (!f || !t || f === t) return; S.tabs.splice(S.tabs.indexOf(f), 1); S.tabs.splice(S.tabs.indexOf(t) + (after ? 1 : 0), 0, f); renderTabs(); VX.emit('tabOrder'); };
   function renderTabs() {
-    const bar = $('#tabbar'); bar.textContent = '';
+    const bar = $('#tabbar'); VX.dnd.sortable(bar, { item: '.tab', id: (el) => el.dataset.id, ignore: '.x', onMove: T.move }); bar.textContent = '';
     for (const t of S.tabs) {
       const icon = t.icon || (t.kind === 'code' ? VX.app.fileIcon(t.title)[0] : T.kinds[t.kind].icon);
-      const el = h('div', { class: 'tab' + (t.id === S.active ? ' active' : ''), title: t.path || t.title, onclick: () => T.activate(t.id), onauxclick: (e) => { if (e.button === 1) T.close(t.id); },
+      const el = h('div', { class: 'tab' + (t.id === S.active ? ' active' : ''), 'data-id': t.id, title: t.path || t.title, onclick: () => T.activate(t.id), onauxclick: (e) => { if (e.button === 1) T.close(t.id); },
         oncontextmenu: (e) => { e.preventDefault(); VX.ui.menu(e.clientX, e.clientY, [{ label: 'Close', run: () => T.close(t.id) }, { label: 'Close others', run: async () => { for (const o of [...S.tabs]) if (o.id !== t.id) await T.close(o.id); } }, { label: 'Close all', run: () => T.closeAll() }, '-', { label: 'Save', run: () => T.save(t), disabled: !T.kinds[t.kind].text }, { label: 'Reveal in folder', run: () => t.path && window.native.reveal(t.path), disabled: !t.path }]); } },
         VX.icon(icon), h('span', {}, t.title), t.dirty ? h('span', { class: 'dot', title: 'Unsaved changes' }) : null,
         h('button', { class: 'x', title: 'Close (Ctrl+W)', onclick: (e) => { e.stopPropagation(); T.close(t.id); } }, VX.icon('x', 12)));

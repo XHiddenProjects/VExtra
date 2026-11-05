@@ -52,7 +52,7 @@ const PROVIDERS = {
 };
 const PERMS = [['read', 'Read project'], ['editor', 'Edit open file'], ['files', 'Create & edit other files'], ['site', 'Build & change site'], ['delete', 'Delete / move files & game items'], ['game', 'Build & change game']];
 const PRESETS = { chat: { read: 'deny', editor: 'deny', files: 'deny', site: 'deny', delete: 'deny', game: 'deny' }, assist: { read: 'allow', editor: 'ask', files: 'ask', site: 'ask', delete: 'ask', game: 'ask' }, agent: { read: 'allow', editor: 'allow', files: 'allow', site: 'allow', delete: 'ask', game: 'allow' }, builder: { read: 'allow', editor: 'allow', files: 'allow', site: 'allow', delete: 'allow', game: 'allow' } };
-const DEF = { provider: 'ollama', baseUrl: '', model: '', apiKey: '', temperature: 0.4, maxTokens: 4096, ctxWindow: 0, timeout: 120, maxSteps: 12, preset: 'assist', p_read: 'allow', p_editor: 'ask', p_files: 'ask', p_site: 'ask', p_delete: 'ask', p_game: 'ask', system: '' };
+const DEF = { provider: 'ollama', baseUrl: '', model: '', apiKey: '', temperature: 0.4, maxTokens: 4096, ctxWindow: 0, timeout: 3600, maxSteps: 12, preset: 'assist', p_read: 'allow', p_editor: 'ask', p_files: 'ask', p_site: 'ask', p_delete: 'ask', p_game: 'ask', system: '' };
 const cfg = () => { const c = Object.assign({}, DEF); for (const k of Object.keys(DEF)) { const v = forge.settings.get(k); if (v !== undefined && v !== null && v !== '') c[k] = v; } return c; };
 const perm = (k) => cfg()['p_' + k];
 const SECRET_FILE = /(^|\/)(\.env(\..*)?|id_rsa.*|.*\.(pem|key|p12|pfx|keystore|jks)|\.npmrc|\.netrc|credentials(\.json)?|secrets?\.(json|ya?ml))$/i;
@@ -107,7 +107,7 @@ async function callModel(c, messages, system) {
   const P = PROVIDERS[c.provider] || PROVIDERS.custom; let base = apiBase(c); const model = c.model;
   if (P.local && !isLoopback(base)) throw new Error(`${P.label} only connects to this computer (localhost). The address “${base}” is not local – choose “Ollama Cloud” or “Custom” to use a remote server.`);
   if (!base) throw new Error('Set the server URL in ⚙ Configure.'); if (!model) throw new Error('Pick a model in ⚙ Configure.'); if (P.key && !c.apiKey && !/^custom/.test(c.provider)) throw new Error(`${P.label} needs an API key – add it in ⚙ Configure.`);
-  messages = fitHistory(c, messages, system); const maxOut = Math.max(64, Math.min(+c.maxTokens || 4096, Math.floor(ctxWindow(c) / 2))); const timeout = Math.max(10, Math.min(300, +c.timeout || 120)); const tryJson = wantsJson(c);
+  messages = fitHistory(c, messages, system); const maxOut = Math.max(64, Math.min(+c.maxTokens || 4096, Math.floor(ctxWindow(c) / 2))); const timeout = Math.max(10, Math.min(3600, +c.timeout || 3600)); const tryJson = wantsJson(c);
   /* Models differ in what they accept, so start with the best request and adapt to what the server complains about. */
   const opt = { json: tryJson, system: true, temp: true, maxName: 'max_tokens' };
   const send = (b) => {
@@ -298,7 +298,7 @@ async function runAction(a, log) {
       case 'preview_site': {
         if (perm('site') === 'deny') return deny('site'); const p = safeRel(a.path || 'index.html'); if (!root || !p) return 'Invalid path or no folder open.'; let html; try { html = await forge.fs.readFile(join(root, p)); } catch { return 'File not found: ' + p; }
         const dir = p.split('/').slice(0, -1).join('/'); const rd = async (r) => { try { return await forge.fs.readFile(join(root, (dir ? dir + '/' : '') + r.replace(/^\.?\//, ''))); } catch { return null; } };
-        const css = [...html.matchAll(/<link[^>]+href=["']([^"':]+\.css)["'][^>]*>/gi)], js = [...html.matchAll(/<script[^>]+src=["']([^"':]+\.js)["'][^>]*><\/script>/gi)];
+        const css = [...html.matchAll(/<link[^>]+href=["']([^"':]+\.css)["'][^>]*>/gi)], js = [...html.matchAll(/<script[^>]+src=["']([^"':]+\.js)["'][^>]*><\/script[^>]*>/gi)];
         for (const m of css) { const c = await rd(m[1]); if (c !== null) html = html.replace(m[0], () => `<style>${c}</style>`); } for (const m of js) { const c = await rd(m[1]); if (c !== null) html = html.replace(m[0], () => `<script>${c.replace(/<\/script/gi, '<\\/script')}</script>`); }
         forge.ui.preview(html, p); log('👁 previewed ' + p); return `Previewed ${p} (${html.length} characters). The user sees it; check your markup for mistakes.`;
       }
@@ -436,7 +436,7 @@ forge.config.register({
     { key: 'baseUrl', label: 'Server URL (optional)', group: 'Model', placeholder: 'empty = provider default', hint: 'Leave empty for the default. Ollama and LM Studio only ever connect to this computer (localhost); use “Ollama Cloud” or “Custom” for a remote server.' },
     { key: 'apiKey', label: 'API key', type: 'password', group: 'Model', hint: 'Stored in Vextra\'s settings on this computer. Not needed for local models.' },
     { key: 'temperature', label: 'Temperature (0–1)', type: 'number', group: 'Generation' }, { key: 'maxTokens', label: 'Max answer length (tokens)', type: 'number', group: 'Generation' },
-    { key: 'timeout', label: 'Timeout (seconds)', type: 'number', group: 'Generation' }, { key: 'ctxWindow', label: 'Context window (tokens, 0 = auto)', type: 'number', group: 'Generation', hint: 'Applies to every provider: the usage bar, the Ollama context size, and older messages are dropped to fit it. 0 = a sensible default for the model.' }, { key: 'maxSteps', label: 'Max actions per request', type: 'number', group: 'Generation', hint: 'Stops runaway loops.' },
+    { key: 'timeout', label: 'Timeout (seconds, max 3600 = 1 hour)', type: 'number', group: 'Generation' }, { key: 'ctxWindow', label: 'Context window (tokens, 0 = auto)', type: 'number', group: 'Generation', hint: 'Applies to every provider: the usage bar, the Ollama context size, and older messages are dropped to fit it. 0 = a sensible default for the model.' }, { key: 'maxSteps', label: 'Max actions per request', type: 'number', group: 'Generation', hint: 'Stops runaway loops.' },
     ...PERMS.map(([k, l]) => ({ key: 'p_' + k, label: l, type: 'select', group: 'Permissions', options: [['deny', 'Deny'], ['ask', 'Ask me each time'], ['allow', 'Allow']] })),
     { key: 'system', label: 'Extra instructions', type: 'textarea', group: 'Behaviour', hint: 'Added to every request, e.g. your coding style.' },
   ],

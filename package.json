@@ -1,8 +1,8 @@
 {
   "name": "vextra-studio",
   "productName": "Vextra Studio",
-  "version": "3.2.0",
-  "description": "Vextra Studio – professional web development and 2D/3D game creation in one workspace (Tauri v2)",
+  "version": "3.3.0",
+  "description": "Vextra Studio \u2013 professional web development and 2D/3D game creation in one workspace (Tauri v2)",
   "author": "Vextra",
   "license": "MIT",
   "scripts": {
