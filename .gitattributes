@@ -1,0 +1,4 @@
+# Large binaries go through Git LFS (GitHub rejects normal files over 100 MB).
+# Run `npm run lfs:setup` once (git lfs install) before committing the server binary.
+src-tauri/resources/server/vextra-server filter=lfs diff=lfs merge=lfs -text
+src-tauri/resources/server/vextra-server.exe filter=lfs diff=lfs merge=lfs -text
