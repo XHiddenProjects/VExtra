@@ -51,7 +51,7 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 
 ## v3.3.0 notes
 - **CodeQL findings fixed** (`plugins/vextra-shield.js`): *Improper code sanitization* (×3) – the exported-game scripts (save guard, embed guard) are now fixed text and read their settings from escaped `data-` attributes instead of having JSON spliced into JavaScript; *Bad HTML filtering regexp* – script-tag matching now also handles end tags such as `</script foo>`. The same regular expression was corrected in the AI site preview and the web tools.
-- **Repository hygiene**: the generated server binary (`vextra-server[.exe]`) and installers are git-ignored; they are build outputs and should be published as release assets, not committed. Verify downloaded builds against the checksums you publish.
+- **Repository hygiene**: the generated server binary (`vextra-server[.exe]`) is stored with Git LFS and installers are git-ignored; publish release builds with checksums and verify downloads against them. LFS objects are fetched from GitHub over HTTPS like any other file.
 - **Vextra AI**: new *Build & change site* permission (Deny / Ask / Allow); website files are written only under it, and `new_site` never overwrites existing files. Stop now aborts a pending request or approval immediately. The *Context window* limit trims what is sent to the provider.
 - Dependencies were updated to their latest releases (`npm audit`: 0 known vulnerabilities).
 - Drag-to-reorder uses the pointer only and moves no data outside the window.

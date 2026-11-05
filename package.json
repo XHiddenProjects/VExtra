@@ -3,7 +3,7 @@
   "productName": "Vextra Studio",
   "version": "3.3.0",
   "description": "Vextra Studio \u2013 professional web development and 2D/3D game creation in one workspace (Tauri v2)",
-  "author": "XHiddenProjects",
+  "author": "Vextra",
   "license": "MIT",
   "scripts": {
     "postinstall": "node scripts/vendor.js",
@@ -16,6 +16,7 @@
     "vendor": "node scripts/vendor.js",
     "web": "node scripts/dev-server.js",
     "server": "node server/server.js",
+    "lfs:setup": "node scripts/setup-lfs.js",
     "test": "node scripts/selftest.js",
     "icons": "tauri icon app-icon.png",
     "clean": "node scripts/uninstall.js --mode=clean --auto",
