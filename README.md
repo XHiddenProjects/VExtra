@@ -39,6 +39,9 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
+## What's new in 3.4.1
+- Microphone and camera blocks now work in the editor's Play panel (the editor hands the devices to the sandboxed game), with clear error messages.
+
 ## What's new in 3.4.0
 - **Realism**: physically based materials + screen effect for hyper-realistic 3D.
 - **New block groups**: Microphone, Camera, VR and AR (with desktop fallbacks).

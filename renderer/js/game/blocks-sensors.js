@@ -6,7 +6,7 @@
   const rad = (o) => 0.5 * Math.max(o.w || 1, o.h || 1, o.d || 1);
   const pos = (o) => ({ x: o.x || 0, y: o.y || 0, z: o.z || 0 });
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-  const fail = (n, g, e) => { const m = (e && e.message) || String(e); g.send(n, 'error', m); if (g.debug && console) console.warn('[Vextra sensors] ' + m); };
+  const fail = (n, g, e) => { const m = (e && e.message) || String(e); g.send(n, 'error', m); try { g.log('warn', '[sensors] ' + m); } catch { /* no log */ } if (g.debug && console) console.warn('[Vextra sensors] ' + m); };
   const objs = (g, n, key, self) => g.targets(n.p[key] || '', self || n.owner, n.owner.lastOther).filter((o) => o.alive);
   const edge = (n, k, v) => { const was = !!n.st[k]; n.st[k] = !!v; return v && !was ? 1 : !v && was ? -1 : 0; };
   const headRay = (g) => { const S = SN(), v = S.state(g).vr, a = S.state(g).ar; let p, yaw, pit; if (v.active) { S.vrFrame(g); p = { x: v.head.x, y: v.head.y, z: v.head.z }; yaw = (v.mode === 'stereo' ? g.cam3d.yaw + v.rig.yaw : 0) + v.head.yaw; pit = v.head.pitch; if (v.mode === 'webxr') { yaw = v.head.yaw; } } else { p = a.cam || g.cam3d.pos; yaw = g.cam3d.yaw + (a.head ? a.head.yaw : 0); pit = a.head ? a.head.pitch : g.cam3d.pitch || 0; } const y = U.rad(yaw), q = U.rad(pit); return { pos: p, dir: { x: -Math.sin(y) * Math.cos(q), y: Math.sin(q), z: -Math.cos(y) * Math.cos(q) } }; };
@@ -35,7 +35,7 @@
       const list = String(n.p.commands || '').split(/[\n,]+/).map((s) => s.trim().toLowerCase()).filter(Boolean); const m = n.p.match; const hit = list.find((c) => (m === 'exact' ? t === c : m === 'starts' ? t.startsWith(c) : new RegExp('(^|\\W)' + c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\W|$)').test(t)));
       if (hit && !n.st.fired) { n.st.fired = true; g.send(n, hit, text); g.send(n, 'out', hit); } else if (!hit && final) g.send(n, 'none', text); if (final) n.st.fired = false; },
     onInput(n, port, v, g) { if (port === 'say') return this.handle(n, g, String(v ?? ''), true); if (port === 'stop') { if (n.st.h) { n.st.h.stop(); n.st.h = null; } return; }
-      if (port === 'start' && !n.st.h) { n.st.h = SN().speech({ lang: n.p.lang, interim: n.p.interim }, (t, fin) => this.handle(n, g, t, fin), (s, e) => { if (s === 'error') fail(n, g, new Error('Speech recognition: ' + e)); }); if (!n.st.h) fail(n, g, new Error('Speech recognition is not available in this browser – use the "say" entry to test.')); } } });
+      if (port === 'start' && !n.st.h) { n.st.h = SN().speech({ lang: n.p.lang, interim: n.p.interim }, (t, fin) => this.handle(n, g, t, fin), (s, e) => { if (s === 'error') fail(n, g, new Error('Speech recognition: ' + e)); }, g); if (!n.st.h) fail(n, g, new Error('Speech recognition is not available in this browser – use the "say" entry to test.')); } } });
 
   B({ id: 'soundDetector', cat: 'mic', label: 'Sound Detector', desc: 'Recognises kinds of sound from the microphone: a clap (or double clap), a whistle, a shout, a loud noise and silence. Great for "clap to turn on the light" or "whistle to call the dog". No microphone? Test keys: C clap, B whistle, V shout.',
     inputs: ['start', 'stop'], outputs: ['clap', 'doubleClap', 'whistle', 'shout', 'loud', 'silence', 'error'],

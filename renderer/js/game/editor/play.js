@@ -17,11 +17,12 @@
         h('span', { class: 'sp' }), h('label', { class: 'mini' }, 'Device'), dev, h('button', { class: 'btn sm', title: 'Simulate a device shake', onclick: () => this.send('shake') }, '📳 Shake'), h('label', { class: 'mini' }, 'Tilt'), this.tilt,
         h('button', { class: 'btn sm', onclick: () => this.ctx.onStop && this.ctx.onStop() }, '■ Stop'));
       this.el = h('div', { class: 'play' }, this.bar, this.stage);
-      this.msg = (e) => { if (e.source !== this.frame.contentWindow) return; const d = e.data; if (d && d.vx === 'log' && this.chan && d.token === this.chan.token) this.ctx.onLog && this.ctx.onLog(d.level, d.text); };
+      this.sense = new VX.SenseHost((type, value, tr) => this.send(type, value, tr));
+      this.msg = (e) => { if (e.source !== this.frame.contentWindow) return; const d = e.data; if (d && d.vx === 'sense' && this.chan && d.token === this.chan.token) { this.sense.handle(d); return; } if (d && d.vx === 'log' && this.chan && d.token === this.chan.token) this.ctx.onLog && this.ctx.onLog(d.level, d.text); };
       window.addEventListener('message', this.msg); this.ro = new ResizeObserver(() => this.layout()); this.ro.observe(this.stage);
     }
     /* The game frame is sandboxed without allow-same-origin, so its origin is opaque and "*" is the only possible target. Every message carries a one-time token the game verifies, and carries no secrets. */
-    send(type, value) { if (!this.chan) return; try { this.frame.contentWindow.postMessage({ vx: 'sim', token: this.chan.token, type, value }, '*'); } catch { /* not ready */ } }
+    send(type, value, transfer) { if (!this.chan) return; try { this.frame.contentWindow.postMessage({ vx: 'sim', token: this.chan.token, type, value }, '*', transfer || []); } catch { /* not ready */ } }
     layout() {
       const s = this.stage.getBoundingClientRect(), st = this.ctx.project().settings; let w, hh;
       if (this.device === 'fit') { this.frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'; this.frame.classList.remove('dev'); return; }
@@ -30,14 +31,14 @@
       this.frame.style.cssText = `position:absolute;left:50%;top:50%;width:${w}px;height:${hh}px;transform:translate(-50%,-50%) scale(${k});transform-origin:center center;`;
     }
     async start() {
-      const my = ++this.token; this.paused = false; this.pb && (this.pb.textContent = '⏸ Pause');
+      const my = ++this.token; this.sense && this.sense.destroy(); this.paused = false; this.pb && (this.pb.textContent = '⏸ Pause');
       try {
         this.chan = { token: VX.channel.token(), origin: VX.channel.origin() }; const html = await VX.gameExport.toHTML(this.ctx.project(), { channel: this.chan }); if (my !== this.token) return;
         this.frame.srcdoc = html; this.layout(); this.frame.onload = () => { this.send('debug', this.debug); this.send('mute', this.muted); this.frame.focus(); };
         this.ctx.onLog && this.ctx.onLog('info', '▶ Game started');
       } catch (e) { this.ctx.onLog && this.ctx.onLog('error', 'Could not start: ' + e.message); VX.ui.toast('Could not start game: ' + e.message, 'error'); }
     }
-    stop() { this.token++; this.frame.srcdoc = ''; this.frame.removeAttribute('srcdoc'); this.send('pause', true); }
+    stop() { this.token++; this.sense && this.sense.destroy(); this.frame.srcdoc = ''; this.frame.removeAttribute('srcdoc'); this.send('pause', true); }
     dispose() { this.token++; window.removeEventListener('message', this.msg); this.ro.disconnect(); this.frame.srcdoc = ''; }
   }
   VX.PlayPanel = PlayPanel;

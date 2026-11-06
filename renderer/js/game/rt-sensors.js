@@ -7,20 +7,36 @@
   S.state = st;
   const need = (api, what) => { if (!api) throw new Error(what + ' is not available here (needs a secure https / localhost page and a supported browser)'); };
 
+  /* ---------- editor bridge ----------
+   * In the editor the game runs in a sandboxed frame (no origin) where the browser refuses the microphone / camera. The editor opens the
+   * devices instead and streams plain data in (see editor/sense-host.js). Outside the editor (exported page, phone) the game uses the devices directly. */
+  const hosted = (g) => !!(g.opts && g.opts.channel && window.parent !== window);
+  const friendly = (e, kind) => { const n = e && e.name; return n === 'NotAllowedError' || n === 'SecurityError' ? new Error('The ' + kind + ' was blocked – allow it in the browser / system permission prompt (Windows: Settings → Privacy & security → ' + (kind === 'camera' ? 'Camera' : 'Microphone') + ')') : n === 'NotFoundError' ? new Error('No ' + kind + ' was found') : n === 'NotReadableError' ? new Error('The ' + kind + ' is in use by another program') : e; };
+  const bridge = (g) => { const s = st(g); if (s.br) return s.br; const ch = g.opts.channel, pend = new Map(); let seq = 0;
+    const on = (e) => { const d = e.data; if (!d || d.vx !== 'sim' || e.source !== window.parent || d.token !== ch.token) return; const v = d.value;
+      if (d.type === 'sense-ack') { const p = pend.get(v.id); if (p) { pend.delete(v.id); v.ok ? p.res(v) : p.rej(Object.assign(new Error(v.error || 'failed'), { name: v.name })); } }
+      else if (d.type === 'mic') { const m = s.mic; if (m && m.bridged) { m.td = v.td; m.fd = v.fd; } }
+      else if (d.type === 'cam') { const c = s.cam, cv = c && c.video; if (cv && c.bridged) { if (cv.width !== v.bmp.width) { cv.width = v.bmp.width; cv.height = v.bmp.height; cv.getContext('2d').imageSmoothingEnabled = true; } cv.getContext('2d').drawImage(v.bmp, 0, 0); cv.videoWidth = v.w; cv.videoHeight = v.h; cv.readyState = 4; } try { v.bmp.close(); } catch { /* gone */ } }
+      else if (d.type === 'speech' && s.sp) s.sp.onText(v.text, v.final, v.conf);
+      else if (d.type === 'speech-state' && s.sp) s.sp.onState(v.state, v.error); };
+    window.addEventListener('message', on);
+    return (s.br = { call: (op, extra) => new Promise((res, rej) => { const id = ++seq; pend.set(id, { res, rej }); try { window.parent.postMessage(Object.assign({ vx: 'sense', token: ch.token, op, id }, extra), ch.origin); } catch (e) { pend.delete(id); rej(e); } setTimeout(() => { if (pend.delete(id)) rej(new Error('The editor did not answer – restart the game')); }, 120000); }), off: () => window.removeEventListener('message', on) }); };
+
   /* ---------- microphone ---------- */
   S.micAcquire = (g) => { const m = st(g).mic; m.n++; if (!m.p) m.p = (async () => {
+    if (hosted(g)) { const a = await bridge(g).call('mic-start'); m.bridged = true; m.sr = a.sr; m.fft = a.fft; m.td = new Float32Array(a.fft); m.fd = new Uint8Array(a.fft / 2); m.ready = true; return true; }
     need(navigator.mediaDevices && navigator.mediaDevices.getUserMedia, 'The microphone');
-    m.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    try { m.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); } catch (e) { throw friendly(e, 'microphone'); }
     const AC = window.AudioContext || window.webkitAudioContext; m.ctx = new AC(); try { await m.ctx.resume(); } catch { /* needs a gesture */ }
     const src = m.ctx.createMediaStreamSource(m.stream); m.an = m.ctx.createAnalyser(); m.an.fftSize = 2048; m.an.smoothingTimeConstant = 0.3; src.connect(m.an);
     m.td = new Float32Array(m.an.fftSize); m.fd = new Uint8Array(m.an.frequencyBinCount); m.ready = true; return true;
   })().catch((e) => { m.p = null; m.n = Math.max(0, m.n - 1); throw e; }); return m.p; };
-  S.micRelease = (g) => { const m = st(g).mic; if (--m.n > 0) return; m.n = 0; try { m.stream && m.stream.getTracks().forEach((t) => t.stop()); } catch { /* gone */ } try { m.ctx && m.ctx.close(); } catch { /* gone */ } Object.assign(m, { p: null, ready: false, stream: null, ctx: null, an: null, r: null }); };
+  S.micRelease = (g) => { const m = st(g).mic; if (--m.n > 0) return; m.n = 0; if (m.bridged) { try { bridge(g).call('mic-stop').catch(() => {}); } catch { /* gone */ } m.bridged = false; } try { m.stream && m.stream.getTracks().forEach((t) => t.stop()); } catch { /* gone */ } try { m.ctx && m.ctx.close(); } catch { /* gone */ } Object.assign(m, { p: null, ready: false, stream: null, ctx: null, an: null, r: null, td: null, fd: null }); };
   /** { level 0–1, db, peak, pitch (Hz, 0 = none), low, mid, high (0–1) } – computed once per frame */
   S.micRead = (g, gain = 1) => {
-    const m = st(g).mic; if (!m.ready) return null; if (m.frame === g.frame && m.r) return m.r; m.frame = g.frame; m.an.getFloatTimeDomainData(m.td); m.an.getByteFrequencyData(m.fd);
+    const m = st(g).mic; if (!m.ready) return null; if (m.frame === g.frame && m.r) return m.r; m.frame = g.frame; if (!m.bridged) { m.an.getFloatTimeDomainData(m.td); m.an.getByteFrequencyData(m.fd); }
     let sum = 0, peak = 0; for (let i = 0; i < m.td.length; i++) { const v = m.td[i]; sum += v * v; if (Math.abs(v) > peak) peak = Math.abs(v); } const rms = Math.sqrt(sum / m.td.length);
-    const sr = m.ctx.sampleRate, bin = sr / m.an.fftSize; let bi = 0, bv = 0, lo = 0, mi = 0, hi = 0, nl = 0, nm = 0, nh = 0;
+    const sr = m.bridged ? m.sr : m.ctx.sampleRate, bin = sr / (m.bridged ? m.fft : m.an.fftSize); let bi = 0, bv = 0, lo = 0, mi = 0, hi = 0, nl = 0, nm = 0, nh = 0;
     for (let i = 1; i < m.fd.length; i++) { const f = i * bin, v = m.fd[i]; if (f < 300) { lo += v; nl++; } else if (f < 2000) { mi += v; nm++; } else if (f < 8000) { hi += v; nh++; } if (f > 80 && f < 3000 && v > bv) { bv = v; bi = i; } }
     return (m.r = { level: U.clamp(rms * 5 * gain, 0, 1), db: 20 * Math.log10(Math.max(rms, 1e-5)), peak: U.clamp(peak * gain, 0, 1), pitch: bv > 90 ? bi * bin : 0, low: lo / Math.max(1, nl) / 255, mid: mi / Math.max(1, nm) / 255, high: hi / Math.max(1, nh) / 255 });
   };
@@ -28,7 +44,8 @@
   S.makeNoise = (g, x, y, z, radius, src) => { const b = st(g).noise; b.push({ x, y, z, radius, t: g.time, src: src || null }); if (b.length > 64) b.shift(); };
   S.noises = (g) => { const b = st(g).noise; while (b.length && g.time - b[0].t > 2) b.shift(); return b; };
   /** speech recognition (voice commands). Returns a handle or null when the browser has no speech recognition. */
-  S.speech = (opts, onText, onState) => {
+  S.speech = (opts, onText, onState, g) => {
+    if (g && hosted(g)) { const s = st(g), h = { on: true, stop() { h.on = false; if (s.sp === h) s.sp = null; try { bridge(g).call('speech-stop').catch(() => {}); } catch { /* gone */ } } }; h.onText = onText; h.onState = onState; s.sp = h; bridge(g).call('speech-start', { lang: opts.lang || 'en-US', interim: !!opts.interim }).catch((e) => { h.on = false; onState('error', e.message); }); return h; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return null; const r = new SR(); r.lang = opts.lang || 'en-US'; r.continuous = true; r.interimResults = !!opts.interim; const h = { on: true, stop() { h.on = false; try { r.abort(); } catch { /* idle */ } } };
     r.onresult = (e) => { for (let i = e.resultIndex; i < e.results.length; i++) { const res = e.results[i]; onText(String(res[0].transcript || '').trim(), res.isFinal, res[0].confidence); } };
     r.onerror = (e) => { if (e.error === 'no-speech' || e.error === 'aborted') return; h.on = e.error === 'network' ? h.on : false; onState('error', e.error); };
@@ -37,12 +54,14 @@
 
   /* ---------- camera ---------- */
   S.camAcquire = (g, facing) => { const c = st(g).cam; c.n++; if (!c.p) c.p = (async () => {
+    if (hosted(g)) { const a = await bridge(g).call('cam-start', { facing: facing || 'user' }); const v = document.createElement('canvas'); v.width = 480; v.height = 360; v.readyState = 0; v.videoWidth = a.w; v.videoHeight = a.h; v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;display:none'; v.setAttribute('data-vx-camera', '1'); g.stageEl && g.stageEl.parentElement && g.stageEl.parentElement.append(v);
+      c.video = v; c.bridged = true; c.W = 64; c.H = 48; c.cv = document.createElement('canvas'); c.cv.width = c.W; c.cv.height = c.H; c.cx = c.cv.getContext('2d', { willReadFrequently: true }); c.mirror = (facing || 'user') === 'user'; c.ready = true; return true; }
     need(navigator.mediaDevices && navigator.mediaDevices.getUserMedia, 'The camera');
-    c.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing || 'user', width: { ideal: 640 }, height: { ideal: 480 } } });
+    try { c.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing || 'user', width: { ideal: 640 }, height: { ideal: 480 } } }); } catch (e) { throw friendly(e, 'camera'); }
     const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.autoplay = true; v.srcObject = c.stream; v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;display:none'; v.setAttribute('data-vx-camera', '1'); g.stageEl && g.stageEl.parentElement && g.stageEl.parentElement.append(v);
     try { await v.play(); } catch { /* autoplay policy */ } c.video = v; c.W = 64; c.H = 48; c.cv = document.createElement('canvas'); c.cv.width = c.W; c.cv.height = c.H; c.cx = c.cv.getContext('2d', { willReadFrequently: true }); c.mirror = (facing || 'user') === 'user'; c.ready = true; return true;
   })().catch((e) => { c.p = null; c.n = Math.max(0, c.n - 1); throw e; }); return c.p; };
-  S.camRelease = (g) => { const c = st(g).cam; if (--c.n > 0) return; c.n = 0; try { c.stream && c.stream.getTracks().forEach((t) => t.stop()); } catch { /* gone */ } if (c.video) c.video.remove(); Object.assign(c, { p: null, ready: false, stream: null, video: null, prev: null }); };
+  S.camRelease = (g) => { const c = st(g).cam; if (--c.n > 0) return; c.n = 0; if (c.bridged) { try { bridge(g).call('cam-stop').catch(() => {}); } catch { /* gone */ } c.bridged = false; } try { c.stream && c.stream.getTracks().forEach((t) => t.stop()); } catch { /* gone */ } if (c.video) c.video.remove(); Object.assign(c, { p: null, ready: false, stream: null, video: null, prev: null }); };
   /** current camera frame, 64×48 RGBA (mirrored for the selfie camera), cached per game frame */
   S.camFrame = (g) => { const c = st(g).cam; if (!c.ready || !c.video || c.video.readyState < 2) return null; if (c.frame === g.frame && c.img) return c.img; c.frame = g.frame; c.cx.save(); if (c.mirror) { c.cx.translate(c.W, 0); c.cx.scale(-1, 1); } c.cx.drawImage(c.video, 0, 0, c.W, c.H); c.cx.restore(); return (c.img = c.cx.getImageData(0, 0, c.W, c.H)); };
   /** how the camera picture is shown: hidden | corner | overlay | behind (3D games: the 3D scene is drawn over it) */
@@ -130,5 +149,5 @@
     if (a.mode === 'webxr' && a.hitSrc && a.frame) { const rs = g.renderer3d.xr.getReferenceSpace(), res = a.frame.getHitTestResults(a.hitSrc); if (res.length) { const p = res[0].getPose(rs).transform.position; a.hit = { x: p.x, y: p.y, z: p.z }; a.found = true; } else a.found = false; return a.found ? a.hit : null; }
     const c = a.cam || g.cam3d.pos, d = a.dir || { x: 0, y: -0.3, z: -1 }; if (d.y >= -0.02) { a.found = false; return null; } const t = (floorY - c.y) / d.y; if (t <= 0 || t > 60) { a.found = false; return null; } a.hit = { x: c.x + d.x * t, y: floorY, z: c.z + d.z * t }; a.found = true; return a.hit;
   };
-  S.destroy = (g) => { const s = g.sense; if (!s) return; try { S.vrExit(g); S.arExit(g); } catch { /* ignore */ } try { if (s.mic.stream) s.mic.stream.getTracks().forEach((t) => t.stop()); if (s.mic.ctx) s.mic.ctx.close(); if (s.cam.stream) s.cam.stream.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ } g.sense = null; };
+  S.destroy = (g) => { const s = g.sense; if (!s) return; try { if (s.br) { if (s.mic.bridged) s.br.call('mic-stop').catch(() => {}); if (s.cam.bridged) s.br.call('cam-stop').catch(() => {}); if (s.sp) s.br.call('speech-stop').catch(() => {}); s.br.off(); } } catch { /* ignore */ } try { S.vrExit(g); S.arExit(g); } catch { /* ignore */ } try { if (s.mic.stream) s.mic.stream.getTracks().forEach((t) => t.stop()); if (s.mic.ctx) s.mic.ctx.close(); if (s.cam.stream) s.cam.stream.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ } g.sense = null; };
 })();

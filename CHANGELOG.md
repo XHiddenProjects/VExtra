@@ -2,7 +2,18 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.4.0] — current
+## [3.4.1] — current
+
+### Fixed
+- **Microphone and camera blocks failed in the editor even with the device allowed.** The Play frame is sandboxed (no origin), and the browser / WebView2 / WebKit refuse `getUserMedia` there (`SecurityError`). The editor now owns the devices (new `editor/sense-host.js`) and streams plain data into the game: microphone analyser data, camera frames and recognised speech. Every Microphone, Sound Detector, Voice Noise / Hearing, Voice Command, Camera, Motion, Colour, Light, Face, Photo and AR-camera block now works in Play. Exported pages and phones still use the devices directly.
+- Clear, specific error messages (blocked / no device / in use by another program / Windows or macOS privacy setting to switch on / no speech recognition in this engine), shown on the block's `error` exit **and** in the game log.
+- The camera and microphone are released when the game is stopped or restarted.
+- macOS: added `NSMicrophoneUsageDescription`, `NSCameraUsageDescription` and `NSSpeechRecognitionUsageDescription` (`src-tauri/Info.plist`) so the system asks instead of silently refusing.
+
+### Note
+- Voice Command needs a speech-recognition service in the web engine (Chrome, Edge, Safari). The desktop app's engine may not have one; the block then reports it – use its "say" entry / test keys, or play the exported game in a browser.
+
+## [3.4.0]
 
 ### Added
 - **Author** in package.json set to XHiddenProjects.

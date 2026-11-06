@@ -573,6 +573,8 @@ Also: \`forge.onUnload(fn)\`, \`forge.fs.list()\`, \`forge.account.signOut()\`.`
 
 These four block groups (shown in **Advanced** mode) let a game use the player's voice, camera and headset. The browser asks for permission the first time. Every block has a **desktop test fallback**, so you can design without a microphone, camera or headset.
 
+**Permissions:** in the editor's Play panel the editor itself opens the microphone / camera (the game frame is sandboxed) – answer the permission prompt once, and on Windows / macOS make sure the system privacy setting for the microphone / camera is on for desktop apps. If a block cannot start, its **error** exit and the game log say exactly why. Voice Command also needs a speech-recognition service (Chrome, Edge, Safari); where the engine has none, use the *say* entry or test keys.
+
 ## Microphone
 | Block | What it does |
 |---|---|
