@@ -511,6 +511,8 @@ Open a game and press **📦 Store export**. Pick your targets and details, then
 1. Steam: \`npm install\` → \`npm run build:<your OS>\`
 2. Mobile: \`npm install\` → \`npx cap add android\` (and iOS on a Mac) → \`npm run assets\` → \`npm run patch\` → \`npx cap sync\` → \`npm run build:android\` (debug APK)
 
+Android builds run on the latest **Android Studio** (it provides Java, Gradle and the SDK – install it from developer.android.com/studio and open it once to finish setup). The export checks for it first and, if it is missing, shows the download link and skips only the Android build. "npm run doctor:android" in the mobile folder shows what was found.
+
 Steam install/build steps are required; mobile steps after install are optional, and any that fail (for example no Android SDK) are listed at the end without stopping the rest. Only \`npm\`, \`npx\` and \`node\` can be run, only inside your \`store-export/\` folder. Signing and uploading stay manual.
 
 ## Building Vextra itself
@@ -566,6 +568,71 @@ The plugin card shows **⚙ Configure** while the plugin is enabled. Without \`l
 | \`publish.before\` | \`{slug, kind, title, files}\` | throw \`forge.hooks.block\` to cancel |
 
 Also: \`forge.onUnload(fn)\`, \`forge.fs.list()\`, \`forge.account.signOut()\`.`);
+
+  A('sensors', 'Making games', 'Microphone, Camera, VR & AR blocks', `# Microphone, Camera, VR & AR blocks
+
+These four block groups (shown in **Advanced** mode) let a game use the player's voice, camera and headset. The browser asks for permission the first time. Every block has a **desktop test fallback**, so you can design without a microphone, camera or headset.
+
+## Microphone
+| Block | What it does |
+|---|---|
+| **Microphone** | Loudness 0–100, pitch (Hz) and low / mid / high sound every frame, plus "loud" and "quiet". Test key **M**. |
+| **Voice Command** | Type commands one per line – each becomes its own exit ("jump", "fire"). Uses the browser's speech recognition. Use the *say* entry to test with text. |
+| **Sound Detector** | Clap, double clap, whistle, shout, loud and silence. Test keys **C**, **B**, **V**. |
+| **Voice Noise** | Turns your voice into **noise at an object** – the louder, the further it carries. Hold the quiet key (Shift) to sneak. |
+| **Make Noise** | Noise from a door, bottle or explosion – or footsteps while an object moves. |
+| **Hearing** | Gives an enemy ears: it hears noises in range, remembers where they came from and **walks to them**. Exits: heard, x / y / z, arrived, lost. |
+
+**Enemy that tracks the player by voice:** put *Microphone-based* **Voice Noise** on the player (source = self) and a **Hearing** block on the enemy (walk towards the sound = on). Shouting makes the enemy come; whispering (or holding Shift) hides you.
+
+## Camera
+| Block | What it does |
+|---|---|
+| **Camera Feed** | Switches the camera on and shows it small, over the game, or behind a 3D scene. |
+| **Motion Sensor** | How much moves (0–100), where, "moved" / "still", swipes (wave left / right / up / down) and a 3×3 "zones" grid. Nothing is recorded or uploaded. Test key **N**. |
+| **Color Tracker** | Follows a colour (a ball, a glove) – can move an object for you. |
+| **Light Sensor** | Brightness 0–100, "dark" / "bright" – cover the lens to hide. Test key **L**. |
+| **Face Tracker** | Face position and size (browsers with the built-in FaceDetector). |
+| **Photo** | Takes a picture into a variable (data URL), optionally downloads it. |
+
+## VR (3D games)
+**VR Mode** enters real VR on a WebXR headset (Quest, SteamVR…) and otherwise shows a **split-screen cardboard view** steered with the mouse / arrow keys (or by turning your phone). Browsers only start VR from a click, so the block shows an **Enter VR** button.
+| Block | What it does |
+|---|---|
+| **VR Head** | Head position, yaw / pitch / roll, nod and head-shake detection, keep an object on the head. |
+| **VR Controller** | Trigger, grip, A / B, thumbstick, position; attach an object; pointer ray over targets. Desktop: mouse = right hand (click = trigger, **E** grip, **Q** / **F** = A / B, **W A S D** stick). |
+| **VR Move** | Smooth walking, snap turn or teleport. |
+| **VR Grab** | Grab, hold and throw objects (tag them *grab*). |
+| **VR Haptics** | Controller vibration. |
+| **VR Gaze** | Select by looking at an object for a moment. |
+
+## AR (3D games)
+**AR Mode** uses real surface tracking on AR phones / headsets (WebXR) and otherwise shows the **camera behind your 3D scene**, steered by tilting the phone. Button: **Start AR**.
+| Block | What it does |
+|---|---|
+| **AR Surface** | Finds the floor / table, shows a placement ring, sends x / y / z. |
+| **AR Place** | Tap to move or spawn an object on that spot. |
+| **AR Pinch & Turn** | Pinch to scale, Shift + wheel to turn (desktop). |
+| **AR Light Match** | Dims / boosts your lights to match the room. |
+| **AR Shadow Floor** | An invisible floor that only catches shadows. |
+| **AR Distance** | Real distance from the device (or between objects). |
+
+> Real WebXR (headsets, AR phones) needs https and a supported browser. The fallbacks work everywhere.
+`);
+
+  A('realism', 'Making games', 'Realism material & hyper-real look', `# Realism – hyper-realistic 3D
+
+Three pieces work together:
+
+1. **Realism materials** – in *Assets → Materials* tick **Physically based "Realism" material**. New sliders appear: clear coat (car paint, varnish), sheen (cloth, velvet), transmission (real glass), index of refraction, thickness, iridescence (soap bubbles), micro-surface detail (tiny bumps and roughness variation, generated for you – no image files needed) and reflection strength. The *Material* library has ready-made ones: **Realistic car paint, brushed steel, polished marble, leather, velvet, concrete, skin, glass, soap bubble, wet asphalt, rubber**.
+2. **Realism object shader** – on any 3D object choose **Inspector → Shader → realism** to give it the physically based look without making a material file.
+3. **Realism screen effect** – a **Shader** block with the effect **Realism (hyper-real camera)** adds a cinematic camera (filmic tone curve, bloom on highlights, lens vignette and colour fringing, film grain, sharpening) and, in a 3D game, switches on filmic tone mapping, **soft shadows**, sky-based reflections and sharper light shadows for the whole scene. Size = bloom radius, Extra A = bloom threshold, Extra B = grain.
+
+Tips: add a **Directional light** with *Cast shadows* on, use realistic materials on big surfaces (floor, walls), and keep metal objects away from pure black backgrounds so they have something to reflect.
+
+## Custom shaders and materials from a list
+When the Shader block's effect is **Custom shader file**, a **Custom shader** drop-down lists every shader in *Assets → Shaders*. With **Custom material file (3D)** a **Custom material** drop-down lists your materials. On a 3D object, choosing **Shader → custom** in the Inspector shows the same list. A shader file works on the screen, on 2D sprites **and** on 3D objects (inside it, **T(uv)** is the object's lit colour).
+`);
 
   A('mobile', 'Making games', 'Mobile & device features', `# Mobile & device features
 

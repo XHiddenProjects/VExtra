@@ -73,6 +73,13 @@ vec4 blurAt(vec2 uv, vec2 step, float rad) {
       'vec4 c = T(vUv); vec4 o = luma(c.rgb) > uA ? vec4(1.0, 1.0, 1.0, c.a) : vec4(0.0); gl_FragColor = mix(c, o, uAmount);'),
     E('wavy', 'Wavy', 'the image ripples with a travelling wave, for underwater or heat haze', { amount: 40, size: 18, a: 3 },
       'vec2 uv = vUv + vec2(sin(vUv.y * uSize + uTime * uA) * 0.02 * uAmount, cos(vUv.x * uSize * 0.8 + uTime * uA * 0.8) * 0.006 * uAmount); gl_FragColor = T(uv);'),
+    E('realism', 'Realism (hyper-real camera)', 'a cinematic camera look: filmic tone curve, soft bloom on highlights, lens vignette and colour fringing, fine film grain and a touch of sharpening. In a 3D game it also switches on filmic tone mapping, soft shadows and image-based lighting. Size = bloom radius, Extra A = bloom threshold (0–1), Extra B = grain (0–1)', { amount: 100, size: 10, a: 0.65, b: 0.25 },
+      'vec2 d = vUv - 0.5; float r2 = dot(d, d); vec2 ca = d * r2 * 0.012 * uAmount; vec3 c; c.r = T(vUv + ca).r; c.g = T(vUv).g; c.b = T(vUv - ca).b; float al = T(vUv).a; vec3 base = c;\n' +
+      'vec3 bl = vec3(0.0); float w = 0.0; for (int k = 1; k <= 3; k++) { for (int i = 0; i < 8; i++) { float ang = float(i) * 0.785398 + float(k) * 0.4; vec2 o = vec2(cos(ang), sin(ang)) * uSize * float(k) / 3.0 * uPx; vec3 s = T(vUv + o).rgb; float l = luma(s); bl += s * smoothstep(uA, 1.0, l); w += 1.0; } } bl /= w; c += bl * 0.9 * uAmount;\n' +
+      'vec3 soft = vec3(0.0); for (int i = 0; i < 4; i++) { float ang = float(i) * 1.5708; soft += T(vUv + vec2(cos(ang), sin(ang)) * 1.2 * uPx).rgb; } soft *= 0.25; c += (base - soft) * 0.6 * uAmount;\n' +
+      'c = (c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14); c = mix(base, clamp(c, 0.0, 1.0), uAmount);\n' +
+      'c *= 1.0 - smoothstep(0.25, 0.85, r2 * 2.2) * 0.55 * uAmount;\n' +
+      'float gr = hash(vUv * uRes + fract(uTime) * 91.7) - 0.5; c += gr * uB * 0.18 * uAmount; gl_FragColor = vec4(clamp(c, 0.0, 1.0), al);'),
   ]);
   const BY = new Map(LIST.map((e) => [e.id, e]));
   VXRT.fxById = (id) => BY.get(id);
@@ -185,4 +192,10 @@ vec4 blurAt(vec2 uv, vec2 step, float rad) {
       default: return '';
     }
   }
+})();
+
+(function () {
+  const VXRT = window.VXRT; if (!VXRT) return;
+  /** Fragment source for a shader FILE used on a 3D object (the same file also works as a screen effect). T(uv) returns the lit surface colour. */
+  VXRT.fxCustomFrag3D = (code) => { let f = VXRT.fxCustomFrag(code); f = f.replace('vec4 T(vec2 uv) { return texture2D(uTex, uv); }', 'vec4 T(vec2 uv) { float l = 0.35 + 0.65 * max(dot(normalize(vN), normalize(vV)), 0.0); return vec4(uColor.rgb * l, 1.0); }').replace('varying vec2 vUv;', 'varying vec2 vUv; varying vec3 vN; varying vec3 vV;'); return f; };
 })();

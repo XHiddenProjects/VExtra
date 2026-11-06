@@ -4,14 +4,15 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.3.x   | ✅ security fixes (current) |
+| 3.4.x   | ✅ security fixes (current) |
+| 3.3.x   | ⚠️ please upgrade to 3.4.x |
 | 3.2.x   | ⚠️ please upgrade to 3.3.x |
 | 3.1.x   | ⚠️ please upgrade to 3.3.x |
 | 3.0.x   | ❌ please upgrade |
 | 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
 
-Current version: **3.3.0** (see `VERSION`). This policy was last reviewed for 3.3.0.
+Current version: **3.4.0** (see `VERSION`). This policy was last reviewed for 3.4.0.
 
 ## Reporting a vulnerability
 
@@ -48,6 +49,11 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.4.0 notes
+- **Microphone, camera, VR and AR** blocks ask the browser for permission and only work while the game is open. Microphone sound and camera frames are analysed **locally in memory** (level, motion, colour) – no audio or video is recorded, stored or sent anywhere by Vextra. The *Photo* block keeps a picture only in a game variable (or a download the player triggers). Speech recognition (Voice Command) is done by the browser's own service, which may send audio to its vendor (Google / Apple) – mention this in your game's privacy notice.
+- Games run inside a sandboxed frame in the editor; the frame is allowed `microphone`, `camera` and `xr-spatial-tracking` only (no geolocation, no clipboard).
+- Streams are released when a block stops, the scene changes or the game is closed (reference-counted, so the camera light turns off).
 
 ## v3.3.0 notes
 - **CodeQL findings fixed** (`plugins/vextra-shield.js`): *Improper code sanitization* (×3) – the exported-game scripts (save guard, embed guard) are now fixed text and read their settings from escaped `data-` attributes instead of having JSON spliced into JavaScript; *Bad HTML filtering regexp* – script-tag matching now also handles end tags such as `</script foo>`. The same regular expression was corrected in the AI site preview and the web tools.

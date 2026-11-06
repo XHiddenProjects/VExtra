@@ -7,7 +7,7 @@
     /** ctx: { project(), onLog(level,text), onStop() } */
     constructor(ctx) {
       this.ctx = ctx; this.device = 'fit'; this.muted = false; this.paused = false; this.debug = false; this.token = 0;
-      this.frame = h('iframe', { class: 'play-frame', sandbox: 'allow-scripts allow-pointer-lock allow-modals allow-popups allow-forms', allow: 'autoplay; fullscreen; gamepad; accelerometer; gyroscope' });
+      this.frame = h('iframe', { class: 'play-frame', sandbox: 'allow-scripts allow-pointer-lock allow-modals allow-popups allow-forms', allow: 'autoplay; fullscreen; gamepad; accelerometer; gyroscope; microphone; camera; xr-spatial-tracking; speech-recognition' });
       this.stage = h('div', { class: 'play-stage' }, this.frame);
       const dev = h('select', { onchange: (e) => { this.device = e.target.value; this.layout(); } }, DEVICES.map(([v, l]) => h('option', { value: v }, l)));
       this.tilt = h('input', { type: 'range', min: -90, max: 90, value: 0, title: 'Tilt (accelerometer)', oninput: (e) => this.send('tilt', { x: +e.target.value / 9, ax: +e.target.value, ay: 0 }) });

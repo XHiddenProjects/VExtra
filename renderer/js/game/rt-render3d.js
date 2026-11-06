@@ -1,7 +1,7 @@
 /* Vextra game runtime – 3D renderer (three.js). `VXRT.build3D` is shared with the editor viewport so both look identical. */
 (function () {
   const VXRT = window.VXRT, U = VXRT.util;
-  VXRT.SHADERS_3D = ['none', 'toon', 'wireframe', 'unlit', 'glass', 'hologram', 'fresnel', 'gradient', 'custom'];
+  VXRT.SHADERS_3D = ['none', 'realism', 'toon', 'wireframe', 'unlit', 'glass', 'hologram', 'fresnel', 'gradient', 'custom'];
   const PRIMS = new Set(['cube', 'sphere', 'cylinder', 'cone', 'plane', 'torus', 'capsule', 'pyramid', 'ramp']);
   VXRT.PRIMS_3D = [...PRIMS];
 
@@ -78,18 +78,19 @@
     const op = (ma.opacity ?? 1) * mat.opacity; mat.opacity = op; mat.transparent = op < 1; mat.side = ma.doubleSided ? T.DoubleSide : mat.side; if (!vertexColors) mat.color.set(ma.color || '#cccccc');
     let tex = null; if (ma.texture) tex = texture(T, env, ma.texture, ma.repeatX, ma.repeatY);
     if (!tex && ma.pattern && ma.pattern !== 'none') { const cache = env.patTex || (env.patTex = new Map()); const key = [ma.pattern, ma.color, ma.color2].join('|'); let t = cache.get(key); if (!t) { t = new T.CanvasTexture(VXRT.patternCanvas(ma.pattern, ma.color, ma.color2 || '#444')); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; cache.set(key, t); } tex = t.clone(); tex.needsUpdate = true; tex.repeat.set(ma.repeatX || 1, ma.repeatY || 1); if (!vertexColors) mat.color.set('#ffffff'); }
+    if (ma.realism && mat.isMeshPhysicalMaterial && VXRT.realismApply) VXRT.realismApply(T, mat, ma, env);
     if (tex) mat.map = tex; if (ma.bump) { const b = texture(T, env, ma.bump, ma.repeatX, ma.repeatY); if (b) { mat.bumpMap = b; mat.bumpScale = ma.bumpScale ?? 1; } }
   }
   function makeMaterial(T, o, env, vertexColors) {
     const m = o.material || {}; const alpha = U.clamp(o.alpha ?? 1, 0, 1), op = (m.opacity ?? 1) * alpha;
-    const mat = new T.MeshStandardMaterial({ color: o.color || m.color || '#cccccc', metalness: m.metalness ?? 0.1, roughness: m.roughness ?? 0.7, emissive: m.emissive || '#000000', emissiveIntensity: m.emissiveIntensity ?? 1, transparent: op < 1, opacity: op, wireframe: !!m.wireframe, flatShading: !!m.flat, vertexColors: !!vertexColors, side: o.type === 'plane' ? T.DoubleSide : T.FrontSide });
+    const mat = new (((materialAsset(o, env) || {}).realism && T.MeshPhysicalMaterial) || T.MeshStandardMaterial)({ color: o.color || m.color || '#cccccc', metalness: m.metalness ?? 0.1, roughness: m.roughness ?? 0.7, emissive: m.emissive || '#000000', emissiveIntensity: m.emissiveIntensity ?? 1, transparent: op < 1, opacity: op, wireframe: !!m.wireframe, flatShading: !!m.flat, vertexColors: !!vertexColors, side: o.type === 'plane' ? T.DoubleSide : T.FrontSide });
     if (vertexColors) mat.color.set('#ffffff');
     if (m.texture) { const t = texture(T, env, m.texture, m.repeatX, m.repeatY); if (t) { mat.map = t; } }
     const ma = materialAsset(o, env); if (ma) { applyMaterialAsset(T, mat, ma, env, vertexColors); mat.userData.vxMat = true; }
     return mat;
   }
   const VERT = 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }';
-  function shaderMaterial(T, o, base) {
+  function shaderMaterial(T, o, base, env) {
     const sh = o.shader; if (!sh || !sh.name || sh.name === 'none') return base;
     const col = new T.Color(sh.color || o.color || '#6c8cff'); const U3 = { uTime: { value: 0 }, uColor: { value: col }, uColor2: { value: new T.Color(sh.color2 || '#34e1c5') }, uAmount: { value: U.num(sh.amount, 1) } };
     const mk = (frag, extra) => { const m = new T.ShaderMaterial(Object.assign({ uniforms: U3, vertexShader: VERT, fragmentShader: frag, transparent: true }, extra || {})); m.isVxShader = true; return m; };
@@ -101,12 +102,14 @@
       case 'hologram': return mk('uniform float uTime; uniform vec3 uColor; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f=pow(1.0-abs(dot(normalize(vN),normalize(vV))),2.0); float scan=0.5+0.5*sin(vUv.y*80.0-uTime*4.0); gl_FragColor=vec4(uColor*(0.35+f*1.4)*(0.6+0.4*scan),0.35+f*0.6); }', { blending: T.AdditiveBlending, depthWrite: false });
       case 'fresnel': return mk('uniform vec3 uColor; uniform vec3 uColor2; varying vec3 vN; varying vec3 vV; void main(){ float f=pow(1.0-abs(dot(normalize(vN),normalize(vV))),3.0); gl_FragColor=vec4(mix(uColor,uColor2,f),1.0); }', { transparent: false });
       case 'gradient': return mk('uniform vec3 uColor; uniform vec3 uColor2; varying vec2 vUv; void main(){ gl_FragColor=vec4(mix(uColor2,uColor,vUv.y),1.0); }', { transparent: false });
-      case 'custom': { try { return mk(sh.code && sh.code.includes('main') ? 'precision highp float; uniform float uTime; uniform vec3 uColor; uniform vec3 uColor2; uniform float uAmount; varying vec2 vUv; varying vec3 vN; varying vec3 vV; ' + sh.code : 'uniform vec3 uColor; void main(){ gl_FragColor=vec4(uColor,1.0); }', { transparent: false }); } catch { return base; } }
+      case 'realism': return VXRT.realismMaterial ? VXRT.realismMaterial(T, o, base, sh, env) : base;
+      case 'custom': { if (sh.file) { try { const as = ((env.assets || (env.data && env.data.assets) || {}).shaders || {})[sh.file]; if (!as) return base; const U3b = { uTime: { value: 0 }, uT: { value: 0 }, uColor: { value: new T.Vector4(col.r, col.g, col.b, 1) }, uAmount: { value: U.num(sh.amount, 1) }, uSize: { value: U.num(sh.size, 8) }, uA: { value: U.num(sh.a, 0) }, uB: { value: U.num(sh.b, 0) }, uRes: { value: new T.Vector2(1, 1) }, uPos: { value: new T.Vector2(0.5, 0.5) }, uDir: { value: new T.Vector2(1, 0) }, uScale: { value: 1 } }; const m = new T.ShaderMaterial({ uniforms: U3b, vertexShader: VERT, fragmentShader: VXRT.fxCustomFrag3D(as.code), transparent: false }); m.isVxShader = true; m.userData.u3 = U3b; return m; } catch { return base; } }
+        try { return mk(sh.code && sh.code.includes('main') ? 'precision highp float; uniform float uTime; uniform vec3 uColor; uniform vec3 uColor2; uniform float uAmount; varying vec2 vUv; varying vec3 vN; varying vec3 vV; ' + sh.code : 'uniform vec3 uColor; void main(){ gl_FragColor=vec4(uColor,1.0); }', { transparent: false }); } catch { return base; } }
       default: return base;
     }
   }
   VXRT.applyShader3D = function (T, o, env) {
-    const root = o.obj3d; if (!root) return; root.traverse((ch) => { if (ch.isMesh && ch.userData.baseMat) { ch.material = shaderMaterial(T, o, ch.userData.baseMat); } });
+    const root = o.obj3d; if (!root) return; root.traverse((ch) => { if (ch.isMesh && ch.userData.baseMat) { ch.material = shaderMaterial(T, o, ch.userData.baseMat, env); } });
   };
 
   /* ---------- object builder ---------- */
@@ -160,7 +163,7 @@
   };
   VXRT.setupScene3D = function (g, sc) {
     const T = window.THREE; if (!T) throw new Error('This scene is 3D but three.js is not loaded');
-    if (!g.canvas3d) { const c = document.createElement('canvas'); c.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%'; g.stageEl.append(c); g.canvas3d = c; g.renderer3d = new T.WebGLRenderer({ canvas: c, antialias: true, preserveDrawingBuffer: !!g.opts.preserveBuffer }); g.renderer3d.shadowMap.enabled = true; g.renderer3d.shadowMap.type = T.PCFShadowMap; g.renderer3d.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); }
+    if (!g.canvas3d) { const c = document.createElement('canvas'); c.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%'; g.stageEl.append(c); g.canvas3d = c; g.renderer3d = new T.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: !!g.opts.preserveBuffer }); g.renderer3d.shadowMap.enabled = true; g.renderer3d.shadowMap.type = T.PCFShadowMap; g.renderer3d.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); }
     g.canvas3d.style.display = 'block';
     const env = sc.env || {}; g.scene3d = new T.Scene(); g.THREE = T; VXRT.studioEnv(T, g.renderer3d, g.scene3d);
     if (env.skyMode === 'gradient') { const cv = document.createElement('canvas'); cv.width = 2; cv.height = 256; const x = cv.getContext('2d'); const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, env.skyTop || '#3a6bd8'); gr.addColorStop(1, env.skyBottom || '#cfe8ff'); x.fillStyle = gr; x.fillRect(0, 0, 2, 256); const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; g.scene3d.background = t; } else g.scene3d.background = new T.Color(env.sky || sc.bg || '#1a2233');
@@ -169,11 +172,11 @@
     g.renderer3d.shadowMap.enabled = env.shadows !== false;
     g.cam3d = { mode: 'fixed', fov: 60, pos: { x: 8, y: 6, z: 10 }, target: { x: 0, y: 1, z: 0 }, follow: null, distance: 8, height: 3, lerp: 0.1, yaw: 0, pitch: 0, shake: 0, eye: 1.6 };
     const c3 = sc.camera3d || {}; Object.assign(g.cam3d, c3); g.camera3d = new T.PerspectiveCamera(g.cam3d.fov, 1, 0.1, 1000); g.tex = g.tex || new Map();
-    g.renderer3d.setClearColor(env.sky || '#1a2233'); g.raycaster3d = new T.Raycaster(); g.particles3d = null;
+    g.renderer3d.setClearColor(env.sky || '#1a2233'); g.raycaster3d = new T.Raycaster(); g.particles3d = null; if (g.realismOn && VXRT.realism) VXRT.realism.apply(g);
   };
   VXRT.onObjectAdded = function (g, o) {
     if (g.dim !== '3d' || !g.scene3d) return; const T = g.THREE; if (o.isScene) return;
-    g.imgs = g.imgs || new Map(); g.assets = g.data.assets; const obj = VXRT.build3D(T, o, g); o.obj3d = obj; g.scene3d.add(obj); VXRT.syncTransform3D(T, o);
+    g.imgs = g.imgs || new Map(); g.assets = g.data.assets; const obj = VXRT.build3D(T, o, g); o.obj3d = obj; g.scene3d.add(obj); if (g.realismOn && VXRT.realism && obj.userData && obj.userData.isLight) VXRT.realism.tuneLight(obj); VXRT.syncTransform3D(T, o);
     if (o.shader && o.shader.name) VXRT.applyShader3D(T, o, g);
     if (o.type === 'camera' && !g._camObj) { g._camObj = o; Object.assign(g.cam3d.pos, { x: o.x, y: o.y, z: o.z }); const d = new T.Vector3(0, 0, -1).applyEuler(new T.Euler(U.rad(o.rx), U.rad(o.ry), U.rad(o.rz), 'YXZ')); g.cam3d.target = { x: o.x + d.x * 10, y: o.y + d.y * 10, z: o.z + d.z * 10 }; if (o.props.fov) g.cam3d.fov = o.props.fov; }
   };
@@ -218,6 +221,7 @@
     if (cm === 'follow' && fo) { const yaw = U.rad(c.yaw + yo), pit = U.rad(c.pitch); const dx = Math.sin(yaw) * Math.cos(pit) * c.distance, dz = Math.cos(yaw) * Math.cos(pit) * c.distance, dy = Math.sin(pit) * c.distance + c.height; const tx = fo.x + dx, ty = fo.y + dy, tz = fo.z + dz; c.pos.x += (tx - c.pos.x) * k; c.pos.y += (ty - c.pos.y) * k; c.pos.z += (tz - c.pos.z) * k; c.target = { x: fo.x, y: fo.y + 1, z: fo.z }; }
     else if (c.mode === 'orbit') { const t = fo ? { x: fo.x, y: fo.y, z: fo.z } : c.target; const yaw = U.rad(c.yaw), pit = U.rad(c.pitch); c.pos = { x: t.x + Math.sin(yaw) * Math.cos(pit) * c.distance, y: t.y + Math.sin(pit) * c.distance, z: t.z + Math.cos(yaw) * Math.cos(pit) * c.distance }; c.target = { x: t.x, y: t.y, z: t.z }; }
     else if (cm === 'fps' && fo) { if (fo.obj3d) { fo.obj3d.visible = false; fo._fpsHid = true; } c.pos = { x: fo.x, y: fo.y + c.eye, z: fo.z }; const yaw = U.rad(c.yaw), pit = U.rad(c.pitch); c.target = { x: c.pos.x - Math.sin(yaw) * Math.cos(pit), y: c.pos.y + Math.sin(pit), z: c.pos.z - Math.cos(yaw) * Math.cos(pit) }; }
+    if (g.sense) { const SN = VXRT.sense; if (g.sense.vr.active) SN.vrPre(g, c); else if (g.sense.ar.active) SN.arPre(g, c); }
     cam.fov = c.fov; cam.updateProjectionMatrix(); const sh = c.shake > 0 ? c.shake * 0.05 : 0; if (c.shake > 0) c.shake = Math.max(0, c.shake - dt * 20);
     cam.position.set(c.pos.x + (Math.random() - 0.5) * sh, c.pos.y + (Math.random() - 0.5) * sh, c.pos.z + (Math.random() - 0.5) * sh); cam.lookAt(c.target.x, c.target.y, c.target.z); cam.updateMatrixWorld(); cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
     // particles
@@ -226,6 +230,7 @@
       const n = P.length, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), cc = new T.Color(); P.forEach((p, i) => { pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; cc.set(p.color); const f = p.fade ? 1 - p.life / p.max : 1; col[i * 3] = cc.r * f; col[i * 3 + 1] = cc.g * f; col[i * 3 + 2] = cc.b * f; });
       g.particles3d.geometry.setAttribute('position', new T.BufferAttribute(pos, 3)); g.particles3d.geometry.setAttribute('color', new T.BufferAttribute(col, 3)); g.particles3d.visible = true; g.particles3d.material.size = Math.max(0.1, (P[0].size || 6) / 24);
     } else if (g.particles3d) g.particles3d.visible = false;
-    g.renderer3d.render(g.scene3d, cam); VXRT.fx && VXRT.fx.screen(g, g.canvas3d);
+    if (g.sense && g.sense.vr.active && g.sense.vr.mode === 'webxr') { cam.position.set(c.pos.x, c.pos.y, c.pos.z); cam.rotation.set(0, U.rad(g.sense.vr.rig.yaw), 0); cam.updateMatrixWorld(); }
+    if (g.sense && g.sense.vr.active && VXRT.sense.vrRender(g, cam)) return; g.renderer3d.render(g.scene3d, cam); VXRT.fx && VXRT.fx.screen(g, g.canvas3d);
   };
 })();

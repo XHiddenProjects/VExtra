@@ -2,7 +2,26 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.3.0] — current
+## [3.4.0] — current
+
+### Added
+- **Store Export uses Android Studio** (plugin 2.1.0): Android builds now run on the latest Android Studio – its bundled Java (JBR) and the project's Gradle wrapper, plus the Android SDK. New generated `scripts/android-env.js` finds Android Studio / JDK / SDK on Windows, macOS and Linux (incl. JetBrains Toolbox, `ANDROID_STUDIO`, `ANDROID_HOME`), writes `local.properties`, accepts SDK licences; `build-android.js` (debug APK, or `--aab` release bundle), `open-android.js`; new `npm run doctor:android` / `build:aab`. The automatic export checks for Android Studio first; if it is missing you get the download link, the Android build is skipped and the rest still exports.
+- **Realism** (hyper-realistic 3D): a physically based *Realism material* option in the Material editor (clear coat, sheen, transmission / real glass, index of refraction, thickness, iridescence, procedural micro-surface detail, reflection strength) with 11 ready-made materials (car paint, brushed steel, polished marble, leather, velvet, concrete, skin, glass, soap bubble, wet asphalt, rubber); a **realism** object shader; and a **Realism (hyper-real camera)** Shader-block effect – filmic tone curve, bloom, vignette, colour fringing, film grain, sharpening, plus filmic tone mapping, soft shadows and sky-based lighting for the whole 3D scene.
+- **Microphone blocks** (new category): *Microphone* (level, pitch, bands, loud / quiet), *Voice Command* (speech recognition, one exit per command), *Sound Detector* (clap, double clap, whistle, shout, silence), *Voice Noise* + *Make Noise* + *Hearing* (enemies that hear the player's voice / footsteps and walk to the sound).
+- **Camera blocks** (new category): *Camera Feed*, *Motion Sensor* (motion, swipes, 3×3 zones), *Color Tracker*, *Light Sensor*, *Face Tracker*, *Photo*. Frames are analysed on the device only.
+- **VR blocks** (new category): *VR Mode* (WebXR headset or split-screen cardboard fallback), *VR Head* (with nod / shake), *VR Controller*, *VR Move* (smooth, snap turn, teleport), *VR Grab* (hold + throw), *VR Haptics*, *VR Gaze*.
+- **AR blocks** (new category): *AR Mode* (WebXR or camera-behind fallback), *AR Surface*, *AR Place*, *AR Pinch & Turn*, *AR Light Match*, *AR Shadow Floor*, *AR Distance*.
+- Docs: "Microphone, Camera, VR & AR blocks" and "Realism material & hyper-real look".
+
+### Changed
+- When a Shader block's effect is **Custom shader file** it shows a **drop-down of your shader files**; new effect **Custom material file (3D)** shows a drop-down of your materials; the custom 3D code box only appears for *Custom 3D code*. Blocks can now hide parameters that do not apply (`showIf`).
+- Selecting **Shader → custom** on a 3D object in the Inspector shows a drop-down of your shader files. A shader file now also works on 3D objects (`T(uv)` is the lit object colour).
+- The game preview allows microphone, camera and WebXR; the 3D canvas is now transparent-capable (needed for AR).
+
+### Fixed
+- Shader files / the realism shader could not use the game's assets on 3D objects (the asset list was not passed to the shader builder).
+
+## [3.3.0]
 
 ### Added
 - **Drag to reorder**: editor tabs, bottom-panel tabs (Console / Problems / Output) and the sidebar icons can now be moved by clicking and dragging them (a line shows where they will land; the order is remembered). Works with the pointer, so it also works inside the desktop webview.

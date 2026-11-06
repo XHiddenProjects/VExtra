@@ -176,7 +176,7 @@
       return this;
     }
     destroy() {
-      this.running = false; cancelAnimationFrame(this._raf); this._ro && this._ro.disconnect(); this.teardownScene(); VXRT.destroyInput && VXRT.destroyInput(this); VXRT.destroyRender && VXRT.destroyRender(this);
+      this.running = false; cancelAnimationFrame(this._raf); VXRT.sense && VXRT.sense.destroy(this); this._ro && this._ro.disconnect(); this.teardownScene(); VXRT.destroyInput && VXRT.destroyInput(this); VXRT.destroyRender && VXRT.destroyRender(this);
       this.audio.stopAll(); if (this.container) { this.container.textContent = ''; } this.running = false;
     }
     resize() { VXRT.resizeRender && VXRT.resizeRender(this); }

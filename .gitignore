@@ -1,2 +1,14 @@
-/target/
-/gen/
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+renderer/vendor/
+server/data/
+
+# The bundled server (src-tauri/resources/server/vextra-server[.exe], ~100 MB) is NOT ignored: it is stored with Git LFS (see .gitattributes / `npm run lfs:setup`).
+# Installers are build outputs – publish them on the Releases page instead of committing them.
+src-tauri/resources/server/*.blob
+src-tauri/resources/server/sea-*
+*.msi
+*.dmg
+*.AppImage
+*.deb

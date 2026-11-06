@@ -5,7 +5,7 @@
   const CATS = (VXRT.CATEGORIES = [
     { id: 'triggers', label: 'Triggers', color: '#e5534b' }, { id: 'logic', label: 'Logic & Math', color: '#3fb950' }, { id: 'components', label: 'Components', color: '#d29922' },
     { id: 'properties', label: 'Properties', color: '#58a6ff' }, { id: 'text', label: 'Text & Lists', color: '#bc8cff' }, { id: 'gui', label: 'GUI', color: '#f778ba' },
-    { id: 'flow', label: 'Game Flow', color: '#39c5cf' }, { id: 'mobile', label: 'Mobile Device', color: '#f0883e' }, { id: 'bundles', label: 'Behavior Bundles', color: '#8b949e' }, { id: 'plugins', label: 'Plugins', color: '#7ee787' },
+    { id: 'flow', label: 'Game Flow', color: '#39c5cf' }, { id: 'mobile', label: 'Mobile Device', color: '#f0883e' }, { id: 'mic', label: 'Microphone', color: '#e3b341' }, { id: 'webcam', label: 'Camera', color: '#2ea6a0' }, { id: 'vr', label: 'VR', color: '#a371f7' }, { id: 'ar', label: 'AR', color: '#ff7b72' }, { id: 'bundles', label: 'Behavior Bundles', color: '#8b949e' }, { id: 'plugins', label: 'Plugins', color: '#7ee787' },
   ]);
   const ICONS = { always: '🔁', timer: '⏱️', once: '1️⃣', mouseClick: '🖱️', mouseMove: '↗️', mouseWheel: '🎡', gesture: '👆', lockedMouse: '🔒', keyboard: '⌨️', controller: '🎮', collision: '💥', inView: '👁️', sensor: '📡', mailbox: '📬', custom: '🧩',
     clip: '🎬', number: '🔢', expression: 'ƒ', customBehavior: '🧠', globalVariable: '🌐', objectVariable: '📦', ease: '〰️', repeater: '🔂', random: '🎲', filter: '🚦', switch: '🎚️', toggleSwitch: '🔀', caseSwitch: '🔣', stateFlag: '🚩', router: '🛤️', logicGate: '⚙️',
@@ -13,7 +13,7 @@
     position: '📍', rotation: '🔄', alpha: '👻', size: '↔️', enabled: '✅', animation: '🎞️', velocity: '➡️', spin: '🌪️', material: '🎨', flip: '🪞', extractor: '🧪', displayOrder: '🥞', blending: '🌗', colors: '🌈', shader: '🔆',
     text: '🔤', textCase: 'Aa', textLength: '📐', toNumber: '#️⃣', textCompare: '⚖️', textSanitize: '🧼', textList: '📝', numberList: '🔢', listModify: '✏️', listOrder: '↕️', listEach: '🔁', listCount: '🧮',
     calendar: '📅', clock: '🕒', label: '🏷️', bar: '📊', alert: '⚠️', cursor: '🖱️', pauseGame: '⏸️', loadLevel: '🗺️', restartGame: '🔄', fetchUrl: '🌍', saveValue: '💾', gameSave: '💾', leaderboard: '🏆', achievement: '🏅', level: '🪜', gamePhysics: '🌍', userInfo: '👤', clipboard: '📋', cloud: '☁️', fullScreen: '⛶', shake: '📳', ad: '📢', vibrate: '📳', accelerometer: '📱', gameCenter: '🎲', deviceCheck: '📱', touchCheck: '👇', exitGame: '🚪', bundle: '📦', bundleInput: '⬅️', bundleOutput: '➡️' };
-  const CAT_ICON = { triggers: '⚡', logic: '🧮', components: '🧱', properties: '🎛️', text: '🔤', gui: '🖼️', flow: '🕹️', mobile: '📱', bundles: '📦', plugins: '🔌' };
+  const CAT_ICON = { triggers: '⚡', logic: '🧮', components: '🧱', properties: '🎛️', text: '🔤', gui: '🖼️', flow: '🕹️', mobile: '📱', mic: '🎤', webcam: '📷', vr: '🥽', ar: '🪄', bundles: '📦', plugins: '🔌' };
   /** Emoji icon for a block definition (plugins may set def.icon). */
   VXRT.blockIcon = (def) => (def && (def.icon || ICONS[def.id] || CAT_ICON[def.cat])) || '▫️';
   VXRT.catColor = (id) => (CATS.find((c) => c.id === id) || CATS[0]).color;
