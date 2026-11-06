@@ -4,7 +4,7 @@
   "version": "3.4.1",
   "description": "Vextra Studio \u2013 professional web development and 2D/3D game creation in one workspace (Tauri v2)",
   "author": "XHiddenProjects",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "postinstall": "node scripts/vendor.js",
     "start": "tauri dev",
