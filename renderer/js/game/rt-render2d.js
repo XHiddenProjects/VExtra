@@ -1,6 +1,7 @@
 /* Vextra game runtime – 2D renderer. Also used by the editor viewport (draw2D.object with an `env`). */
 (function () {
   const VXRT = window.VXRT, U = VXRT.util;
+  VXRT.LAYERS = ['background', 'world', 'ui']; VXRT.layerRank = (o) => { const i = VXRT.LAYERS.indexOf(o && o.layer); return i < 0 ? 1 : i; };
   const BLEND = { normal: 'source-over', add: 'lighter', multiply: 'multiply', screen: 'screen' };
 
   /* env = { assets, imgs:Map, time, vars, onImageLoad } – the editor builds one with makeEnv(), the runtime passes the Game itself. */
@@ -113,7 +114,7 @@
       if (o.type === 'empty' || o.isScene) return; ctx.save(); ctx.strokeStyle = o.physics && o.physics.body !== 'none' ? '#4cc38a' : '#f5c451'; ctx.lineWidth = 1; ctx.translate(o.x, o.y);
       if (o.physics && o.physics.shape === 'circle') { ctx.beginPath(); ctx.arc(0, 0, Math.min(o.w, o.h) / 2, 0, Math.PI * 2); ctx.stroke(); } else ctx.strokeRect(-o.w / 2, -o.h / 2, o.w, o.h); ctx.restore();
     },
-    sorted: (objs) => objs.map((o, i) => [o, i]).sort((a, b) => (a[0].order - b[0].order) || (a[1] - b[1])).map((x) => x[0]),
+    sorted: (objs) => objs.map((o, i) => [o, i]).sort((a, b) => (VXRT.layerRank(a[0]) - VXRT.layerRank(b[0])) || (a[0].order - b[0].order) || (a[1] - b[1])).map((x) => x[0]),
   });
 
   /* ---- sprite animation ---- */
@@ -199,8 +200,10 @@
       const isBg = (o) => (o.tags || []).includes('background'); const bc = getBg(W, H), bx = bc.getContext('2d'); bx.setTransform(1, 0, 0, 1, 0, 0); bx.fillStyle = g.scene.bg || g.settings.bg; bx.fillRect(0, 0, W, H); bx.setTransform(c.zoom, 0, 0, c.zoom, W / 2 - c.x * c.zoom + sx, H / 2 - c.y * c.zoom + sy);
       for (const o of sorted) if (isBg(o) && o.alive && o.enabled) draw2D.object(bx, o, g); bx.setTransform(1, 0, 0, 1, 0, 0); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); if (!VXRT.fx.layer(g, ctx, 'bg', bc, W, H)) ctx.drawImage(bc, 0, 0); ctx.restore(); rest = sorted.filter((o) => !isBg(o));
     }
-    for (const o of rest) if (o.alive && o.enabled) draw2D.object(ctx, o, g);
-    drawParticles2D(ctx, g); VXRT.drawDarkness(ctx, g.objects, g.scene, g); if (g.debug) for (const o of g.objects) draw2D.collider(ctx, o);
+    for (const o of rest) if (o.alive && o.enabled && o.layer !== 'ui') draw2D.object(ctx, o, g);
+    drawParticles2D(ctx, g); VXRT.drawDarkness(ctx, g.objects, g.scene, g); if (g.debug) for (const o of g.objects) if (o.layer !== 'ui') draw2D.collider(ctx, o);
+    /* UI layer: drawn last in screen space (ignores the camera and screen shake) */
+    if (rest.some((o) => o.layer === 'ui')) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.translate(0, 0); for (const o of rest) if (o.layer === 'ui' && o.alive && o.enabled) draw2D.object(ctx, o, g); }
     ctx.setTransform(1, 0, 0, 1, 0, 0); VXRT.fx && VXRT.fx.screen(g, g.canvas2d);
   };
   VXRT.camera2dView = (g) => g.camera2d;

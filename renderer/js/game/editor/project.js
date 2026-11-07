@@ -64,7 +64,10 @@
       data.format = 'vextra-game'; data.version = 2; data.settings = Object.assign({ id: uid('game'), title: 'My game', width: 960, height: 540, bg: '#10131a', pixelArt: false, startScene: 0, cloudUrl: '' }, data.settings || {});
       data.scenes = data.scenes && data.scenes.length ? data.scenes : [GP.blankScene('2d')]; data.behaviors = data.behaviors || {}; data.assets = Object.assign({ sprites: {}, sounds: {}, models: {} }, data.assets || {}); for (const k of ['sprites', 'sounds', 'models', 'shaders', 'materials', 'animations']) data.assets[k] = data.assets[k] || {}; data.prefabs = data.prefabs || [];
       for (const b of Object.values(data.behaviors)) if (b && b.graph) { VXRT.migrateGraph(b.graph); GP.fixWires(b.graph); }
-      for (const s of data.scenes) { s.id = s.id || uid('s'); s.dim = s.dim || '2d'; s.objects = s.objects || []; s.behaviors = s.behaviors || []; for (const o of s.objects) { if (o.graph) VXRT.migrateGraph(o.graph); o.id = o.id || uid(); o.props = o.props || {}; o.physics = o.physics || { body: 'none' }; o.tags = o.tags || []; o.behaviors = o.behaviors || []; } }
+      /* older projects (and some plugins) put a script directly on an object: turn it into a real behaviour so it shows up in the Logic tab */
+      const toBeh = (o) => { if (typeof o.script === 'string') { const code = o.script; delete o.script; if (code.trim()) { const id = 'b_' + String(o.id).replace(/\W+/g, '_'); data.behaviors[id] = { id, name: (o.name || 'Object') + ' script', mode: 'code', code }; o.behaviors = (o.behaviors || []).concat(id); } } };
+      for (const s of data.scenes) { s.id = s.id || uid('s'); s.dim = s.dim || '2d'; s.objects = s.objects || []; s.behaviors = s.behaviors || []; for (const o of s.objects) { if (o.graph) VXRT.migrateGraph(o.graph); o.id = o.id || uid(); o.props = o.props || {}; o.physics = o.physics || { body: 'none' }; o.tags = o.tags || []; o.behaviors = o.behaviors || []; toBeh(o); } }
+      for (const o of data.prefabs) { o.id = o.id || uid(); o.behaviors = o.behaviors || []; toBeh(o); }
       return data;
     },
     fromLegacyScene(old) {

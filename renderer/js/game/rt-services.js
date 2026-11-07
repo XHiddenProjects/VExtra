@@ -9,6 +9,8 @@
   function place(e, o) {
     const a = ANCH[o.anchor] || ANCH.topLeft; e.style.position = 'absolute'; const ox = U.num(o.x, 0) * (a[0] === 100 ? -1 : 1), oy = U.num(o.y, 0) * (a[1] === 100 ? -1 : 1); e.style.left = `calc(${a[0]}% + ${ox}px)`; e.style.top = `calc(${a[1]}% + ${oy}px)`; e.style.maxWidth = '94%'; e.style.transform = `translate(-${a[0]}%,-${a[1]}%)`;
   }
+  /** per-scene layout made in the editor's UI layer (scene.uiLayout[id] = { anchor, x, y }); ids of object-owned elements end in :objectId */
+  const uiOv = (g, id) => { const L = g.scene && g.scene.uiLayout; return L ? L[String(id).split(':')[0]] || null : null; };
   const gm = (g) => g.guiMap || (g.guiMap = new Map());
   function register(g, id, node, extra) {
     const m = gm(g); const old = m.get(id); if (old) old.el.remove(); const rec = Object.assign({ el: node, remove() { node.remove(); m.delete(id); g.guiItems.delete(node); } }, extra); m.set(id, rec); g.guiItems.add(node); g.guiEl.append(node); return rec;
@@ -17,13 +19,13 @@
   VXRT.gui = {
     label(g, id, o) {
       let rec = gm(g).get(id); if (rec && !rec.el.isConnected) { gm(g).delete(id); rec = null; } if (!rec) { const e = el('div', 'pointer-events:none;white-space:pre-wrap;'); e.setAttribute('data-vx-label', '1'); if (g._fxLabels) e.style.filter = g._fxLabels; rec = register(g, id, e, {}); }
-      rec.o = Object.assign(rec.o || {}, o); const q = rec.o, e = rec.el; e.style.font = `${q.bold ? 700 : 500} ${U.num(q.size, 22)}px system-ui,sans-serif`; e.style.color = q.color || '#fff'; e.style.textShadow = q.shadow === false ? '' : '0 2px 6px rgba(0,0,0,.55)';
+      rec.o = Object.assign(rec.o || {}, o, uiOv(g, id) || {}); const q = rec.o, e = rec.el; e.style.whiteSpace = 'pre'; e.style.font = `${q.bold ? 700 : 500} ${U.num(q.size, 22)}px system-ui,sans-serif`; e.style.color = q.color || '#fff'; e.style.textShadow = q.shadow === false ? '' : '0 2px 6px rgba(0,0,0,.55)';
       e.style.background = q.bg || 'transparent'; e.style.padding = q.bg ? '6px 12px' : '0'; e.style.borderRadius = '8px'; e.style.display = q.hidden ? 'none' : 'block';
       rec.tpl = q.text; rec.refresh = () => { e.textContent = U.tpl(rec.tpl ?? '', guiVars(g)); if (!q.follow) place(e, q); }; rec.refresh(); return rec;
     },
     bar(g, id, o) {
       let rec = gm(g).get(id); if (!rec) { const e = el('div', 'pointer-events:none;overflow:hidden;'), f = el('div', 'height:100%;width:0;transition:width .12s'); e.append(f); rec = register(g, id, e, { fill: f }); rec.value = 1; }
-      rec.o = Object.assign(rec.o || {}, o); const q = rec.o, e = rec.el; Object.assign(e.style, { width: U.num(q.w, 220) + 'px', height: U.num(q.h, 18) + 'px', background: q.bg || 'rgba(0,0,0,.45)', borderRadius: U.num(q.radius, 9) + 'px', border: '1px solid rgba(255,255,255,.25)', display: q.hidden ? 'none' : 'block' });
+      rec.o = Object.assign(rec.o || {}, o, uiOv(g, id) || {}); const q = rec.o, e = rec.el; Object.assign(e.style, { width: U.num(q.w, 220) + 'px', height: U.num(q.h, 18) + 'px', background: q.bg || 'rgba(0,0,0,.45)', borderRadius: U.num(q.radius, 9) + 'px', border: '1px solid rgba(255,255,255,.25)', display: q.hidden ? 'none' : 'block' });
       rec.fill.style.background = q.color || '#4cc38a'; rec.fill.style.width = U.clamp(rec.value, 0, 1) * 100 + '%'; if (!q.follow) place(e, q); return rec;
     },
     /** Banner ad in the game GUI. o.service: house | image | html | adsense. */

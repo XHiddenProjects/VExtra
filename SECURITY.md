@@ -12,7 +12,7 @@
 | 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
 
-Current version: **3.5.0** (see `VERSION`). This policy was last reviewed for 3.5.0.
+Current version: **3.6.0** (see `VERSION`). This policy was last reviewed for 3.6.0.
 
 ## Reporting a vulnerability
 
@@ -49,6 +49,12 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.6.0 notes
+- **Script → behaviour conversion** only moves text from one field of the project file to another; nothing is executed during conversion. Code behaviours run exactly as before: inside the sandboxed Play frame / exported page, never in the editor's own context.
+- The **Logic tab preview** of a code behaviour runs the script once against inert stand-ins (`game`, `self`, `VXRT`… do nothing), so previewing no longer reaches real engine services such as the microphone or camera.
+- **UI layout** (`scene.uiLayout`) stores only an anchor name and two numbers per element id; values are validated as numbers/known anchors when applied and are never evaluated as code.
+- Layer visibility / lock in the editor is view-only state and is not saved into the game.
 
 ## v3.5.0 notes
 - **Android toolchain auto-install (Store Export):** HTTPS only; hosts limited to api.adoptium.net, github.com / githubusercontent.com, services.gradle.org / downloads.gradle.org, developer.android.com and dl.google.com; every archive's SHA-256 is verified before it is unpacked; archive paths are checked (no zip-slip); installs go to your user folder (`~/.vextra/toolchain`), never need administrator rights, and no shell is used except Gradle's own launcher. The process runner restrictions above are unchanged.

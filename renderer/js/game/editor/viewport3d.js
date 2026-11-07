@@ -14,12 +14,12 @@
       this.tc.addEventListener('objectChange', () => this._fromGizmo()); this.three.add(this.tc.getHelper ? this.tc.getHelper() : this.tc);
       this.gridHelper = new T.GridHelper(60, 60, 0x4a5578, 0x2a3047); this.gridHelper.material.transparent = true; this.gridHelper.material.opacity = 0.5; this.three.add(this.gridHelper); this.axes = new T.AxesHelper(1.5); this.three.add(this.axes);
       this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.el); this.canvas.addEventListener('pointerdown', (e) => this._down(e)); this.canvas.addEventListener('keydown', (e) => this._key(e)); this.canvas.addEventListener('wheel', () => this.render(), { passive: true });
-      this.env = { assets: {}, data: null, imgs: new Map(), tex3d: new Map(), onImageLoad: () => this.render() }; this.ray = new T.Raycaster();
+      this.env = { assets: {}, data: null, imgs: new Map(), tex3d: new Map(), onImageLoad: () => this.render() }; this.ray = new T.Raycaster(); this.pos = VX.layers.readout(this.el); this.canvas.addEventListener('pointermove', (e) => { const p = this.dropPoint(e.clientX, e.clientY, true); this.pos.cursor(`Ground X ${p.x.toFixed(1)}, Z ${p.z.toFixed(1)}`); });
       VX.dnd.target(this.el, (d, cx, cy) => { const p = this.dropPoint(cx, cy); this.ctx.onDropType && this.ctx.onDropType(d, p.x, p.y, p.z); }, (d) => d && (d.kind === 'obj' || d.kind === 'prefab-obj' || d.kind === 'asset-model' || d.kind === 'asset-sprite'));
     }
     dispose() { this.ro.disconnect(); this.tc.dispose && this.tc.dispose(); this.orbit.dispose(); this.renderer.dispose(); }
     resize() { const r = this.el.getBoundingClientRect(); if (r.width < 2) return; this.renderer.setSize(r.width, r.height, false); this.canvas.style.width = r.width + 'px'; this.canvas.style.height = r.height + 'px'; this.cam.aspect = r.width / r.height; this.cam.updateProjectionMatrix(); this.render(); }
-    render() { if (this._need) return; this._need = true; requestAnimationFrame(() => { this._need = false; this._upd(); this.renderer.render(this.three, this.cam); }); }
+    render() { if (this._need) return; this._need = true; requestAnimationFrame(() => { this._need = false; this._upd(); { const so = this.scene ? this.sel.map((id) => this.scene.objects.find((o) => o.id === id)).filter(Boolean) : []; this.pos.selected(so.length === 1 ? `${so[0].name}: X ${(+so[0].x).toFixed(2)}, Y ${(+so[0].y).toFixed(2)}, Z ${(+so[0].z).toFixed(2)}` : so.length > 1 ? so.length + ' selected' : ''); } this.renderer.render(this.three, this.cam); }); }
     _upd() { for (const [id, rec] of this.map) { const o = rec.o; if (rec.root.userData.isLight || o.type === 'camera') { /* handled by sync */ } if (rec.root.material && rec.root.material.isVxShader) rec.root.material.uniforms.uTime.value = performance.now() / 1000; } }
     setScene(scene, project) {
       this.scene = scene; this.project = project; this.env.assets = project.assets; this.env.data = project; this.env.tex3d = new Map(); this.rebuild();
@@ -36,7 +36,7 @@
     _add(o) {
       const T = this.T; const root = VXRT.build3D(T, o, this.env); const rec = { o, root }; this.map.set(o.id, rec); root.userData.vxObj = o; root.traverse((c) => { c.userData.vxObj = o; });
       if (o.shader && o.shader.name && o.shader.name !== 'none') { try { VXRT.applyShader3D(T, { ...o, obj3d: root }, this.env); } catch { /* ignore */ } }
-      this._place(rec); root.visible = o.visible !== false && !o.hidden; this.three.add(root);
+      this._place(rec); root.visible = o.visible !== false && !o.hidden && !VX.layers.hidden(o); this.three.add(root);
       if (['light', 'camera', 'empty'].includes(o.type)) { const col = o.type === 'light' ? 0xffd54a : o.type === 'camera' ? 0x6c8cff : 0xaaaaaa; const geo = o.type === 'camera' ? new T.ConeGeometry(0.35, 0.7, 4) : o.type === 'light' ? new T.OctahedronGeometry(0.3) : new T.BoxGeometry(0.4, 0.4, 0.4); const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: col, wireframe: true })); if (o.type === 'camera') m.rotation.x = -Math.PI / 2; const gz = new T.Group(); gz.add(m); if (o.type === 'light') this._lightHelper(T, o, gz); gz.userData.vxObj = o; m.userData.vxObj = o; rec.gizmo = gz; this.three.add(gz); this._placeGizmo(rec); }
     }
     /** Shows what a light does: reach sphere (point), aim line (directional/spot) and cone (spot). */
@@ -67,8 +67,8 @@
       if (rec._box) { const b = new this.T.Box3().setFromObject(rec.root); rec._box.box.copy(b); }
       this.ctx.onLiveChange && this.ctx.onLiveChange();
     }
-    pick(cx, cy) { const T = this.T, r = this.canvas.getBoundingClientRect(); this.ray.setFromCamera(new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.cam); const objs = []; for (const rec of this.map.values()) { if (rec.root.visible) objs.push(rec.root); if (rec.gizmo) objs.push(rec.gizmo); } const hits = this.ray.intersectObjects(objs, true); for (const hit of hits) { const o = hit.object.userData.vxObj; if (o && !o.locked) return o; } return null; }
-    dropPoint(cx, cy) { const T = this.T, r = this.canvas.getBoundingClientRect(); this.ray.setFromCamera(new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.cam); const plane = new T.Plane(new T.Vector3(0, 1, 0), 0); const p = new T.Vector3(); if (this.ray.ray.intersectPlane(plane, p)) return { x: Math.round(p.x * 2) / 2, y: 0, z: Math.round(p.z * 2) / 2 }; return { x: this.orbit.target.x, y: 0, z: this.orbit.target.z }; }
+    pick(cx, cy) { const T = this.T, r = this.canvas.getBoundingClientRect(); this.ray.setFromCamera(new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.cam); const objs = []; for (const rec of this.map.values()) { if (rec.root.visible) objs.push(rec.root); if (rec.gizmo) objs.push(rec.gizmo); } const hits = this.ray.intersectObjects(objs, true); for (const hit of hits) { const o = hit.object.userData.vxObj; if (o && !o.locked && !VX.layers.locked(o)) return o; } return null; }
+    dropPoint(cx, cy, raw) { const T = this.T, r = this.canvas.getBoundingClientRect(); this.ray.setFromCamera(new T.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.cam); const plane = new T.Plane(new T.Vector3(0, 1, 0), 0); const p = new T.Vector3(); if (this.ray.ray.intersectPlane(plane, p)) return raw ? { x: p.x, y: 0, z: p.z } : { x: Math.round(p.x * 2) / 2, y: 0, z: Math.round(p.z * 2) / 2 }; return { x: this.orbit.target.x, y: 0, z: this.orbit.target.z }; }
     _down(e) {
       this.canvas.focus({ preventScroll: true });
       if (e.button === 0 && !this._dragging && !(this.tc.axis)) {

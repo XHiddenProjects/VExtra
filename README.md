@@ -39,6 +39,12 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
+## What's new in 3.6.0
+- **Layers** (Background / World / UI) with show / lock, and UI-layer objects that stay on screen.
+- **Edit UI layout:** drag labels and bars to where you want them, or type the anchor and X / Y.
+- **Live cursor + selected-object position** in the 2D and 3D viewports.
+- Object scripts are now **behaviours** (Logic tab) – old projects convert automatically.
+
 ## What's new in 3.5.0
 - **Ten example games** (5 × 2D, 5 × 3D) in Library → Games.
 - **Store Export** checks Java / Gradle / Android SDK automatically (JAVA_HOME), installs and updates them for you, and shows a simple checklist.

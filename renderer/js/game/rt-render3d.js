@@ -131,7 +131,7 @@
     } else {
       const geo = primGeometry(T, PRIMS.has(o.type) ? o.type : 'cube'); const mat = makeMaterial(T, o, env); const mesh = new T.Mesh(geo, mat); mesh.userData.baseMat = mat; mesh.castShadow = o.castShadow !== false; mesh.receiveShadow = o.receiveShadow !== false; root = mesh;
     }
-    root.userData.vxObj = o; root.traverse((c) => { c.userData.vxObj = o; }); return root;
+    root.userData.vxObj = o; root.traverse((c) => { c.userData.vxObj = o; if (o.layer === 'background') { c.renderOrder = -10; if (c.material && !Array.isArray(c.material)) c.material.depthWrite = false; } }); return root;
   };
   function buildModel(T, as, o, env) {
     const g = new T.Group();

@@ -2,7 +2,7 @@
 (function () {
   const listeners = {};
   const Forge = {
-    version: '3.5.0',
+    version: '3.6.0',
     host: {},                 // filled in by app.js
     commands: new Map(),      // id -> {id,title,run,plugin}
     statusItems: new Map(),   // id -> {id,text,align,onClick,plugin}

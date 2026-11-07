@@ -124,7 +124,7 @@
   /* ---------- helpers used by blocks ---------- */
   VXRT.hitObject = function (g, o, sx, sy) {
     if (g.dim === '3d') return VXRT.pick3D(g, g.input.mouse.sx, g.input.mouse.sy) === o;
-    const w = VXRT.screenToWorld(g, sx, sy); const dx = w.x - o.x, dy = w.y - o.y, r = U.rad(-o.rot), lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
+    const w = o.layer === 'ui' ? { x: sx, y: sy } : VXRT.screenToWorld(g, sx, sy); const dx = w.x - o.x, dy = w.y - o.y, r = U.rad(-o.rot), lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
     if (o.type === 'ellipse') return (lx * lx) / ((o.w / 2) ** 2 || 1) + (ly * ly) / ((o.h / 2) ** 2 || 1) <= 1; return Math.abs(lx) <= Math.abs(o.w) / 2 && Math.abs(ly) <= Math.abs(o.h) / 2;
   };
   /** Numeric tweening used by Property blocks (duration > 0). */

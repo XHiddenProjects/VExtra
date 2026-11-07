@@ -2,7 +2,20 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.5.0] — current
+## [3.6.0] — current
+
+### Added
+- **Layers – Background, World, UI.** Every object has a *Layer* (Inspector → Appearance). Background is drawn first, World follows the camera, **UI is screen-space and always on top** (it ignores the camera and screen shake, and clicks on it use screen coordinates). In 3D, Background objects render behind the scene. The viewport toolbar has a layer bar: pick the layer new objects are added to, hide a layer or lock it (locked layers can't be picked) while you edit. The hierarchy marks BG / UI objects.
+- **Cursor and object position readout** in the 2D and 3D viewports: live `Cursor X, Y` (3D: `Ground X, Z`) plus the selected object's position (and size), so you know exactly where to place things.
+- **Edit UI layout** (viewport toolbar): shows the game screen with every Label / Bar block of the scene and drag them to where you want them. Pick the anchor (9 positions) and type exact X / Y, snap to 4 px (hold Alt for free movement), Reset to go back to the block's own values. The layout is saved per scene (`scene.uiLayout`) and applied when the game runs, even for blocks written in code behaviours.
+- The screen position readout also works inside the UI-layout editor (`Screen X, Y`).
+
+### Changed
+- **Object scripts are now behaviours.** Scripts that used to sit inside an object (all ten example games, older projects and plugins) become real code behaviours (`Player script`, …) shown in the Logic tab, editable, reusable and attachable to other objects. Old projects are converted automatically when opened. (The runtime still understands a raw `script` field, so nothing breaks.)
+- The Logic tab's code → blocks preview no longer touches real engine services (microphone, particles…) while previewing a script.
+- Labels never wrap onto several lines when anchored to the right edge.
+
+## [3.5.0]
 
 ### Added
 - **Ten example games** in Library → Games (open one, press Play, then edit it): 2D – Neon Breakout, Drone Swarm, Sling Smash, Hopper, Echo Pads; 3D – Echo Maze (first person, the Stalker hears your real voice), Sky Parkour (kinematic moving / crumbling platforms, checkpoints), Hyper-Real Showroom (Realism look), Core Defender (arena defence) and Marble Lanes (bowling physics).

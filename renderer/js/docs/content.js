@@ -504,6 +504,16 @@ A block's output can now be wired back to its own input; the signal arrives on t
 - **Cursor**: the *none* shape hides the system cursor completely.
 - Block settings panels can be resized horizontally by dragging their edge.`);
 
+  A('layers', 'Making games', 'Layers & UI layout', `# Layers and UI layout
+
+**Layers.** Each object lives on one of three layers (Inspector → Appearance → Layer): **Background** (drawn first), **World** (the normal game world) and **UI** (screen-space: positioned in screen pixels, always on top, ignores the camera). Use the layer bar above the viewport to choose where new objects go, and the eye / lock buttons to hide or lock a whole layer while you edit (this only affects the editor).
+
+**Where am I?** The bottom-left corner of the viewport shows the cursor position (2D: world X, Y; 3D: ground X, Z) and the selected object's position and size.
+
+**Edit UI layout.** Press **Edit UI layout** to see the game screen with every Label and Bar block of the scene. Drag one to move it, or click it and set the *Anchor* and exact *X / Y* in the bar at the top. Snap is 4 px (hold Alt to move freely); **Reset** returns to the block's own values. The layout is saved with the scene and also works for blocks created by code behaviours.
+
+**Behaviours instead of object scripts.** Logic now lives in behaviours (Logic tab). Older projects with scripts inside objects are converted automatically.`);
+
   A('examples', 'Making games', 'Example games', `# Example games
 
 Library → Games lists ten ready-made games. Open one, press **Play**, then change anything – they are ordinary projects made of objects, blocks and short scripts.

@@ -102,23 +102,29 @@
     }
     loadScene() {
       const is3 = this.is3d; this.ensureViewport(); this.vpHost && [...this.vpHost.children].forEach((c) => { c.style.display = 'none'; });
-      const v = this.vpNow(); if (v) { v.el.style.display = ''; v.setScene(this.scene, this.project); if (v.select) v.sel = this.sel.slice(); v.syncSel ? v.syncSel() : v.render && v.render(); }
+      const v = this.vpNow(); if (v) { v.el.style.display = ''; v.setScene(this.scene, this.project); if (this.uil) { this.uil.setScene(this.scene, this.project); } if (v.select) v.sel = this.sel.slice(); v.syncSel ? v.syncSel() : v.render && v.render(); }
       this.renderHierarchy(); this.inspect(); this.renderViewTools(); this.pendingLayoutFit = true; if (this.root.isConnected) this.onShow();
     }
     ensureViewport() {
       if (!this.vpHost) { this.vpHost = h('div', { class: 'gl-vps' }); this.sceneView.append(this.vpHost); }
+      if (!this.uil) { this.uil = new VX.UiLayer({ onChange: () => this.commit() }); this.vpHost.append(this.uil.el); }
       const key = this.is3d ? '3d' : '2d'; if (this.vp[key]) return;
       const ctx = {
         onSelect: (ids) => this.setSel(ids, true), onChange: () => this.commit(), onLiveChange: () => { this.liveUpdate(); }, onDropType: (d, x, y, z) => this.dropOnScene(d, x, y, z), onDelete: (ids) => this.deleteObjects(ids), onDuplicate: () => this.duplicate(), onCopy: () => this.copy(), onPaste: () => this.paste(), onUndo: () => this.undo(), onRedo: () => this.redo(), onView: () => {}, onTool: (t) => { this.vpTool = t; this.renderViewTools(); },
       };
-      this.vp[key] = key === '3d' ? new VX.Viewport3D(ctx) : new VX.Viewport2D(ctx); this.vpHost.append(this.vp[key].el);
+      this.vp[key] = key === '3d' ? new VX.Viewport3D(ctx) : new VX.Viewport2D(ctx); this.vpHost.insertBefore(this.vp[key].el, this.uil.el);
     }
     liveUpdate() { this.opts.onChange && this.opts.onChange(); this.updateInspectorValues(); }
     renderViewTools() {
       const t = this.viewTools; t.textContent = ''; const v = this.vpNow(), b = (l, fn, cls, title) => h('button', { class: 'btn sm ' + (cls || ''), title: title || '', onclick: fn }, l);
       if (this.view === 'scene' && v) {
+        const L = VX.layers, bar = h('span', { class: 'layer-bar', title: 'Layers: Background → World → UI' });
+        for (const [id, nm, ic, tip] of L.list) { if (id === 'ui' && this.is3d) continue; const st = L.state[id]; bar.append(h('span', { class: 'lb' + (L.active === id ? ' on' : '') }, h('button', { class: 'nm', title: tip + '\nClick: new objects are added to this layer', onclick: () => { L.active = id; this.renderViewTools(); } }, ic + ' ' + nm), h('button', { title: st.hide ? 'Show layer' : 'Hide layer in the editor', onclick: () => { st.hide = !st.hide; this.refreshView(); this.renderViewTools(); } }, st.hide ? '🚫' : '👁'), h('button', { title: st.lock ? 'Unlock layer' : 'Lock layer (cannot be picked)', onclick: () => { st.lock = !st.lock; this.renderViewTools(); } }, st.lock ? '🔒' : '🔓'))); }
+        bar.append(h('button', { class: 'btn sm' + (this.uiEdit ? ' on' : ''), title: 'Drag labels, bars and other GUI blocks to where you want them on screen', onclick: () => { this.uiEdit = !this.uiEdit; this.uil.show(this.uiEdit); this.renderViewTools(); } }, '🖥 Edit UI layout'));
+        this.__layerBar = bar;
         if (this.is3d) { for (const [k, l, ti] of [['translate', '✥ Move', 'W'], ['rotate', '⟳ Rotate', 'E'], ['scale', '⤢ Scale', 'R']]) t.append(b(l, () => { v.setTool(k); this.renderViewTools(); }, v.tool === k ? 'on' : '', ti)); t.append(b('Snap', () => { v.setSnap(!v.snap); this.renderViewTools(); }, v.snap ? 'on' : '', 'Snap to 0.5 / 15° / 0.25'), b('Grid', () => { v.setGrid(!v.showGrid); this.renderViewTools(); }, v.showGrid ? 'on' : ''), b('Focus', () => v.focusSelection(), '', 'F'), b('Reset view', () => v.fit())); }
         else t.append(b('Snap', () => { v.snap = !v.snap; this.renderViewTools(); }, v.snap ? 'on' : '', 'Snap to grid (hold Alt to bypass)'), b('Grid', () => { v.showGrid = !v.showGrid; v.render(); this.renderViewTools(); }, v.showGrid ? 'on' : ''), b('Colliders', () => { v.showColliders = !v.showColliders; v.render(); this.renderViewTools(); }, v.showColliders ? 'on' : ''), b('Camera', () => { v.showCam = !v.showCam; v.render(); this.renderViewTools(); }, v.showCam ? 'on' : ''), b('Fit', () => v.fit(), '', 'Fit the game area'), b('Focus', () => v.focusSelection(), '', 'F'));
+        t.append(bar);
       }
     }
     toolbar() {
@@ -151,7 +157,7 @@
       if (!objs.length) box.append(h('div', { class: 'empty left', style: 'padding:10px;font-size:12px' }, 'Empty scene. Drag objects from the Create panel (left activity bar → Create) or press ＋ below.'));
       objs.forEach((o) => {
         const T = GP.type(o.type) || {}; const row = h('div', { class: 'gl-row obj' + (this.sel.includes(o.id) ? ' on' : '') + (o.hidden ? ' dim' : '') + (o.prefab ? ' prefab' : ''), title: T.label || o.type, 'data-id': o.id },
-          h('span', { class: 'ico' }, T.icon || '◻'), h('span', { class: 'nm' }, o.name), o.behaviors && o.behaviors.length ? h('span', { class: 'badge', title: o.behaviors.length + ' behaviour(s)' }, '🧩' + o.behaviors.length) : null, o.prefab ? h('span', { class: 'badge', title: 'Prefab (spawned at runtime)' }, 'P') : null,
+          h('span', { class: 'ico' }, T.icon || '◻'), h('span', { class: 'nm' }, o.name), o.behaviors && o.behaviors.length ? h('span', { class: 'badge', title: o.behaviors.length + ' behaviour(s)' }, '🧩' + o.behaviors.length) : null, o.prefab ? h('span', { class: 'badge', title: 'Prefab (spawned at runtime)' }, 'P') : null, VX.layers.of(o) !== 'world' ? h('span', { class: 'lay ' + VX.layers.of(o), title: 'Layer: ' + VX.layers.name(VX.layers.of(o)) }, VX.layers.of(o) === 'ui' ? 'UI' : 'BG') : null,
           h('button', { class: 'mini-btn', title: 'Hide in editor', onclick: (e) => { e.stopPropagation(); o.hidden = !o.hidden; this.refreshView(); this.renderHierarchy(true); } }, o.hidden ? '🚫' : '👁'), h('button', { class: 'mini-btn', title: 'Lock', onclick: (e) => { e.stopPropagation(); o.locked = !o.locked; this.commit(); this.renderHierarchy(true); } }, o.locked ? '🔒' : '🔓'));
         row.addEventListener('click', (e) => { if (e.shiftKey || e.ctrlKey || e.metaKey) this.setSel(this.sel.includes(o.id) ? this.sel.filter((i) => i !== o.id) : [...this.sel, o.id]); else this.setSel([o.id]); });
         row.addEventListener('dblclick', async () => { const n = await VX.ui.ask('Object name', o.name); if (n) { o.name = n; this.commit(); this.renderHierarchy(true); this.inspect(); } });
@@ -167,7 +173,7 @@
       const dim = this.scene.dim; const v = this.vpNow(); const t = GP.type(type); if (!t) return null;
       if (x === undefined) { if (dim === '3d') { const tg = v && v.orbit ? v.orbit.target : { x: 0, z: 0 }; x = Math.round(tg.x * 2) / 2; y = t.type === 'light' ? 6 : (t.h || 1) / 2 + (t.type === 'plane' ? -(t.h || 1) / 2 : 0); z = Math.round(tg.z * 2) / 2; } else { const r = v ? v.canvas.getBoundingClientRect() : { left: 0, top: 0, width: 400, height: 300 }; const p = v ? v.toWorld(r.left + r.width / 2, r.top + r.height / 2) : { x: 200, y: 200 }; x = v ? v._snapv(p.x) : p.x; y = v ? v._snapv(p.y) : p.y; } }
       else if (dim === '3d' && t.type !== 'plane') y = (extra && extra.y) ?? Math.max(y, (t.h || 1) / 2);
-      const o = GP.newObject(type, dim, x, y, z || 0, this.names()); if (extra) Object.assign(o, extra); this.scene.objects.push(o); this.commit(true); this.refreshView(); this.setSel([o.id]); return o;
+      const o = GP.newObject(type, dim, x, y, z || 0, this.names()); if (VX.layers.active !== 'world' && !(dim === '3d' && VX.layers.active === 'ui')) o.layer = VX.layers.active; if (extra) Object.assign(o, extra); this.scene.objects.push(o); this.commit(true); this.refreshView(); this.setSel([o.id]); return o;
     }
     dropOnScene(d, x, y, z) {
       if (d.kind === 'obj') { if (GP.type(d.type) && GP.type(d.type).dim === '3d' && !this.is3d) return VX.ui.toast('That object is 3D – add a 3D scene (＋ next to Scenes).', 'warn'); if (this.is3d && GP.type(d.type) && GP.type(d.type).dim === '2d' && !['sprite', 'text'].includes(d.type)) VX.ui.toast('Note: 2D shapes in a 3D scene render as flat planes.', 'warn'); this.addObject(d.type, this.is3d ? x : Math.round(x / 8) * 8, this.is3d ? y : Math.round(y / 8) * 8, z); }
@@ -226,6 +232,7 @@
       box.append(this.sec('Transform', ...tr));
       /* appearance */
       const ap = [this.row('Colour', this.colorIn(o, 'color')), this.row('Opacity', (() => { const r = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: o.alpha ?? 1 }); r.addEventListener('input', () => { o.alpha = +r.value; this.touch(o); }); r.addEventListener('change', () => this.commit()); return r; })()), this.row('Visible', this.boolIn(o, 'visible', () => this.touch(o))), this.row('Enabled', this.boolIn(o, 'enabled'))];
+      ap.push(this.row('Layer', (() => { const sl = h('select', { title: 'Background is drawn first, World follows the camera, UI is screen-space and always on top' }, VX.layers.list.filter((l) => !(is3 && l[0] === 'ui')).map((l) => h('option', { value: l[0] }, l[2] + ' ' + l[1]))); sl.value = VX.layers.of(o); sl.addEventListener('change', () => { o.layer = sl.value; this.refreshView(); this.commit(true); }); return sl; })()));
       if (!is3) ap.push(this.row('Draw order', this.numIn(o, 'order', { step: 1 })), this.row('Flip', h('label', { class: 'chk' }, this.boolIn(o, 'flipX', () => this.touch(o)), ' X'), h('label', { class: 'chk' }, this.boolIn(o, 'flipY', () => this.touch(o)), ' Y'))); else { o.material = o.material || {}; ap.push(this.row('Metalness', this.numIn(null, 'metalness', { target: o.material, step: 0.1, min: 0, max: 1, scope: 'mat' })), this.row('Roughness', this.numIn(null, 'roughness', { target: o.material, step: 0.1, min: 0, max: 1, scope: 'mat' })), this.row('Emissive', this.colorIn(null, 'emissive', { target: o.material })), this.row('Wireframe', this.boolIn(o.material, 'wireframe', () => this.touch(o))), this.row('Cast shadow', (() => { const c = h('input', { type: 'checkbox' }); c.checked = o.castShadow !== false; c.addEventListener('change', () => { o.castShadow = c.checked; this.commit(); this.touch(o); }); return c; })())); if (o.castShadow === undefined) { /* default on */ } }
       const shaders = is3 ? VXRT.SHADERS_3D : VXRT.SHADERS_2D; o.shader = o.shader || null; if (is3) { const mats = Object.values(this.project.assets.materials || {}); ap.push(this.row('Material file', (() => { const s = h('select', {}, h('option', { value: '' }, '— none —'), mats.map((m) => h('option', { value: m.id }, m.name))); s.value = o.matAsset || ''; s.addEventListener('change', () => { o.matAsset = s.value || undefined; o.dirty3d = true; this.commit(true); this.refreshView(); }); return s; })())); }
       ap.push(this.row('Shader', (() => { const s = h('select', {}, shaders.map((n) => h('option', { value: n }, n))); s.value = (o.shader && o.shader.name) || 'none'; s.addEventListener('change', () => { o.shader = s.value === 'none' ? null : Object.assign({}, o.shader || {}, { name: s.value }); this.touch(o); this.commit(); this.inspect(); }); return s; })()));

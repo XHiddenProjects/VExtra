@@ -40,7 +40,7 @@
       block: (type, params, pos) => { const node = { id: 'c' + ++counter + '_' + type, type, params: params || {}, x: pos?.x ?? 0, y: pos?.y ?? 0 }; cur().nodes.push(node); return handle(node); },
       connect: (a, out, b, inp) => a.to(b, out, inp), at: (x, y) => ({ x, y }),
       bundle: (label, fn) => { const sub = { nodes: [], wires: [] }; stack.push(sub); try { fn(); } finally { stack.pop(); } const node = { id: 'c' + ++counter + '_bundle', type: 'bundle', params: { name: label }, graph: sub }; cur().nodes.push(node); return handle(node); },
-      on: noop, after: noop, every: noop, emit: noop, fire: noop, log: (...a) => logs.push(a.join(' ')), self: anyObj, game: anyObj, input: anyObj, vars: anyObj, Math, U: window.VXRT ? VXRT.util : {},
+      on: noop, after: noop, every: noop, emit: noop, fire: noop, log: (...a) => logs.push(a.join(' ')), self: anyObj, game: anyObj, input: anyObj, vars: anyObj, VXRT: anyObj, Math, U: window.VXRT ? VXRT.util : {},
     };
     const names = Object.keys(api);
     try { new Function(...names, '"use strict";\n' + code)(...names.map((k) => api[k])); } catch (e) { return { error: e.message, graph: null, logs }; }
