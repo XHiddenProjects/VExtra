@@ -1,6 +1,6 @@
 /* Five 3D example games for Library → Games: first-person mic hunt, third-person parkour, hyper-real garage, arena defence, bowling lanes. */
 (function () {
-  const K = VX.exKit, PH = K.PH, S = (fn) => '(' + fn.toString() + ')();';
+  const K = VX.exKit, PH = K.PH, BEH = K.beh, S = (fn) => '(' + fn.toString() + ')();';
   const add = (p, ...a) => K.add(p, '3d', ...a);
   const stat = (e) => PH('static', Object.assign({ friction: 0.4 }, e));
 
@@ -14,7 +14,7 @@
     MAP.forEach((row, r) => [...row].forEach((ch, c) => { const [x, z] = at(c, r); if (ch === '#') add(p, 'cube', 'Wall', x, 2, { z, w: C, h: 4, d: C, color: '#3a4a6b', matAsset: wallMat, physics: stat({ friction: 0 }), tags: ['wall'] }); else if (ch === 'S') start = [x, z]; else if (ch === 'G') gems.push([x, z]); else if (ch === '.' && (r + c) % 4 === 1) gems.push([x, z]); }));
     add(p, 'cube', 'Floor', 0, -0.5, { z: 0, w: 60, h: 1, d: 60, color: '#1a2236', matAsset: floorMat, physics: stat({ friction: 0 }) }); add(p, 'cube', 'Ceiling', 0, 4.5, { z: 0, w: 60, h: 1, d: 60, color: '#0e1424', physics: stat() });
     gems.forEach(([x, z], i) => add(p, 'sphere', 'Gem ' + i, x, 1.2, { z, w: 0.6, h: 0.6, d: 0.6, color: '#5be4ff', tags: ['gem'], material: { emissive: '#1b8ea8', metalness: 0.4, roughness: 0.2 } }));
-    add(p, 'sphere', 'Stalker', at(9, 9)[0], 1.2, { z: at(9, 9)[1], w: 1.6, h: 1.6, d: 1.6, color: '#ff3b57', material: { emissive: '#a0102a', roughness: 0.3, metalness: 0.2 }, tags: ['enemy'], script: S(function () {
+    add(p, 'sphere', 'Stalker', at(9, 9)[0], 1.2, { z: at(9, 9)[1], w: 1.6, h: 1.6, d: 1.6, color: '#ff3b57', material: { emissive: '#a0102a', roughness: 0.3, metalness: 0.2 }, tags: ['enemy'], behaviors: [BEH(p, 'Echo Maze – stalker', S(function () {
       const me = self; let player = null, tx = null, tz = null, wander = 0, lastGrowl = 0; vars.alert = 'calm';
       on('update', (dt) => {
         player = player || game.find('Player'); if (vars.state !== 'play' || !player) { me.vx = me.vz = 0; return; }
@@ -23,8 +23,8 @@
         if (tx !== null) { const dx = tx - me.x, dz = tz - me.z, d = Math.hypot(dx, dz); if (d < 1.2) { tx = null; wander = 1.5; } else { const sp = vars.alert === 'hunting' ? 4.2 : 2.6; me.vx = dx / d * sp; me.vz = dz / d * sp; } } else { wander -= dt; me.vx *= 0.9; me.vz *= 0.9; }
         if (Math.hypot(player.x - me.x, player.z - me.z) < 1.7) { vars.state = 'dead'; vars.msg = 'The Stalker heard you.  Click to try again'; }
       });
-    }) });
-    add(p, 'cube', 'Player', start[0], 1.2, { z: start[1], w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), script: S(function () {
+    }))] });
+    add(p, 'cube', 'Player', start[0], 1.2, { z: start[1], w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), behaviors: [BEH(p, 'Echo Maze – player & voice', S(function () {
       const me = self; game.cam3d.yaw = 180; vars.gems = 0; vars.state = 'play'; vars.msg = ''; vars.alert = 'calm'; vars.mic = 'asking for the microphone …'; const total = game.findByTag('gem').length; vars.total = total;
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y }); block('once', { when: 'start' }).to(l); };
       hud('hud', 'Gems {gems} / {total}', 'topLeft', 24, '#9fe8ff', 14); hud('alert', 'Stalker: {alert}', 'topRight', 20, '#ff9aa8', 14); hud('msg', '{msg}', 'center', 30, '#ffffff', 0); hud('help', 'WASD move · Shift sneak · mouse look (click to capture) · M shout · mic = your voice', 'bottom', 14, '#7c8db5', 10);
@@ -40,7 +40,7 @@
         const m = micOk ? VXRT.sense.micRead(game, 1.2) : null; if (m && m.level > 0.12) VXRT.sense.makeNoise(game, me.x, me.y, me.z, 6 + m.level * 40, 'voice'); if (input.isDown('m') && step <= 0.3) { VXRT.sense.makeNoise(game, me.x, me.y, me.z, 30, 'voice'); step = 0.3; }
         for (const g of game.findByTag('gem')) { g.rot += 90 * dt; if (Math.hypot(g.x - me.x, g.z - me.z) < 1.1) { game.removeObject(g); vars.gems++; play('gem'); VXRT.emitParticles(game, { x: g.x, y: g.y, z: g.z, count: 14, color: '#5be4ff', speed: 4, spread: 360, angle: 0, life: 0.5, size: 0.15, gravity: 0, shrink: true }); if (vars.gems >= vars.total) { vars.state = 'won'; vars.msg = 'All gems collected – you escaped!  Click to play again'; play('win'); } } }
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 2 · Sky Parkour (third person, kinematic moving platforms, crumbling tiles, checkpoints) */
@@ -56,7 +56,7 @@
     plat('Top', 14, 11.4, -66, 8, 8, { matAsset: grass, tags: ['checkpoint'] }); add(p, 'cone', 'Goal', 14, 14, { z: -66, w: 1.6, h: 3, d: 1.6, color: '#ffd23f', material: { emissive: '#aa8800', metalness: 0.6, roughness: 0.2 }, tags: ['goal'] });
     [[0, 1.4, -9], [5, 2.6, -15], [10, 3.8, -21], [14, 5.4, -28], [22, 6, -28], [28, 7.2, -35], [34, 8, -40], [31, 8.8, -49], [24, 10, -56], [14, 12, -66]].forEach(([x, y, z], i) => add(p, 'cylinder', 'Coin ' + i, x, y + 0.4, { z, w: 0.7, h: 0.1, d: 0.7, color: '#ffd23f', rx: 90, tags: ['coin'], material: { emissive: '#aa8800', metalness: 0.8, roughness: 0.2 } }));
     for (let i = 0; i < 18; i++) add(p, 'sphere', 'Cloud ' + i, -30 + (i * 17) % 90, -6 + (i % 4) * -2, { z: -(i * 13) % 100 + 10, w: 8 + (i % 3) * 3, h: 3, d: 6, color: '#ffffff', alpha: 0.9, tags: ['decor'] });
-    add(p, 'cube', 'Player', 0, 1.2, { z: 0, w: 0.9, h: 1.6, d: 0.9, color: '#6c8cff', tags: ['player'], material: { metalness: 0.2, roughness: 0.4 }, physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), script: S(function () {
+    add(p, 'cube', 'Player', 0, 1.2, { z: 0, w: 0.9, h: 1.6, d: 0.9, color: '#6c8cff', tags: ['player'], material: { metalness: 0.2, roughness: 0.4 }, physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), behaviors: [BEH(p, 'Sky Parkour – player', S(function () {
       const me = self; let spawn = { x: 0, y: 1.2, z: 0 }, t0 = 0; vars.coins = 0; vars.state = 'play'; vars.msg = ''; vars.time = 0; vars.cp = 'Start';
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y }); block('once', { when: 'start' }).to(l); };
       hud('hud', 'Coins {coins} / 10      Time {time}s', 'topLeft', 24, '#12304f', 14); hud('cp', 'Checkpoint: {cp}', 'topRight', 18, '#12304f', 16); hud('msg', '{msg}', 'center', 30, '#12304f', 0); hud('help', 'WASD move · Space jump · mouse turns the camera (click to capture)', 'bottom', 14, '#12304f', 10);
@@ -79,7 +79,7 @@
         const goal = game.find('Goal'); if (goal) { goal.ry += 60 * dt; if (Math.hypot(goal.x - me.x, goal.z - me.z) < 2 && Math.abs(goal.y - me.y) < 5) { vars.state = 'won'; vars.msg = 'You made it in ' + Math.floor(t0) + 's with ' + vars.coins + ' coins!  Click to play again'; play('win'); } }
         if (me.y < -15) { me.x = spawn.x; me.y = spawn.y; me.z = spawn.z; me.vy = 0; play('fall'); }
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 3 · Showroom (hyper-real PBR materials, Realism effect, turntables) */
@@ -97,7 +97,7 @@
       for (const [dx, dz] of [[1.4, 1], [1.4, -1], [-1.4, 1], [-1.4, -1]]) { part('cylinder', 'tyre', dx, 0.45, dz * 0.95, 0.9, 0.35, 0.9, rubber, { rx: 90 }); part('cylinder', 'rim', dx, 0.45, dz * 1.1, 0.55, 0.1, 0.55, steel, { rx: 90 }); }
       for (const dz of [0.6, -0.6]) part('sphere', 'lamp', 2.2, 0.9, dz, 0.35, 0.25, 0.3, steel, { material: { emissive: '#fff6d8', emissiveIntensity: 3 } }); };
     car('Red coupe', -12, -2, paints[0]); car('Blue coupe', 0, -6, paints[1]); car('Pearl coupe', 12, -2, paints[2]);
-    add(p, 'cube', 'Player', 0, 1.2, { z: 14, w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true }), script: S(function () {
+    add(p, 'cube', 'Player', 0, 1.2, { z: 14, w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true }), behaviors: [BEH(p, 'Showroom – player & lights', S(function () {
       const me = self; game.cam3d.yaw = 0; let light = 'Night', photo = false; const HELP = 'WASD walk · mouse look (click to capture) · 1 Night · 2 Dusk · 3 Studio · P photo mode';
       const refresh = () => { vars.ui1 = photo ? '' : 'Light: ' + light; vars.ui2 = photo ? '' : HELP; }; refresh();
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y }); block('once', { when: 'start' }).to(l); return l; };
@@ -112,7 +112,7 @@
         for (const t of game.findByTag('turn')) t.ry += t.vars.speed * dt;
         for (const c of game.findByTag('carpart')) { const tt = game.find(c.name.split(' ')[0] + ' ' + c.name.split(' ')[1] + ' turntable'); if (!tt) continue; const a = tt.ry * Math.PI / 180, v = c.vars; c.x = v.cx + v.dx * Math.cos(a) + v.dz * Math.sin(a); c.z = v.cz - v.dx * Math.sin(a) + v.dz * Math.cos(a); c.ry = tt.ry; }
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 4 · Core Defender (first-person arena defence, hitscan turret) */
@@ -124,7 +124,7 @@
     for (const [x, z, w, d] of [[0, -30, 60, 1], [0, 30, 60, 1], [-30, 0, 1, 60], [30, 0, 1, 60]]) add(p, 'cube', 'Wall', x, 2, { z, w, h: 4, d, color: '#3b2f5c', physics: stat({ friction: 0 }) });
     add(p, 'sphere', 'Core', 0, 1.6, { z: 0, w: 2.2, h: 2.2, d: 2.2, color: '#44e0ff', matAsset: coreMat, tags: ['core'] });
     add(p, 'sphere', 'Crawler', 0, 0.7, { z: 0, w: 1.1, h: 1.1, d: 1.1, color: '#ff5a7a', prefab: true, tags: ['enemy'], material: { emissive: '#661428', roughness: 0.5 } });
-    add(p, 'cube', 'Player', 0, 1, { z: 5, w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true }), script: S(function () {
+    add(p, 'cube', 'Player', 0, 1, { z: 5, w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true }), behaviors: [BEH(p, 'Core Defender – player & waves', S(function () {
       const me = self; game.cam3d.yaw = 0; vars.core = 100; vars.wave = 0; vars.score = 0; vars.scrap = 0; vars.state = 'play'; vars.msg = '';
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y }); block('once', { when: 'start' }).to(l); };
       hud('hud', 'Core {core}%   Wave {wave}   Score {score}   Scrap {scrap}', 'topLeft', 22, '#bff3ff', 14); hud('msg', '{msg}', 'center', 30, '#ffffff', -110); hud('cross', '+', 'center', 28, '#ffffff', 0); hud('help', 'WASD move · mouse aim (click to capture) · click shoot · R repair (3 scrap)', 'bottom', 14, '#b9a9e0', 10);
@@ -151,7 +151,7 @@
         const core = game.find('Core'); if (core) { core.ry += 30 * dt; core.y = 1.6 + Math.sin(game.time * 2) * 0.12; }
         if (vars.core <= 0) { vars.core = 0; vars.state = 'lost'; vars.msg = 'The core fell on wave ' + vars.wave + ' – score ' + vars.score + '.  Click to retry'; play('lose'); }
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 5 · Marble Lanes (bowling with real physics) */

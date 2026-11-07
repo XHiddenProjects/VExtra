@@ -1,7 +1,7 @@
 /* Five 2D example games for Library → Games. Each one is a small project whose rules are a script (see Docs → Scripting API) mixed with blocks
  * (labels, bars, sound detector …), physics bodies, prefabs and synth sounds – open one and read it to learn. */
 (function () {
-  const K = VX.exKit, PH = K.PH, S = (fn) => '(' + fn.toString() + ')();';
+  const K = VX.exKit, PH = K.PH, BEH = K.beh, S = (fn) => '(' + fn.toString() + ')();';
   const add = (p, ...a) => K.add(p, '2d', ...a);
 
   /* ---------------------------------------------------------------- 1 · Neon Breakout (physics, prefabs, power-ups) */
@@ -13,7 +13,7 @@
     add(p, 'rect', 'Paddle', 480, 500, { w: 120, h: 16, color: '#00e5ff', physics: PH('kinematic', { bounce: 1, friction: 0 }) });
     add(p, 'rect', 'Brick', -500, -500, { w: 68, h: 24, color: '#ff3df2', prefab: true, tags: ['brick'], physics: PH('static', { bounce: 1, friction: 0 }) });
     add(p, 'rect', 'Pill', -500, -500, { w: 30, h: 14, color: '#fff35c', prefab: true, tags: ['pill'], physics: PH('kinematic', { sensor: true }) });
-    add(p, 'ellipse', 'Ball', 480, 470, { w: 16, h: 16, color: '#ffffff', physics: PH('dynamic', { shape: 'circle', bounce: 1, friction: 0, gravityScale: 0, fixedRotation: true }), script: S(function () {
+    add(p, 'ellipse', 'Ball', 480, 470, { w: 16, h: 16, color: '#ffffff', physics: PH('dynamic', { shape: 'circle', bounce: 1, friction: 0, gravityScale: 0, fixedRotation: true }), behaviors: [BEH(p, 'Breakout – ball & bricks', S(function () {
       const W = 960, ball = self, paddle = game.find('Paddle'); let speed = 380, wide = 0;
       const hud = (id, text, anchor, size, color) => { const l = block('label', { id, text, anchor, size, color, y: 12 }); block('once', { when: 'start' }).to(l); };
       hud('hud', 'Score {score}      Lives {lives}      Bricks {bricks}', 'topLeft', 22, '#9fe8ff'); hud('msg', '{msg}', 'center', 30, '#ffffff');
@@ -36,7 +36,7 @@
         let s = Math.hypot(ball.vx, ball.vy) || 1; ball.vx *= speed / s; ball.vy *= speed / s; if (Math.abs(ball.vy) < 90) ball.vy = (ball.vy < 0 ? -1 : 1) * 90;
         if (ball.y > 570) { vars.lives--; play('lose'); if (vars.lives <= 0) { vars.state = 'over'; vars.msg = 'Game over – click to try again'; ball.vx = ball.vy = 0; } else { vars.state = 'ready'; vars.msg = 'Click or press Space to launch'; speed = Math.max(380, speed - 40); } }
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 2 · Void Swarm (top-down shooter, waves, bar block) */
@@ -46,7 +46,7 @@
     for (let i = 0; i < 40; i++) add(p, 'ellipse', 'Star ' + i, Math.round(Math.random() * 960), Math.round(Math.random() * 540), { w: 2 + (i % 3), h: 2 + (i % 3), color: '#2b3b6b', alpha: 0.9 });
     add(p, 'ellipse', 'Drone', -500, -500, { w: 28, h: 28, color: '#ff4d6d', prefab: true, tags: ['enemy'], vars: { hp: 2 } });
     add(p, 'ellipse', 'Bullet', -500, -500, { w: 9, h: 9, color: '#fff35c', prefab: true, tags: ['bullet'] });
-    add(p, 'triangle', 'Player', 480, 270, { w: 30, h: 34, color: '#4dd2ff', tags: ['player'], script: S(function () {
+    add(p, 'triangle', 'Player', 480, 270, { w: 30, h: 34, color: '#4dd2ff', tags: ['player'], behaviors: [BEH(p, 'Swarm – player & waves', S(function () {
       const me = self, W = 960, H = 540; vars.score = 0; vars.hp = 100; vars.wave = 0; vars.state = 'play'; vars.msg = '';
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y: y === undefined ? 12 : y }); block('once', { when: 'start' }).to(l); };
       hud('hud', 'Score {score}     Wave {wave}', 'topLeft', 22, '#9fe8ff'); hud('msg', '{msg}', 'center', 30, '#ffffff'); hud('help', 'WASD move · mouse aim · click / hold to shoot', 'bottom', 15, '#7c8db5', 10);
@@ -69,7 +69,7 @@
         if (vars.hp <= 0) { vars.state = 'dead'; vars.msg = 'Overrun on wave ' + vars.wave + ' – score ' + vars.score + '\nClick to try again'; burst(me.x, me.y, '#4dd2ff', 40); me.visible = false; }
         else if (toSpawn <= 0 && !drones.some((d) => d.alive)) { vars.hp = Math.min(100, vars.hp + 15); startWave(); }
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 3 · Sling Tower (physics sandbox, drag to launch) */
@@ -82,7 +82,7 @@
     add(p, 'ellipse', 'Boulder', -500, -500, { w: 34, h: 34, color: '#555b66', prefab: true, tags: ['boulder'], physics: PH('dynamic', { shape: 'circle', bounce: 0.3, friction: 0.5, mass: 3 }) });
     add(p, 'ellipse', 'Target', -500, -500, { w: 30, h: 30, color: '#e5484d', prefab: true, tags: ['target'], physics: PH('dynamic', { shape: 'circle', bounce: 0.2, friction: 0.5, mass: 0.6 }) });
     add(p, 'rect', 'Aim', 150, 420, { w: 10, h: 4, color: '#fff35c', visible: false });
-    add(p, 'empty', 'Game rules', 0, 0, { script: S(function () {
+    add(p, 'empty', 'Game rules', 0, 0, { behaviors: [BEH(p, 'Sling – game rules', S(function () {
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y: y === undefined ? 12 : y }); block('once', { when: 'start' }).to(l); };
       hud('hud', 'Level {level}     Shots {shots}     Targets {targets}', 'topLeft', 22, '#ffffff'); hud('msg', '{msg}', 'center', 32, '#ffffff'); hud('help', 'Drag back from the sling and release to fling', 'bottom', 15, '#e2e8f0', 10);
       const play = (s) => { try { game.audio.play('snd_' + s); } catch (e) { /* sound off */ } };
@@ -103,7 +103,7 @@
         else if (vars.shots <= 0 && vars.state !== 'fly' && (!ball || !ball.alive || Math.hypot(ball.vx, ball.vy) < 12)) { vars.state = 'over'; vars.msg = 'Out of boulders – click to retry'; on('click', () => game.restart(false)); }
         if (ball && ball.alive && vars.state === 'fly' && Math.hypot(ball.vx, ball.vy) < 25 && t > 0.5) vars.state = 'aim';
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 4 · Sky Hopper (kinematic pipes, dynamic bird, parallax, high score) */
@@ -115,7 +115,7 @@
     add(p, 'rect', 'Ground', 480, 520, { w: 1100, h: 60, color: '#caa45a', physics: PH('static'), tags: ['ground'], order: 5 });
     add(p, 'rect', 'Pipe', -500, -500, { w: 70, h: 500, color: '#3aa545', prefab: true, tags: ['pipe'], physics: PH('kinematic'), order: 2 });
     add(p, 'rect', 'Gap', -500, -500, { w: 10, h: 540, color: '#ffffff', alpha: 0, prefab: true, tags: ['gap'], physics: PH('kinematic', { sensor: true }) });
-    add(p, 'ellipse', 'Bird', 220, 250, { w: 34, h: 28, color: '#ffd23f', physics: PH('dynamic', { shape: 'circle', bounce: 0, friction: 0, fixedRotation: true, gravityScale: 0 }), order: 6, script: S(function () {
+    add(p, 'ellipse', 'Bird', 220, 250, { w: 34, h: 28, color: '#ffd23f', physics: PH('dynamic', { shape: 'circle', bounce: 0, friction: 0, fixedRotation: true, gravityScale: 0 }), order: 6, behaviors: [BEH(p, 'Hopper – bird & pipes', S(function () {
       const bird = self; vars.score = 0; vars.state = 'ready'; vars.msg = 'Press Space or click to start'; vars.best = 0; try { vars.best = +localStorage.getItem('vx-hopper-best') || 0; } catch (e) { /* storage blocked */ }
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y }); block('once', { when: 'start' }).to(l); };
       hud('hud', '{score}', 'top', 54, '#ffffff', 14); hud('msg', '{msg}', 'center', 28, '#ffffff', 0); hud('best', 'Best {best}', 'topLeft', 18, '#1b3a57', 14);
@@ -133,7 +133,7 @@
         if (bird.y < -20) die(); speed = 210 + vars.score * 4; spawnT -= dt; if (spawnT <= 0) { spawnT = 1.55 - Math.min(0.5, vars.score * 0.02); spawn(); }
         for (const o of game.findByTag('pipe').concat(game.findByTag('gap'))) if (o.x < -120) game.removeObject(o);
       });
-    }) });
+    }))] });
     return p; } });
 
   /* ---------------------------------------------------------------- 5 · Echo Pads (memory puzzle with clickable pads and sound) */
@@ -142,7 +142,7 @@
     const cols = ['#ff5d73', '#45d483', '#4da3ff', '#ffd23f'], notes = [261, 329, 392, 523];
     cols.forEach((c, i) => { K.synth(p, 'n' + i, 'triangle', notes[i], notes[i], 0.35, 0.4); add(p, 'rect', 'Pad' + i, 405 + (i % 2) * 150, 160 + Math.floor(i / 2) * 150, { w: 140, h: 140, color: c, alpha: 0.4, tags: ['pad'], vars: { i } }); });
     K.synth(p, 'bad', 'saw', 200, 60, 0.6, 0.4); K.synth(p, 'good', 'square', 523, 1046, 0.4, 0.3);
-    add(p, 'empty', 'Game rules', 0, 0, { script: S(function () {
+    add(p, 'empty', 'Game rules', 0, 0, { behaviors: [BEH(p, 'Echo Pads – game rules', S(function () {
       const cols = ['#ff5d73', '#45d483', '#4da3ff', '#ffd23f'], pads = [0, 1, 2, 3].map((i) => game.find('Pad' + i)); let seq = [], pos = 0, accept = false, busy = false;
       vars.round = 0; vars.best = 0; vars.msg = 'Click or press Enter to start'; vars.state = 'idle'; try { vars.best = +localStorage.getItem('vx-echo-best') || 0; } catch (e) { /* storage blocked */ }
       const hud = (id, text, anchor, size, color, y) => { const l = block('label', { id, text, anchor, size, color, y }); block('once', { when: 'start' }).to(l); };
@@ -153,6 +153,6 @@
       const press = (i) => { if (vars.state === 'idle') { if (busy) return; seq = []; vars.state = 'play'; return next(); } if (!accept) return; flash(i, 220); if (seq[pos] !== i) return lose(); pos++; if (pos === seq.length) { accept = false; vars.msg = 'Nice!'; try { game.audio.play('snd_good'); } catch (e) { /* sound off */ } after(0.8, next); } };
       on('mousedown', (e) => { for (let i = 0; i < 4; i++) if (Math.abs(e.x - pads[i].x) < 70 && Math.abs(e.y - pads[i].y) < 70) return press(i); if (vars.state === 'idle') press(0); });
       on('key:1', () => press(0)); on('key:2', () => press(1)); on('key:3', () => press(2)); on('key:4', () => press(3)); on('key:left', () => press(0)); on('key:up', () => press(1)); on('key:down', () => press(2)); on('key:right', () => press(3)); on('key:enter', () => { if (vars.state === 'idle') press(0); });
-    }) });
+    }))] });
     return p; } });
 })();

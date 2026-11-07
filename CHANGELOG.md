@@ -11,7 +11,7 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - The screen position readout also works inside the UI-layout editor (`Screen X, Y`).
 
 ### Changed
-- **Object scripts are now behaviours.** Scripts that used to sit inside an object (all ten example games, older projects and plugins) become real code behaviours (`Player script`, …) shown in the Logic tab, editable, reusable and attachable to other objects. Old projects are converted automatically when opened. (The runtime still understands a raw `script` field, so nothing breaks.)
+- **Object scripts are now behaviours.** Scripts that used to sit inside an object (all ten example games now store their logic in the project's `behaviors` object and list the behaviour ids on their objects – no `script` keys remain; older projects and plugins are converted on open) become real code behaviours (`Player script`, …) shown in the Logic tab, editable, reusable and attachable to other objects. Old projects are converted automatically when opened. (The runtime still understands a raw `script` field, so nothing breaks.)
 - The Logic tab's code → blocks preview no longer touches real engine services (microphone, particles…) while previewing a script.
 - Labels never wrap onto several lines when anchored to the right edge.
 

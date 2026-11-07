@@ -20,6 +20,8 @@
     /** a material asset: returns its id, use it as { matAsset: id } */
     mat(p, name, props) { const id = 'mat_' + name.replace(/\W+/g, '_').toLowerCase(); p.assets.materials = p.assets.materials || {}; p.assets.materials[id] = Object.assign({ id, name, color: '#cccccc', metalness: 0.1, roughness: 0.7, emissive: '#000000', emissiveIntensity: 1, opacity: 1, pattern: 'none', color2: '#444444', repeatX: 1, repeatY: 1, wireframe: false, flat: false, doubleSided: false }, props); return id; },
     /** an invisible object that carries the game's rules as a script */
-    rules(p, dim, script) { return VX.exKit.add(p, dim, 'empty', 'Game rules', 0, 0, { script }); },
+    rules(p, dim, code) { return VX.exKit.add(p, dim, 'empty', 'Game rules', 0, 0, { behaviors: [VX.exKit.beh(p, p.name + ' – game rules', code)] }); },
+    /** registers a code behaviour in project.behaviors (the same shape the Logic tab creates) and returns its id so an object can list it in `behaviors` */
+    beh(p, name, code) { const base = 'b_' + String(name).toLowerCase().replace(/\W+/g, '_').replace(/^_|_$/g, ''); let id = base, n = 2; while (p.behaviors[id]) id = base + '_' + n++; p.behaviors[id] = { id, name, mode: 'code', graph: { nodes: [], wires: [] }, code }; return id; },
   };
 })();
