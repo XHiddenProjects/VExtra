@@ -504,6 +504,18 @@ A block's output can now be wired back to its own input; the signal arrives on t
 - **Cursor**: the *none* shape hides the system cursor completely.
 - Block settings panels can be resized horizontally by dragging their edge.`);
 
+  A('examples', 'Making games', 'Example games', `# Example games
+
+Library → Games lists ten ready-made games. Open one, press **Play**, then change anything – they are ordinary projects made of objects, blocks and short scripts.
+
+**2D:** Neon Breakout (bricks, power-ups), Drone Swarm (top-down wave shooter), Sling Smash (physics puzzle), Hopper (platformer), Echo Pads (memory / rhythm).
+
+**3D:** Echo Maze (first person; the Stalker hears your footsteps and your real voice), Sky Parkour (kinematic moving platforms, crumbling tiles, checkpoints), Hyper-Real Showroom (Realism look, keys 1-3 change the light), Core Defender (arena defence, mouse aim) and Marble Lanes (bowling physics).
+
+**Voice Command in the desktop app:** its web engine has no speech recognition, so open **Settings → Voice commands (games)** and set a speech service (an OpenAI-compatible transcription URL and key). Exported games played in Chrome, Edge or Safari use the browser's own recognition.
+
+**Kinematic bodies:** tick *Kinematic gravity* in the Physics inspector (or the Physics block) to let a kinematic body fall; it still pushes dynamic bodies and is not pushed back.`);
+
   A('store-export', 'Share & publish', 'Store Export', `# Store Export (plugin)
 
 Open a game and press **📦 Store export**. Pick your targets and details, then **Create packages**. With *Install, assign and build automatically* ticked (desktop app) Vextra runs the npm steps for you and shows a **progress bar** with a live log and a Cancel button:
@@ -511,9 +523,9 @@ Open a game and press **📦 Store export**. Pick your targets and details, then
 1. Steam: \`npm install\` → \`npm run build:<your OS>\`
 2. Mobile: \`npm install\` → \`npx cap add android\` (and iOS on a Mac) → \`npm run assets\` → \`npm run patch\` → \`npx cap sync\` → \`npm run build:android\` (debug APK)
 
-Android builds run on the latest **Android Studio** (it provides Java, Gradle and the SDK – install it from developer.android.com/studio and open it once to finish setup). The export checks for it first and, if it is missing, shows the download link and skips only the Android build. "npm run doctor:android" in the mobile folder shows what was found.
+Android builds are fully automatic: **Java** (latest LTS), **Gradle** (latest release) and the **Android SDK** (newest platform + build tools) are found through JAVA_HOME / GRADLE_HOME / ANDROID_HOME or your PATH, and are downloaded and updated by themselves when missing or outdated – into your own folder (~/.vextra/toolchain), without administrator rights. Android Studio is not needed. Downloads come only from the official sites (Adoptium, gradle.org, developer.android.com / dl.google.com) over HTTPS and are verified against their published SHA-256 checksum before use. The export shows a plain checklist (prerequisites first, then each step with a spinner, check mark or cross) instead of a terminal; "Copy technical details" is there if something fails.
 
-Steam install/build steps are required; mobile steps after install are optional, and any that fail (for example no Android SDK) are listed at the end without stopping the rest. Only \`npm\`, \`npx\` and \`node\` can be run, only inside your \`store-export/\` folder. Signing and uploading stay manual.
+Steam install/build steps are required; the Android steps are skipped with a plain explanation if Java, Gradle or the SDK could not be set up (for example offline), and the project files are still written.
 
 ## Building Vextra itself
 \`npm run build:win\`, \`npm run build:linux\`, \`npm run build:mac\` (each builds installers for that OS; build on the target OS).`);

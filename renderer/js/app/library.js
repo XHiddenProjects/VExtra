@@ -12,7 +12,7 @@
     { id: 'blank2d', name: 'Blank 2D game', desc: 'An empty 2D scene.', type: 'game2d', build: () => VX.GameProject.blank({ name: 'My 2D game', dim: '2d' }) },
     { id: 'blank3d', name: 'Blank 3D game', desc: 'An empty 3D scene.', type: 'game3d', build: () => VX.GameProject.blank({ name: 'My 3D game', dim: '3d' }) },
   ];
-  lib.defaults = () => ({ websites: VX.templates.list().map((t) => ({ id: t.id, name: t.name, desc: t.desc, type: 'website', template: t.id })), games: GAMES });
+  lib.defaults = () => ({ websites: VX.templates.list().map((t) => ({ id: t.id, name: t.name, desc: t.desc, type: 'website', template: t.id })), games: GAMES.concat((VX.gameExamples || []).map((g) => ({ id: g.id, name: g.name, desc: g.desc, type: g.type, build: g.build }))) });
   lib.sources = () => (VX.app.settings.librarySources && VX.app.settings.librarySources.length ? VX.app.settings.librarySources : DEFAULT_SOURCES);
   lib.installed = () => VX.app.settings.libraryInstalled || [];
   const remember = (rec) => { const l = lib.installed().filter((x) => x.url !== rec.url); l.unshift(Object.assign({ at: Date.now() }, rec)); VX.app.set('libraryInstalled', l.slice(0, 50)); VX.emit('library'); };

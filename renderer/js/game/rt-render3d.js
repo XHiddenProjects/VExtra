@@ -191,6 +191,8 @@
   };
 
   /** F3: 1st person → 3rd person (back) → 3rd person (front); called once per frame from the game loop */
+  /** the camera mode that is really being drawn: 'fps' or 'follow' can be switched with the view key, so c.mode alone can be wrong */
+  VXRT.camMode = function (g) { const c = g.cam3d; if (!c) return 'fixed'; if ((c.mode === 'fps' || c.mode === 'follow') && c.follow && c.follow.alive && g.camView !== undefined) return g.camView === 0 ? 'fps' : 'follow'; return c.mode; };
   VXRT.cycleCamView = function (g) { const c = g.cam3d; if (!c || !(c.follow && c.follow.alive) || !(c.mode === 'fps' || c.mode === 'follow')) return; if (g.camView === undefined) g.camView = c.mode === 'fps' ? 0 : 1; g.camView = (g.camView + 1) % 3; g.camViewName = ['1st person', '3rd person – back', '3rd person – front'][g.camView]; g.camViewT = 1.6; g.emit('cameraView', ['first', 'back', 'front'][g.camView]); };
   VXRT.render3D = function (g, dt) {
     const T = g.THREE; if (!g.renderer3d || !g.scene3d) return; const c = g.cam3d, cam = g.camera3d;

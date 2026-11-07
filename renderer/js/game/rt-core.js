@@ -304,7 +304,7 @@
     const is3 = g.dim === '3d';
     for (const o of g.objects) {
       if (!o.alive || !o.enabled) continue;
-      if (o.physics.body === 'none' || o.physics.body === 'kinematic') { o.x += o.vx * dt; o.y += o.vy * dt; if (is3) o.z += o.vz * dt; }
+      if (o.physics.body === 'none' || (o.physics.body === 'kinematic' && !o.kg)) { o.x += o.vx * dt; o.y += o.vy * dt; if (is3) o.z += o.vz * dt; }
       if (o.spin) { if (is3) o['r' + (o.spinAxis || 'y')] += o.spin * dt; else o.rot += o.spin * dt; }
       if (o.parent && o.offset) { o.x = o.parent.x + o.offset.x; o.y = o.parent.y + o.offset.y; o.z = o.parent.z + o.offset.z; }
       if (o.anim && o.anim.playing) VXRT.stepAnim && VXRT.stepAnim(g, o, dt);

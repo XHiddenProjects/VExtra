@@ -39,6 +39,12 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
+## What's new in 3.5.0
+- **Ten example games** (5 × 2D, 5 × 3D) in Library → Games.
+- **Store Export** checks Java / Gradle / Android SDK automatically (JAVA_HOME), installs and updates them for you, and shows a simple checklist.
+- Voice Command speech-service fallback, mouse-look and kinematic-gravity fixes. See `CHANGELOG.md`.
+- Community files: contributing guide, code of conduct, issue and pull request templates.
+
 ## What's new in 3.4.1
 - Microphone and camera blocks now work in the editor's Play panel (the editor hands the devices to the sandboxed game), with clear error messages.
 

@@ -257,3 +257,20 @@ input[type=checkbox], input[type=radio] { flex: 0 0 auto; width: 18px; height: 1
 .tab.drop-before, .bp-tab.drop-before { box-shadow: inset 3px 0 0 var(--accent); } .tab.drop-after, .bp-tab.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
 .act.drop-before { box-shadow: inset 0 3px 0 var(--accent); } .act.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
 #tabbar .tab, #bp-tabs .bp-tab, #activity .act { user-select: none; }
+
+/* plain-text checklist dialog (forge.ui.checklist) */
+.chk{display:flex;flex-direction:column;gap:2px;min-width:min(520px,80vw);max-height:60vh;overflow:auto}
+.chk-group{margin:10px 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#8b95a8)}
+.chk-row{display:flex;gap:10px;align-items:flex-start;padding:5px 2px}
+.chk-ico{flex:0 0 22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid var(--border,#2a3246);color:var(--muted,#8b95a8);box-sizing:border-box}
+.chk-ico.chk-ok{background:#2fa36b;border-color:#2fa36b;color:#fff}
+.chk-ico.chk-fail{background:#e5484d;border-color:#e5484d;color:#fff}
+.chk-ico.chk-warn{border-color:#e0a030;color:#e0a030}
+.chk-ico.chk-todo{border-color:var(--accent,#6c8cff);color:var(--accent,#6c8cff)}
+.chk-ico.chk-skip{opacity:.6}
+.chk-ico.chk-run{border-color:var(--border,#2a3246);border-top-color:var(--accent,#6c8cff);animation:chk-spin .8s linear infinite}
+@keyframes chk-spin{to{transform:rotate(360deg)}}
+.chk-label{font-weight:600}
+.chk-text{font-size:12px;color:var(--muted,#8b95a8);line-height:1.4;word-break:break-word}
+.chk-sum{margin-top:10px;font-size:13px;padding-top:8px;border-top:1px solid var(--border,#2a3246)}
+@media (prefers-reduced-motion:reduce){.chk-ico.chk-run{animation-duration:2.4s}}

@@ -12,7 +12,7 @@
 | 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
 
-Current version: **3.4.1** (see `VERSION`). This policy was last reviewed for 3.4.1.
+Current version: **3.5.0** (see `VERSION`). This policy was last reviewed for 3.5.0.
 
 ## Reporting a vulnerability
 
@@ -49,6 +49,11 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.5.0 notes
+- **Android toolchain auto-install (Store Export):** HTTPS only; hosts limited to api.adoptium.net, github.com / githubusercontent.com, services.gradle.org / downloads.gradle.org, developer.android.com and dl.google.com; every archive's SHA-256 is verified before it is unpacked; archive paths are checked (no zip-slip); installs go to your user folder (`~/.vextra/toolchain`), never need administrator rights, and no shell is used except Gradle's own launcher. The process runner restrictions above are unchanged.
+- **Speech service fallback** is off unless you set a URL and key in Settings. The key is stored in the app settings on your computer and audio is sent only to that URL while a Voice Command block is listening.
+- Example games are ordinary projects (scripts included) – review any game you import from elsewhere.
 
 ## v3.4.1 notes
 - The editor's Play frame stays sandboxed (no `allow-same-origin`). Instead of loosening it for the microphone and camera, the editor opens the devices and sends the game only data (audio analysis arrays, small camera frames, recognised text). Only the frame the panel started may ask (one-time token + source check); the streams are stopped when the game stops, and nothing leaves the computer.

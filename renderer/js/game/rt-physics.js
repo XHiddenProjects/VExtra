@@ -51,7 +51,8 @@
     for (const o of g.objects) {
       if (!o.alive || !o.enabled || o.isScene) continue;
       o.grounded = false;
-      if (o.physics.body === 'dynamic') {
+      const kg = o.physics.body === 'kinematic' && o.physics.kgravity; o.kg = kg; // kinematic bodies that use gravity fall and land like characters
+      if (o.physics.body === 'dynamic' || kg) {
         o.vx += G.x * o.physics.gravityScale * dt; o.vy += G.y * o.physics.gravityScale * dt; if (is3) o.vz += G.z * o.physics.gravityScale * dt;
         const drag = o.physics.drag || 0; if (drag) { const k = Math.max(0, 1 - drag * dt); o.vx *= k; o.vy *= k; if (is3) o.vz *= k; }
         o.x += o.vx * dt; o.y += o.vy * dt; if (is3) o.z += o.vz * dt;
@@ -79,9 +80,9 @@
         if (a.parent === b || b.parent === a) continue;
         const r0 = pair(a, b, is3, ha, hs.get(b)); if (!r0) continue; const r = fixNormal(a, b, r0, is3);
         const key = a.id < b.id ? a.id + '|' + b.id : b.id + '|' + a.id; now.add(key);
-        const solid = pa.body !== 'none' && pb.body !== 'none' && !pa.sensor && !pb.sensor && (pa.body === 'dynamic' || pb.body === 'dynamic');
+        const movA = pa.body === 'dynamic' || a.kg, movB = pb.body === 'dynamic' || b.kg; const solid = pa.body !== 'none' && pb.body !== 'none' && !pa.sensor && !pb.sensor && (movA || movB);
         if (solid) {
-          const ia = pa.body === 'dynamic' ? 1 / a.mass : 0, ib = pb.body === 'dynamic' ? 1 / b.mass : 0, sum = ia + ib; const [nx, ny, nz] = r.n;
+          const ia = movA ? 1 / (a.mass || 1) : 0, ib = movB ? 1 / (b.mass || 1) : 0, sum = ia + ib; const [nx, ny, nz] = r.n;
           const corr = r.pen * 1.0;
           a.x -= nx * corr * (ia / sum); a.y -= ny * corr * (ia / sum); if (is3) a.z -= nz * corr * (ia / sum);
           b.x += nx * corr * (ib / sum); b.y += ny * corr * (ib / sum); if (is3) b.z += nz * corr * (ib / sum);

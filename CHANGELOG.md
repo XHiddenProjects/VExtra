@@ -2,10 +2,29 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.4.1] — current
+## [3.5.0] — current
+
+### Added
+- **Ten example games** in Library → Games (open one, press Play, then edit it): 2D – Neon Breakout, Drone Swarm, Sling Smash, Hopper, Echo Pads; 3D – Echo Maze (first person, the Stalker hears your real voice), Sky Parkour (kinematic moving / crumbling platforms, checkpoints), Hyper-Real Showroom (Realism look), Core Defender (arena defence) and Marble Lanes (bowling physics).
+- **Store Export rework (plugin 2.2.0):** detects Java through `JAVA_HOME` (Android Studio is no longer used or required), shows the prerequisites, then a plain-text **checklist** (spinner → ✓ / ✕) instead of a terminal. Missing Java (Temurin, latest LTS) and Gradle (latest) are downloaded automatically into `~/.vextra/toolchain` (no admin rights) and updated automatically; the Android SDK command-line tools / platform / build-tools are installed and kept at the latest version. Every download is HTTPS-only, from an allow-listed official host, SHA-256 verified before unpacking.
+- Plugin API: `forge.ui.checklist` (progress list with spinner / ✓ / ✕).
+- **Speech service fallback:** Settings → Voice commands (games) – when the web engine has no speech recognition (desktop app), Voice Command can send short recordings to an OpenAI-compatible `/audio/transcriptions` endpoint you configure (mode Auto / Browser / Service).
+- Community files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ISSUE_TEMPLATES.md`, `PULL_REQUEST_TEMPLATE.md` and the matching `.github/` templates.
+- Physics: **Kinematic + gravity** option (`kgravity`) so kinematic bodies can fall and still push other bodies.
+
+### Fixed
+- **Voice Command said "needs an internet connection"** while online: that was the desktop engine's speech service failing (`network`), not your connection. The message now says so, stops retrying, and points to the fallback above.
+- **First-person mouse look was inverted** in some camera setups: the look action now follows the view that is actually drawn.
+- **Kinematic bodies sometimes did not move / ignored gravity:** kinematic bodies are driven by their velocity and now optionally gravity (see above).
+
+## [3.4.1]
+
+### Changed
+- `package.json` license is now **GNU Affero General Public License v3** (SPDX `AGPL-3.0-only`).
 
 ### Fixed
 - **Microphone and camera blocks failed in the editor even with the device allowed.** The Play frame is sandboxed (no origin), and the browser / WebView2 / WebKit refuse `getUserMedia` there (`SecurityError`). The editor now owns the devices (new `editor/sense-host.js`) and streams plain data into the game: microphone analyser data, camera frames and recognised speech. Every Microphone, Sound Detector, Voice Noise / Hearing, Voice Command, Camera, Motion, Colour, Light, Face, Photo and AR-camera block now works in Play. Exported pages and phones still use the devices directly.
+- **Camera hardening:** the editor retries simpler camera requests (many webcams reject width / height / facing constraints), keeps the camera element on-screen so the web engine keeps decoding, and reports "opened but sent no picture" instead of failing silently. Errors now always include the technical name (e.g. `[NotReadableError]`).
 - Clear, specific error messages (blocked / no device / in use by another program / Windows or macOS privacy setting to switch on / no speech recognition in this engine), shown on the block's `error` exit **and** in the game log.
 - The camera and microphone are released when the game is stopped or restarted.
 - macOS: added `NSMicrophoneUsageDescription`, `NSCameraUsageDescription` and `NSSpeechRecognitionUsageDescription` (`src-tauri/Info.plist`) so the system asks instead of silently refusing.

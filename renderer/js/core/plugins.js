@@ -2,7 +2,7 @@
 (function () {
   const listeners = {};
   const Forge = {
-    version: '3.4.1',
+    version: '3.5.0',
     host: {},                 // filled in by app.js
     commands: new Map(),      // id -> {id,title,run,plugin}
     statusItems: new Map(),   // id -> {id,text,align,onClick,plugin}
@@ -125,6 +125,31 @@
         modal: (opts) => VX.ui.modal({ title: opts.title, body: opts.html ?? opts.body, wide: opts.wide }),
         preview: (html, title) => VX.ui.preview(html, title),
         /** Progress dialog: set(percent, status), log(line), close(), onCancel(cb), cancelled */
+        /** Plain-text checklist dialog (no terminal): checklist(title, [{ id, label, group }]) → { set(id, state, text), label(id, text), note(text), detail(line), done(buttonLabel), onCancel(cb), close(), cancelled }
+         *  state: 'pending' | 'run' (spinner) | 'ok' (check mark) | 'fail' (cross) | 'warn' | 'todo' (will be downloaded) | 'skip'. detail() collects technical output that is only shown by "Copy technical details". */
+        checklist(title, items) {
+          const h = VX.h, api = { cancelled: false }, rows = new Map(), details = []; let cb = null;
+          const ICON = { pending: '○', run: '', ok: '✓', fail: '✕', warn: '!', todo: '⬇', skip: '–' };
+          const list = h('div', { class: 'chk' }); let group = null;
+          for (const it of items) {
+            if (it.group && it.group !== group) { group = it.group; list.append(h('div', { class: 'chk-group' }, group)); }
+            const ico = h('span', { class: 'chk-ico chk-pending' }, ICON.pending), lab = h('span', { class: 'chk-label' }, it.label), txt = h('div', { class: 'chk-text' }, it.text || '');
+            list.append(h('div', { class: 'chk-row' }, ico, h('div', { class: 'chk-main' }, lab, txt))); rows.set(it.id, { ico, lab, txt });
+          }
+          const sum = h('div', { class: 'chk-sum' }, 'Starting …');
+          const cancel = h('button', { class: 'btn', onclick: () => { api.cancelled = true; cancel.disabled = true; sum.textContent = 'Cancelling …'; cb && cb(); } }, 'Cancel');
+          const copy = h('button', { class: 'btn', style: 'display:none', onclick: () => { try { navigator.clipboard.writeText(details.join('\n')); VX.ui.toast('Technical details copied'); } catch { /* clipboard blocked */ } } }, 'Copy technical details');
+          const m = VX.ui.modal({ title, dismissable: false, body: h('div', {}, list, sum), actions: [copy, cancel] });
+          api.set = (id, state, text) => { const r = rows.get(id); if (!r) return; r.ico.className = 'chk-ico chk-' + state; r.ico.textContent = ICON[state] ?? ''; if (text != null) r.txt.textContent = text; };
+          api.label = (id, text) => { const r = rows.get(id); if (r) r.lab.textContent = text; };
+          api.state = (id) => { const r = rows.get(id); return r ? r.ico.className.replace('chk-ico chk-', '') : ''; };
+          api.note = (text) => { sum.textContent = text; };
+          api.detail = (line) => { details.push(String(line).slice(0, 400)); if (details.length > 400) details.splice(0, 100); };
+          api.onCancel = (f) => { cb = f; };
+          api.done = (label) => { cancel.textContent = label || 'Close'; cancel.disabled = false; cancel.onclick = () => m.close(); if (details.length) copy.style.display = ''; };
+          api.close = () => m.close();
+          return api;
+        },
         progress(title) {
           const h = VX.h; const bar = h('div', { class: 'prog-fill' }); const st = h('div', { class: 'prog-status' }, 'Starting…'); const pct = h('span', { class: 'prog-pct' }, '0%');
           const log = h('pre', { class: 'prog-log' }); let cb = null; const api = { cancelled: false };
