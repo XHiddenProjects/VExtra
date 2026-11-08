@@ -39,6 +39,12 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
+## What's new in 3.7.0
+- **Customizable loading page** for every game (title, colours, logo, tips, progress style) with the Vextra Studio credit.
+- Exported websites and UI designs carry a "Made with Vextra Studio · © XHiddenProjects" footer.
+- Store Export builds with **Java 27** and retries slow downloads.
+- Fixed spawned objects that were invisible in some games; Echo Maze now hears your voice.
+
 ## What's new in 3.6.0
 - **Layers** (Background / World / UI) with show / lock, and UI-layer objects that stay on screen.
 - **Edit UI layout:** drag labels and bars to where you want them, or type the anchor and X / Y.

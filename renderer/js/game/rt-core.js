@@ -228,7 +228,8 @@
     }
     spawn(templateName, over = {}) {
       const def = typeof templateName === 'string' ? this.prefabByName(templateName) : templateName; if (!def) { this.log('warn', 'Spawn: no object named "' + templateName + '"'); return null; }
-      const copy = JSON.parse(JSON.stringify(def)); copy.prefab = false; const o = this.addObject(copy, Object.assign({}, over, { name: over.name || def.name })); o.spawned = true; return o;
+      const copy = JSON.parse(JSON.stringify(def)); copy.prefab = false; for (const k of Object.keys(over)) if (over[k] === undefined) delete over[k]; /* an undefined override must never wipe a default (it made spawned 3D objects invisible) */
+      const o = this.addObject(copy, Object.assign({}, over, { name: over.name || def.name })); o.spawned = true; return o;
     }
     removeObject(o, silent) {
       if (!o || !o.alive) return; o.alive = false;

@@ -149,6 +149,9 @@ Security checklist: serve over HTTPS, keep the db/ folder private, never commit 
 
   Web.buildSiteArchive = async function (opts) {
     const { name, format, domain, configs, dbMode } = opts; const { rels, entries } = await collect(opts);
+    /* every exported page carries the "Made with Vextra Studio · © XHiddenProjects" footer (look and pages are customizable) */
+    const fo = { align: opts.footerAlign || 'center', theme: opts.footerTheme || 'auto' }; const homeOnly = opts.footerPages === 'home'; const credited = [];
+    for (const en of entries) { if (!/\.(html?|php|phtml)$/i.test(en.path)) continue; if (homeOnly && !/^index\.(html?|php)$/i.test(en.path)) continue; const dec = new TextDecoder('utf-8', { fatal: false }); const txt = dec.decode(en.data); if (/\.(php|phtml)$/i.test(en.path) && !/<\/body\s*>/i.test(txt)) continue; const out = VX.credit.injectFooter(txt, fo); if (out !== txt) { en.data = enc.encode(out); credited.push(en.path); } }
     const has = (f) => rels.some((r) => r.toLowerCase() === f);
     const php = rels.some((r) => /\.(php|phtml|php\d)$/i.test(r)); const has404 = has('404.html');
     const spa = false; const notes = [];
@@ -173,7 +176,7 @@ Security checklist: serve over HTTPS, keep the db/ folder private, never commit 
     // everything goes into <name>/ so extracting never spills files into the current folder; the .htaccess/nginx.conf/README stay inside it too
     const wrapped = entries.map((e) => ({ ...e, path: name + '/' + e.path })).sort((a, b) => a.path.localeCompare(b.path));
     const bytes = format === 'zip' ? await VX.archive.zip(wrapped) : await VX.archive.tarGz(wrapped);
-    return { bytes, count: entries.length, php, db, notes };
+    if (!credited.length && rels.some((r) => /\.(html?)$/i.test(r))) notes.push('The Vextra Studio footer was not added (already present)'); return { bytes, count: entries.length, php, db, notes, credited };
   };
 
   Web.exportSite = async function () {
@@ -185,10 +188,14 @@ Security checklist: serve over HTTPS, keep the db/ folder private, never commit 
     const cfg = h('input', { type: 'checkbox', checked: true }), rd = h('input', { type: 'checkbox', checked: true });
     const dbSel = h('select', {}, h('option', { value: 'none' }, 'Do not include'), h('option', { value: 'sql' }, 'SQL dump (db/database.sql)'), h('option', { value: 'sqlite' }, 'SQLite file (db/database.sqlite)'), h('option', { value: 'both' }, 'Both'));
     try { const t = await VX.db.tables(); if (t.length) dbSel.value = 'sql'; } catch { /* engine missing */ }
+    const fAlign = h('select', {}, h('option', { value: 'center' }, 'Centered'), h('option', { value: 'left' }, 'Left'), h('option', { value: 'right' }, 'Right'));
+    const fTheme = h('select', {}, h('option', { value: 'auto' }, 'Match the page (transparent)'), h('option', { value: 'dark' }, 'Light bar, dark text'), h('option', { value: 'light' }, 'Dark bar, light text'));
+    const fPages = h('select', {}, h('option', { value: 'all' }, 'Every page'), h('option', { value: 'home' }, 'Home page only (index)'));
     const row = (l, el, hint) => h('div', { class: 'xs-row' }, h('label', {}, l), el, hint ? h('small', {}, hint) : null);
     const body = h('div', { class: 'xs' }, row('Site folder name', name, 'The archive contains one folder with this name.'), row('Format', fmt), row('Domain (for nginx.conf)', domain),
       h('div', { class: 'xs-row' }, h('label', {}, h('span', {}, cfg, ' Include '), h('b', {}, '.htaccess'), ' and ', h('b', {}, 'nginx.conf'))), h('div', { class: 'xs-row' }, h('label', {}, rd, ' Include README-DEPLOY.txt')),
       row('Database', dbSel, 'Stored in db/ and blocked from the web by both configs.'),
+      h('div', { class: 'ask-hint' }, `Every exported page gets a footer: “${VX.credit.text()}”. Choose how it looks:`), row('Footer alignment', fAlign), row('Footer style', fTheme), row('Footer on', fPages),
       h('div', { class: 'ask-hint' }, 'node_modules, .git, hidden folders and the local database.sqlite are never included. Unsaved editor changes are included.'));
     return new Promise((resolve) => {
       const btn = h('button', { class: 'btn primary' }, '📦 Export');
@@ -197,7 +204,7 @@ Security checklist: serve over HTTPS, keep the db/ folder private, never commit 
         const nm = name.value.trim().replace(/[^\w.-]+/g, '-') || stem; btn.disabled = true; btn.textContent = 'Packing…';
         try {
           const format = fmt.value === 'tgz' ? 'tgz' : 'zip';
-          const r = await Web.buildSiteArchive({ name: nm, format, domain: domain.value.trim() || 'example.com', configs: cfg.checked, dbMode: dbSel.value, readme: rd.checked });
+          const r = await Web.buildSiteArchive({ name: nm, format, domain: domain.value.trim() || 'example.com', configs: cfg.checked, dbMode: dbSel.value, readme: rd.checked, footerAlign: fAlign.value, footerTheme: fTheme.value, footerPages: fPages.value });
           const file = nm + (format === 'zip' ? '.zip' : '.tar.gz'); const saved = await window.native.saveBinary(file, VX.archive.toB64(r.bytes));
           m.close(); if (saved) VX.ui.toast(`Exported ${r.count} files → ${saved}${r.php ? ' (includes PHP)' : ''}`);
           resolve(r);

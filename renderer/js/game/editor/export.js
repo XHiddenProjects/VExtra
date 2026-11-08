@@ -29,12 +29,12 @@
     const scripts = []; for (const f of RT_FILES) scripts.push(`/* ${f} */\n` + safeScript(await src(base + 'js/game/' + f + '.js')));
     let threeSrc = ''; if (has3d) threeSrc = await src(base + 'vendor/three/three.module.min.js');
     const title = esc(data.settings.title || 'Vextra game'); const json = lit(data);
-    const bg = esc(data.settings.bg || '#10131a');
+    const bg = esc(data.settings.bg || '#10131a'); const LD = VX.gameLoader.build(data, { channel: opts.channel });
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="generator" content="Vextra Studio"><title>${title}</title>
-<style>html,body{margin:0;height:100%;background:${bg};overflow:hidden;overscroll-behavior:none}#vx-game{position:fixed;inset:0;width:100%;height:100%}#vx-boot{position:fixed;inset:0;display:grid;place-items:center;color:#9aa3bd;font:14px system-ui,sans-serif}</style></head>
-<body><div id="vx-game"></div><div id="vx-boot">Loading…</div>
+<style>html,body{margin:0;height:100%;background:${bg};overflow:hidden;overscroll-behavior:none}#vx-game{position:fixed;inset:0;width:100%;height:100%}${LD.css}</style><script>${LD.script}</script></head>
+<body><div id="vx-game"></div>${LD.html}
 <script>window.VXRT = window.VXRT || {};${opts.channel ? `window.__VX_CH = ${VX.jsLit({ token: String(opts.channel.token), origin: String(opts.channel.origin) })};` : ''}${opts.cloudUrl ? `window.VX_CLOUD = { url: ${VX.jsLit(opts.cloudUrl)} };` : ''}</script>
 <script type="module">
 const DATA = ${json};
@@ -43,13 +43,19 @@ const url = URL.createObjectURL(new Blob([THREE_SRC], { type: 'text/javascript' 
 window.THREE = await import(url);` : ''}
 const RT = ${lit(scripts.join("\n;\n"))};
 (0, eval)(RT);
-const boot = document.getElementById('vx-boot');
+const VXL = window.__vxl;
 try {
+  VXL.set(0.3);
   const g = new VXRT.Game(DATA, { host: window.parent !== window, channel: window.__VX_CH || null });
-  window.__vxGame = g; g.start(document.getElementById('vx-game')); boot.remove();
+  window.__vxGame = g; VXL.set(0.5);
+  /* decode every sprite frame first, so the game starts with its pictures ready */
+  const pics = []; for (const sp of Object.values((DATA.assets && DATA.assets.sprites) || {})) for (const f of (sp.frames || [])) if (typeof f === 'string' && f.indexOf('data:image/') === 0) pics.push(f);
+  let done = 0; await Promise.all(pics.map((src) => new Promise((res) => { const im = new Image(); im.onload = im.onerror = () => { done++; VXL.set(0.5 + 0.4 * done / pics.length); res(); }; im.src = src; })));
+  await VXL.finish();
+  g.start(document.getElementById('vx-game')); VXL.hide();
   window.addEventListener('error', (e) => g.log('error', e.message));
   window.addEventListener('unhandledrejection', (e) => g.log('error', String(e.reason && e.reason.message || e.reason)));
-} catch (e) { boot.textContent = 'Could not start the game: ' + e.message; console.error(e); if (window.parent !== window) window.parent.postMessage({ vx: 'log', token: window.__VX_CH && window.__VX_CH.token, level: 'error', text: e.stack || e.message }, window.__VX_CH ? window.__VX_CH.origin : location.origin); }
+} catch (e) { VXL.fail('Could not start the game: ' + e.message); console.error(e); if (window.parent !== window) window.parent.postMessage({ vx: 'log', token: window.__VX_CH && window.__VX_CH.token, level: 'error', text: e.stack || e.message }, window.__VX_CH ? window.__VX_CH.origin : location.origin); }
 </script></body></html>`;
   }
 

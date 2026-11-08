@@ -526,6 +526,26 @@ Library → Games lists ten ready-made games. Open one, press **Play**, then cha
 
 **Kinematic bodies:** tick *Kinematic gravity* in the Physics inspector (or the Physics block) to let a kinematic body fall; it still pushes dynamic bodies and is not pushed back.`);
 
+  A('loading-page', 'Share & publish', 'Loading page & credit', `# Loading page & credit
+
+Every game starts with a **loading page**: the title, a progress bar and the line “Made with Vextra Studio · © <year> XHiddenProjects”. It is part of exported games, published games and Play.
+
+Open a game and press **⏳ Loading page** in the toolbar to customize it:
+
+| Setting | What it does |
+|---|---|
+| Title / Subtitle | Text shown (the title defaults to the game title) |
+| Progress style | Bar (with percentage), spinner or bouncing dots |
+| Background / Text / Accent | Colours (the background defaults to the game background) |
+| Logo | One of the game's sprites |
+| Tips | One per line, shown in turn while loading |
+| Show for at least | Seconds the page stays up (0 – 10) so players can read it |
+| Credit line position | Top or bottom – the credit can be moved but not removed |
+
+The bar fills as the runtime starts and every sprite picture is decoded; the game starts when it is full. In Play the minimum time is skipped so testing stays quick.
+
+**Websites and UI designs:** Export website adds a footer “Made with Vextra Studio · © <year> XHiddenProjects” to every page (or only the home page); pick its alignment and style in the export dialog. Exported UI designs carry the same footer.`);
+
   A('store-export', 'Share & publish', 'Store Export', `# Store Export (plugin)
 
 Open a game and press **📦 Store export**. Pick your targets and details, then **Create packages**. With *Install, assign and build automatically* ticked (desktop app) Vextra runs the npm steps for you and shows a **progress bar** with a live log and a Cancel button:
@@ -533,7 +553,7 @@ Open a game and press **📦 Store export**. Pick your targets and details, then
 1. Steam: \`npm install\` → \`npm run build:<your OS>\`
 2. Mobile: \`npm install\` → \`npx cap add android\` (and iOS on a Mac) → \`npm run assets\` → \`npm run patch\` → \`npx cap sync\` → \`npm run build:android\` (debug APK)
 
-Android builds are fully automatic: **Java** (latest LTS), **Gradle** (latest release) and the **Android SDK** (newest platform + build tools) are found through JAVA_HOME / GRADLE_HOME / ANDROID_HOME or your PATH, and are downloaded and updated by themselves when missing or outdated – into your own folder (~/.vextra/toolchain), without administrator rights. Android Studio is not needed. Downloads come only from the official sites (Adoptium, gradle.org, developer.android.com / dl.google.com) over HTTPS and are verified against their published SHA-256 checksum before use. The export shows a plain checklist (prerequisites first, then each step with a spinner, check mark or cross) instead of a terminal; "Copy technical details" is there if something fails.
+Android builds are fully automatic: **Java 27**, **Gradle** (latest release) and the **Android SDK** (newest platform + build tools) are found through JAVA_HOME / GRADLE_HOME / ANDROID_HOME or your PATH, and are downloaded and updated by themselves when missing or outdated – into your own folder (~/.vextra/toolchain), without administrator rights. Android Studio is not needed. Downloads come only from the official sites (Adoptium, gradle.org, developer.android.com / dl.google.com) over HTTPS and are verified against their published SHA-256 checksum before use. The export shows a plain checklist (prerequisites first, then each step with a spinner, check mark or cross) instead of a terminal; "Copy technical details" is there if something fails.
 
 Steam install/build steps are required; the Android steps are skipped with a plain explanation if Java, Gradle or the SDK could not be set up (for example offline), and the project files are still written.
 

@@ -2,7 +2,20 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.6.0] — current
+## [3.7.0] — current
+
+### Added
+- **Loading page for every game** (Game toolbar → ⏳ Loading page): shown while a game loads in exported pages and in Play. Customize the title, subtitle, progress style (bar / spinner / dots), colours, logo (one of your sprites), rotating tips, minimum time and the percentage. It has a real progress bar (runtime → pictures → start). The game starts when it is done.
+- **Credit and copyright:** the loading page always shows “Made with Vextra Studio · © <year> XHiddenProjects” (move it top / bottom and change colours). Exported **websites** get the same line as a footer on every page (or the home page only) with alignment / style options in Export website; exported **UI designs** carry it too.
+
+### Changed
+- **Store Export uses Java 27** (falls back to the newest older release if the download service does not offer it yet). Downloads wait up to 2 minutes for a slow server and retry network errors up to 4 times instead of failing with “timed out”. Store Export plugin 2.2.1.
+
+### Fixed
+- **Spawned objects were invisible in some games** (Marble Lanes pins, Core Defender crawlers…): the Spawn block passed an empty rotation that wiped the object's default, so its 3D rotation became NaN and it was not drawn. Spawned objects now keep their defaults.
+- **Echo Maze:** the Stalker now hears your real voice (the Voice Noise range was far too small, so only shouting next to it worked), and the “No microphone” text only appears when the microphone really cannot be opened.
+
+## [3.6.0]
 
 ### Added
 - **`ACCESSIBILITY.md`** – what the editor supports today, known gaps, and how to make accessible games.
@@ -20,7 +33,6 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - Labels never wrap onto several lines when anchored to the right edge.
 
 ### Fixed
-- **Echo Maze:** the Stalker now hears your real voice (the Voice Noise range was far too small, so only shouting next to it worked), and the "No microphone" text only appears when the microphone really cannot be opened.
 - **3D example lights:** the Sun and Sky light of the 3D examples were created as plain point lights (their settings were dropped), so shadows and brightness were off. They are now a real directional sun and a hemisphere sky light.
 
 ## [3.5.0]

@@ -131,7 +131,7 @@
       const b = (l, fn, cls, title) => h('button', { class: 'btn sm ' + (cls || ''), title: title || '', onclick: fn }, l);
       return [b([VX.icon('undo', 14), 'Undo'], () => this.undo(), '', 'Ctrl+Z'), b([VX.icon('redo', 14), 'Redo'], () => this.redo(), '', 'Ctrl+Shift+Z'), h('span', { class: 'sep' }),
         h('span', { class: 'tag' }, this.project.settings.title), h('span', { class: 'spacer' }),
-        b('⚙ Game settings', () => this.gameSettings()), b('📖 Blocks docs', () => this.opts.openDocs && this.opts.openDocs('logic')), b('⬇ Export HTML', () => this.exportHTML()), b('🌐 Publish', () => VX.cloudUI && VX.cloudUI.publish(), '', 'Host it on a public URL'), b('📦 Store export', () => { const c = window.Forge && Forge.commands.get('store-export.package'); c ? c.run() : VX.ui.toast('Enable the “Store Export” plugin (Plugins panel) to package for Steam, Google Play and the App Store.', 'warn'); }, 'adv', 'Package for Steam / Google Play / App Store'), b([VX.icon('play', 13), 'Play'], () => this.play(), 'primary', 'Run the game')];
+        b('⚙ Game settings', () => this.gameSettings()), b('⏳ Loading page', () => this.loadingPage()), b('📖 Blocks docs', () => this.opts.openDocs && this.opts.openDocs('logic')), b('⬇ Export HTML', () => this.exportHTML()), b('🌐 Publish', () => VX.cloudUI && VX.cloudUI.publish(), '', 'Host it on a public URL'), b('📦 Store export', () => { const c = window.Forge && Forge.commands.get('store-export.package'); c ? c.run() : VX.ui.toast('Enable the “Store Export” plugin (Plugins panel) to package for Steam, Google Play and the App Store.', 'warn'); }, 'adv', 'Package for Steam / Google Play / App Store'), b([VX.icon('play', 13), 'Play'], () => this.play(), 'primary', 'Run the game')];
     }
     play() { this.setView('play'); }
     ensurePlay() {
@@ -140,6 +140,12 @@
     }
     async exportHTML() {
       try { const name = (this.project.settings.title || 'game').replace(/[^\w.-]+/g, '_') + '.html'; const html = await VX.gameExport.toHTML(this.project); if (window.native && native.saveAs) { const r = await native.saveAs(name, html); if (r) VX.ui.toast('Exported ' + (r.split ? r.split(/[\\/]/).pop() : name), 'ok'); } else VX.download(name, html, 'text/html'); } catch (e) { VX.ui.toast('Export failed: ' + e.message, 'error'); }
+    }
+    /** customize the loading page that every exported / played game shows (it always carries the Vextra Studio credit), then preview it */
+    async loadingPage() {
+      if (!(await VX.gameLoader.edit(this))) return; this.commit();
+      const frame = h('iframe', { class: 'ld-preview', sandbox: 'allow-scripts', style: 'width:100%;height:340px;border:1px solid var(--border,#333);border-radius:8px;background:#000' }); frame.srcdoc = VX.gameLoader.previewPage(this.project);
+      VX.ui.modal({ title: 'Loading page preview', size: 'medium', body: h('div', {}, frame, h('div', { class: 'ask-hint' }, 'This is how players see the game load. Reopen “Loading page” to change it.')) });
     }
     async gameSettings() {
       const s = this.project.settings; const v = await VX.ui.form({ title: 'Game settings', fields: [{ key: 'title', label: 'Title', value: s.title, required: true }, { key: 'width', label: 'Design width (2D)', type: 'number', value: s.width }, { key: 'height', label: 'Design height (2D)', type: 'number', value: s.height }, { key: 'bg', label: 'Background', type: 'color', value: s.bg }, { key: 'pixelArt', label: 'Pixel-art mode (crisp scaling)', type: 'checkbox', value: s.pixelArt }, { key: 'cloudUrl', label: 'Cloud server URL (leaderboards, cloud saves)', value: s.cloudUrl || '', placeholder: 'https://my-server.example.com', hint: 'Leave empty to use the server the game is published on.' }], submit: 'Save' }); if (!v) return;

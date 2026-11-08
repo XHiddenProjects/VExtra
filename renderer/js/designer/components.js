@@ -151,6 +151,7 @@
   <div class="stage">
 ${items}
   </div>
+${VX.credit ? VX.credit.footerHTML({ align: 'center', theme: 'auto' }) : ''}
 </body>
 </html>
 `;
