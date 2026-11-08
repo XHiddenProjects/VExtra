@@ -11,6 +11,8 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 ### Changed
 - **Store Export uses Java 27** (falls back to the newest older release if the download service does not offer it yet). Downloads wait up to 2 minutes for a slow server and retry network errors up to 4 times instead of failing with “timed out”. Store Export plugin 2.2.1.
 
+- **Android Studio first:** if Android Studio is installed, Store Export uses its SDK as it is (the newest platform and build-tools installed there – no internet check, no warning) and, when Java 27 cannot be downloaded, its bundled Java. Update the SDK from Android Studio → SDK Manager. Store Export plugin 2.2.2.
+
 ### Fixed
 - **Spawned objects were invisible in some games** (Marble Lanes pins, Core Defender crawlers…): the Spawn block passed an empty rotation that wiped the object's default, so its 3D rotation became NaN and it was not drawn. Spawned objects now keep their defaults.
 - **Echo Maze:** the Stalker now hears your real voice (the Voice Noise range was far too small, so only shouting next to it worked), and the “No microphone” text only appears when the microphone really cannot be opened.
