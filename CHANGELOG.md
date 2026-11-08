@@ -20,6 +20,7 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - Labels never wrap onto several lines when anchored to the right edge.
 
 ### Fixed
+- **Echo Maze:** the Stalker now hears your real voice (the Voice Noise range was far too small, so only shouting next to it worked), and the "No microphone" text only appears when the microphone really cannot be opened.
 - **3D example lights:** the Sun and Sky light of the 3D examples were created as plain point lights (their settings were dropped), so shadows and brightness were off. They are now a real directional sun and a hemisphere sky light.
 
 ## [3.5.0]

@@ -51,8 +51,8 @@
       go('w', '-speed * (state == 0)', 'signalZ'); go('arrowup', '-speed * (state == 0)', 'signalZ'); go('s', 'speed * (state == 0)', 'signalZ'); go('arrowdown', 'speed * (state == 0)', 'signalZ');
       go('d', 'speed * (state == 0)', 'signalX'); go('arrowright', 'speed * (state == 0)', 'signalX'); go('a', '-speed * (state == 0)', 'signalX'); go('arrowleft', '-speed * (state == 0)', 'signalX');
       block('makeNoise', { source: 'self', radius: 8, footsteps: true, stepSpeed: 1.5, stepRadius: 5, stepEvery: 0.45 }, 'Footsteps');
-      const voice = block('voiceNoise', { source: 'self', radius: 14, minLevel: 12, gain: 1.2, quietKey: 'shift', testKey: 'm' }, 'Your voice');
-      const nomic = block('label', { id: 'mic', text: 'No microphone – hold M to shout', anchor: 'topRight', size: 14, color: '#7c8db5', y: 44 }); voice.to(nomic, 'error');
+      const voice = block('voiceNoise', { source: 'self', radius: 60, minLevel: 8, gain: 2, quietKey: 'shift', testKey: 'm' }, 'Your voice');
+      const nomic = block('label', { id: 'mic', text: 'No microphone – hold M to shout', anchor: 'topRight', size: 14, color: '#7c8db5', y: 44 }); start().to(nomic, 'out', 'hide'); voice.to(nomic, 'error', 'show');
       /* gems */
       const pick = block('proximity', { target: 'tag:gem', radius: 1.1, mode: 'enter' }, 'Gem in reach');
       pick.to(block('emit', { target: 'other', count: 14, color: '#5be4ff', speed: 4, spread: 360, life: 0.5, size: 0.15, gravity: 0 }), 'out', 'emit'); pick.to(block('destroyer', { target: 'other' })); pick.to(snd('gem'));
