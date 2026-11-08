@@ -55,6 +55,8 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 - The **Logic tab preview** of a code behaviour runs the script once against inert stand-ins (`game`, `self`, `VXRT`… do nothing), so previewing no longer reaches real engine services such as the microphone or camera.
 - **UI layout** (`scene.uiLayout`) stores only an anchor name and two numbers per element id; values are validated as numbers/known anchors when applied and are never evaluated as code.
 - Layer visibility / lock in the editor is view-only state and is not saved into the game.
+- **Example games are block graphs**, so they run through the same block runtime as any project (Expressions are parsed by the engine's arithmetic parser, not `eval`). The new **Light** block only sets a light's numeric brightness and a colour string on the object.
+- Accessibility reports can be filed publicly (see `ACCESSIBILITY.md`); security problems should still go through the process above.
 
 ## v3.5.0 notes
 - **Android toolchain auto-install (Store Export):** HTTPS only; hosts limited to api.adoptium.net, github.com / githubusercontent.com, services.gradle.org / downloads.gradle.org, developer.android.com and dl.google.com; every archive's SHA-256 is verified before it is unpacked; archive paths are checked (no zip-slip); installs go to your user folder (`~/.vextra/toolchain`), never need administrator rights, and no shell is used except Gradle's own launcher. The process runner restrictions above are unchanged.

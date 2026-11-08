@@ -5,15 +5,22 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 ## [3.6.0] — current
 
 ### Added
+- **`ACCESSIBILITY.md`** – what the editor supports today, known gaps, and how to make accessible games.
+- **Light block** (Properties): changes a 3D light's brightness and colour live (day / night switches, flickers, torches). The Showroom's keys 1-3 use it.
 - **Layers – Background, World, UI.** Every object has a *Layer* (Inspector → Appearance). Background is drawn first, World follows the camera, **UI is screen-space and always on top** (it ignores the camera and screen shake, and clicks on it use screen coordinates). In 3D, Background objects render behind the scene. The viewport toolbar has a layer bar: pick the layer new objects are added to, hide a layer or lock it (locked layers can't be picked) while you edit. The hierarchy marks BG / UI objects.
 - **Cursor and object position readout** in the 2D and 3D viewports: live `Cursor X, Y` (3D: `Ground X, Z`) plus the selected object's position (and size), so you know exactly where to place things.
 - **Edit UI layout** (viewport toolbar): shows the game screen with every Label / Bar block of the scene and drag them to where you want them. Pick the anchor (9 positions) and type exact X / Y, snap to 4 px (hold Alt for free movement), Reset to go back to the block's own values. The layout is saved per scene (`scene.uiLayout`) and applied when the game runs, even for blocks written in code behaviours.
 - The screen position readout also works inside the UI-layout editor (`Screen X, Y`).
 
 ### Changed
+- **All ten example games are built from blocks.** Every game is a set of wired block graphs (Mailbox / Message, Timer, Sensor, Proximity, Hearing, Ray Cast, List blocks, Expressions…) in the project's `behaviors` object – no raw code. Open one, press Logic and you can read, rewire and extend it.
+- Ray Cast **"camera" direction** now includes where you look up / down (pitch), so a crosshair shot hits what the crosshair is on.
 - **Object scripts are now behaviours.** Scripts that used to sit inside an object (all ten example games now store their logic in the project's `behaviors` object and list the behaviour ids on their objects – no `script` keys remain; older projects and plugins are converted on open) become real code behaviours (`Player script`, …) shown in the Logic tab, editable, reusable and attachable to other objects. Old projects are converted automatically when opened. (The runtime still understands a raw `script` field, so nothing breaks.)
 - The Logic tab's code → blocks preview no longer touches real engine services (microphone, particles…) while previewing a script.
 - Labels never wrap onto several lines when anchored to the right edge.
+
+### Fixed
+- **3D example lights:** the Sun and Sky light of the 3D examples were created as plain point lights (their settings were dropped), so shadows and brightness were off. They are now a real directional sun and a hemisphere sky light.
 
 ## [3.5.0]
 

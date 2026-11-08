@@ -6,7 +6,7 @@
   function forward(g, o) { if (is3(g)) { const y = U.rad(o.ry); return { x: -Math.sin(y), y: 0, z: -Math.cos(y) }; } const a = U.rad(o.rot); return { x: Math.cos(a), y: Math.sin(a), z: 0 }; }
   function dirVec(g, o, dir, angle) {
     if (dir === 'forward') return forward(g, o); if (dir === 'angle') { const a = U.rad(U.num(angle)); return is3(g) ? { x: Math.cos(a), y: 0, z: -Math.sin(a) } : { x: Math.cos(a), y: Math.sin(a), z: 0 }; }
-    if (dir === 'camera' && is3(g)) { const y = U.rad(g.cam3d.yaw); return { x: -Math.sin(y), y: 0, z: -Math.cos(y) }; }
+    if (dir === 'camera' && is3(g)) { const y = U.rad(g.cam3d.yaw), pt = U.rad(g.cam3d.pitch || 0); return { x: -Math.sin(y) * Math.cos(pt), y: Math.sin(pt), z: -Math.cos(y) * Math.cos(pt) }; }
     const up = is3(g) ? 1 : -1; return { left: { x: -1, y: 0, z: 0 }, right: { x: 1, y: 0, z: 0 }, up: { x: 0, y: up, z: 0 }, down: { x: 0, y: -up, z: 0 }, back: is3(g) ? { x: 0, y: 0, z: 1 } : { x: 0, y: 0, z: 0 }, front: is3(g) ? { x: 0, y: 0, z: -1 } : { x: 0, y: 0, z: 0 } }[dir] || { x: 1, y: 0, z: 0 };
   }
   VXRT.dirVec = dirVec;

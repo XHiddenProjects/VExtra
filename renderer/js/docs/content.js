@@ -516,11 +516,11 @@ A block's output can now be wired back to its own input; the signal arrives on t
 
   A('examples', 'Making games', 'Example games', `# Example games
 
-Library → Games lists ten ready-made games. Open one, press **Play**, then change anything – they are ordinary projects made of objects, blocks and short scripts.
+Library → Games lists ten ready-made games. Open one, press **Play**, then change anything – they are ordinary projects built entirely from **blocks**: open the Logic tab to read the wired graphs (rules and HUD in the scene behaviour, one behaviour per kind of object) and rewire them. Lists, timers, messages, sensors, Hearing, Ray Cast and Expressions do the work – there is no hand-written code.
 
 **2D:** Neon Breakout (bricks, power-ups), Drone Swarm (top-down wave shooter), Sling Smash (physics puzzle), Hopper (platformer), Echo Pads (memory / rhythm).
 
-**3D:** Echo Maze (first person; the Stalker hears your footsteps and your real voice), Sky Parkour (kinematic moving platforms, crumbling tiles, checkpoints), Hyper-Real Showroom (Realism look, keys 1-3 change the light), Core Defender (arena defence, mouse aim) and Marble Lanes (bowling physics).
+**3D:** Echo Maze (first person; the Stalker hears your footsteps and your real voice), Sky Parkour (kinematic moving platforms, crumbling tiles, checkpoints), Hyper-Real Showroom (Realism look, keys 1-3 change the light with the **Light** block), Core Defender (arena defence, mouse aim) and Marble Lanes (bowling physics).
 
 **Voice Command in the desktop app:** its web engine has no speech recognition, so open **Settings → Voice commands (games)** and set a speech service (an OpenAI-compatible transcription URL and key). Exported games played in Chrome, Edge or Safari use the browser's own recognition.
 

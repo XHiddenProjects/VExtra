@@ -44,6 +44,8 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 - **Edit UI layout:** drag labels and bars to where you want them, or type the anchor and X / Y.
 - **Live cursor + selected-object position** in the 2D and 3D viewports.
 - Object scripts are now **behaviours** (Logic tab) – old projects convert automatically.
+- **All ten example games are block graphs** – open one in Logic and read or rewire it. New **Light** block for live 3D lights.
+- New **[ACCESSIBILITY.md](ACCESSIBILITY.md)**.
 
 ## What's new in 3.5.0
 - **Ten example games** (5 × 2D, 5 × 3D) in Library → Games.
@@ -108,4 +110,4 @@ If the exe was already committed *without* LFS, convert it: `git lfs migrate imp
 - Plugin blocks must be self-contained functions to survive export.
 - Legacy `.forgescene` files are converted best-effort. Data from the old McDev app folder is not migrated.
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes and [SECURITY.md](SECURITY.md) for the security policy and known advisories.
+See [CHANGELOG.md](CHANGELOG.md) for release notes, [SECURITY.md](SECURITY.md) for the security policy and known advisories, and [ACCESSIBILITY.md](ACCESSIBILITY.md) for accessibility.
