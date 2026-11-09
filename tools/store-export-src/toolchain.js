@@ -233,6 +233,17 @@ async function setWrapper(androidDir) {
 }
 function restoreWrapper(w) { if (!w || !w.changed || !w.previous) return; try { let t = fs.readFileSync(w.file, 'utf8').replace(/^distributionUrl=.*$/m, 'distributionUrl=' + w.previous).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); fs.writeFileSync(w.file, t); } catch { /* ignore */ } }
 
+/** Newest stable Android Gradle plugin on Google's Maven repository (previews are skipped). */
+async function latestAgp() { const xml = String(await get('https://dl.google.com/android/maven2/com/android/tools/build/gradle/maven-metadata.xml')); const v = [...xml.matchAll(/<version>(\d+\.\d+\.\d+)<\/version>/g)].map((m) => m[1]).sort(cmp); if (!v.length) throw new Error('no Android Gradle plugin version found'); return v[v.length - 1]; }
+/** Points the project's Android Gradle plugin at the newest stable release. Returns what changed so it can be undone. */
+async function setAgp(androidDir) {
+  const files = ['build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts'].map((x) => path.join(androidDir, x)).filter(exists), re = [/(com\.android\.tools\.build:gradle:)(\d+\.\d+\.\d+)/g, /(com\.android\.(?:application|library)['"]\)?\s*version\s*['"])(\d+\.\d+\.\d+)/g];
+  let latest; try { latest = await latestAgp(); } catch { return null; } const saved = []; let previous = null;
+  for (const f of files) { const t = fs.readFileSync(f, 'utf8'); let out = t; for (const r of re) out = out.replace(r, (m, p, v) => { previous = previous || v; return cmp(v, latest) < 0 ? p + latest : m; }); if (out !== t) { saved.push({ file: f, text: t }); fs.writeFileSync(f, out); } }
+  return { changed: saved.length > 0, saved, previous, version: latest };
+}
+function restoreAgp(a) { if (a && a.saved) for (const x of a.saved) { try { fs.writeFileSync(x.file, x.text); } catch { /* ignore */ } } }
+
 /* ---------- ANDROID SDK ---------- */
 const SDK = path.join(ROOT, 'android-sdk');
 const sdkMgr = (root) => [path.join(root, 'cmdline-tools', 'latest', 'bin', bat('sdkmanager')), ...ls(path.join(root, 'cmdline-tools')).filter((x) => x !== 'latest').map((v) => path.join(root, 'cmdline-tools', v, 'bin', bat('sdkmanager')))].find(exists) || null;
@@ -308,13 +319,14 @@ function resolve(o = {}) {
   return { java, gradle, sdk, env: envWith(java && java.home, sdk && sdk.root) };
 }
 function prune() { pruneJava(); pruneGradle(); pruneSdk(SDK, null); }
-module.exports = { setWrapper, restoreWrapper, detect, cfg, chosenJava, get, fetchVerified, resolve, envWith, cmp, parseSdkList, parseCmdlineTools, parseRepoXml, unzip, ROOT, gradleBin, sdkPlatform, sdkBuildTools, emit, setEmitId, readState, writeState, ensureJava, ensureGradle, ensureSdk, managedJava, managedGradle, pruneJava, pruneGradle, prune, setKeep, keepOf, DEFAULT_JAVA, latestGradle };
+module.exports = { latestAgp, setAgp, restoreAgp, setWrapper, restoreWrapper, detect, cfg, chosenJava, get, fetchVerified, resolve, envWith, cmp, parseSdkList, parseCmdlineTools, parseRepoXml, unzip, ROOT, gradleBin, sdkPlatform, sdkBuildTools, emit, setEmitId, readState, writeState, ensureJava, ensureGradle, ensureSdk, managedJava, managedGradle, pruneJava, pruneGradle, prune, setKeep, keepOf, DEFAULT_JAVA, latestGradle };
 
 if (require.main === module) {
   (async () => {
     const cmd = process.argv[2] || 'check', arg = process.argv[3], check = cmd === 'check';
     const guard = (id, p) => p.catch((e) => { if (check) emit(id, 'warn', String(e.message)); else throw e; });
     try {
+      if (cmd === 'agp') { const a = await setAgp(path.resolve(arg || 'android')); console.log(a ? (a.changed ? 'Android Gradle plugin ' + a.previous + ' → ' + a.version : 'Android Gradle plugin is already up to date (' + a.version + ')') : 'Could not reach Google Maven'); return; }
       if (cmd === 'detect') { console.log('@@vx-detect ' + JSON.stringify(detect())); return; }
       if (cmd === 'env') { const r = resolve(); console.log(JSON.stringify({ java: r.java && r.java.home, gradle: r.gradle && r.gradle.home, sdk: r.sdk && r.sdk.root }, null, 1)); return; }
       if (cmd === 'prune') { prune(); console.log('pruned'); return; }

@@ -6,7 +6,8 @@
 // with Java 21 and the Gradle version the project itself asks for.
 const cp = require('child_process'), path = require('path'), fs = require('fs'), T = require('./toolchain.js');
 const root = path.resolve(__dirname, '..'), dir = path.join(root, 'android'), win = process.platform === 'win32', say = (state, text) => T.emit('build', state, text);
-const aab = process.argv.includes('--aab');
+const aab = process.argv.includes('--aab'), forceAgp = process.argv.includes('--update-agp');
+const AGPISH = /Android Gradle plugin|Minimum supported Gradle|requires Gradle|tested up to compile SDK|Could not find com\.android\.tools\.build|Failed to apply plugin 'com\.android/i;
 const slug = (() => { try { return String(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).name || 'app').replace(/-mobile$/, ''); } catch { return 'app'; } })();
 const COMPAT = /Unsupported class file major version|Unsupported Java|requires Java|incompatible with Java|Gradle .* requires|Could not (?:initialize|create) class|BUG! exception|Unsupported (?:Gradle|major)|Failed to apply plugin|minimum supported Gradle|org\.gradle\.api\.internal\.tasks\.TaskDependencyResolveException/i;
 const TARGET = /Failed to find target with hash string|Failed to find Platform SDK|Cannot cast object 'android-|does not specify `compileSdk`|compileSdk(?:Version)? .*(?:not|unsupported)/i;
@@ -59,13 +60,22 @@ function collect() {
       const j = R.java && R.java.source === 'chosen' && R.java.major >= 17 && R.java.major <= 23 ? R.java : (T.setKeep('java', [21]), await T.ensureJava({ major: 21 })); const keepJ = j; R = T.resolve({ javaMajor: 21 }); R.java = keepJ; R.env = T.envWith(j.home, R.sdk.root);
       const w = path.join(dir, win ? 'gradlew.bat' : 'gradlew'); if (!win) { try { fs.chmodSync(w, 0o755); } catch { /* ignore */ } } if (fs.existsSync(w)) wrap = w;
     }
-    const run = () => { r = gradle(wrap || T.gradleBin(R.gradle.home), R); out = (r.stdout || '') + (r.stderr || ''); };
+    const run = () => { r = gradle(wrap || (R.gradle && T.gradleBin(R.gradle.home)), R); out = (r.stdout || '') + (r.stderr || ''); };
+    if (!R.gradle) { const w0 = path.join(dir, win ? 'gradlew.bat' : 'gradlew'); if (!win) { try { fs.chmodSync(w0, 0o755); } catch { /* ignore */ } } if (fs.existsSync(w0)) wrap = w0; else { say('fail', 'The project has no Gradle wrapper (android/gradlew) – run "npm run sync" and try again.'); return 2; } }
     /* the wrapper points at the latest Gradle (services.gradle.org); if the project's Android Gradle plugin cannot run on it, the original version is restored */
     let wr = null; try { wr = await T.setWrapper(dir); if (wr && wr.changed) say('run', 'Gradle wrapper set to the latest release: ' + wr.url.replace(/^.*gradle-/, 'gradle-').replace(/-bin\.zip$/, '')); } catch { /* keep the project's own */ }
+    let ag = null, agpTried = false;
+    /** newest stable Android Gradle plugin (newer plugins know newer Android platforms and Gradle); undone when it does not help */
+    async function tryAgp(plat) {
+      agpTried = true; try { ag = await T.setAgp(dir); } catch { ag = null; } if (!ag || !ag.changed) return false;
+      say('run', 'Updating the Android Gradle plugin ' + ag.previous + ' → ' + ag.version + ' …'); prepare(R, plat); run();
+      if (r.status !== 0) { T.restoreAgp(ag); ag.changed = false; say('run', 'The newer Android Gradle plugin did not help – going back to the project\'s version …'); run(); } return true;
+    }
     let fell = !!wrap;
     for (;;) {
       const plat = plats[ti] || R.sdk.platform; prepare(R, plat); say('run', 'Building the Android ' + (aab ? 'bundle' : 'app') + ' (Java ' + R.java.major + ', Gradle ' + (wrap ? 'of the project' : R.gradle && R.gradle.version) + ', Android ' + plat + ') – the first build can take several minutes …');
-      run();
+      if (forceAgp && !agpTried && (await tryAgp(plat))) { /* already built */ } else run();
+      if (r.status !== 0 && !agpTried && (COMPAT.test(out) || TARGET.test(out) || AGPISH.test(out))) await tryAgp(plat);
       if (r.status !== 0 && wr && wr.changed && COMPAT.test(out)) { T.restoreWrapper(wr); wr.changed = false; say('run', 'This project\'s Android Gradle plugin needs an older Gradle – using the version the project asks for …'); run(); }
       if (r.status !== 0 && !fell && COMPAT.test(out)) { fell = true; say('run', 'The newest Java / Gradle does not fit this project – trying again with Java 21 and the project\'s own Gradle …'); try { await useFallback(); prepare(R, plat); run(); } catch (e) { console.error('fallback: ' + (e && e.message || e)); } }
       if (r.status !== 0 && TARGET.test(out) && ti + 1 < plats.length) { ti++; say('run', 'Android ' + plat + ' is not usable with this project – trying Android ' + plats[ti] + ' …'); continue; }
@@ -73,7 +83,7 @@ function collect() {
     }
     if (r.status === 0) { const rel = collect(); say('ok', rel ? (aab ? 'Release bundle ready: ' + rel + ' (unsigned – sign it for Google Play). The android/ folder opens in Android Studio as is.' : 'App ready: ' + rel + ' – install it on a phone, or open the android/ folder in Android Studio.') : 'Build finished.'); return 0; }
     console.error(tail(out));
-    const why = TARGET.test(out) ? 'The Android platform in the SDK could not be used by this project – open the android/ folder in Android Studio and let it install / sync the platform it asks for.' : COMPAT.test(out) ? 'This project\'s Android Gradle plugin does not work with the installed Java / Gradle – run "npm update" to get the newest Capacitor and try again.' : /licen[sc]e/i.test(out) ? 'An Android SDK licence has not been accepted – run "npm run toolchain:update" and build again.' : /No space left|ENOSPC/i.test(out) ? 'The disk is full – free some space and build again.' : /Could not resolve|UnknownHost|timed out|Connection|Could not GET/i.test(out) ? 'Gradle could not download a library – check the internet connection and build again.' : 'The Android build failed – "Copy technical details" has the full output.';
+    const why = TARGET.test(out) ? 'The Android platform in the SDK could not be used by this project – open the android/ folder in Android Studio and let it install / sync the platform it asks for.' : COMPAT.test(out) ? 'This project\'s Android Gradle plugin does not work with the installed Java / Gradle – run "npm run update:agp" (newest Android Gradle plugin) or "npm update" (newest Capacitor) and try again.' : /licen[sc]e/i.test(out) ? 'An Android SDK licence has not been accepted – run "npm run toolchain:update" and build again.' : /No space left|ENOSPC/i.test(out) ? 'The disk is full – free some space and build again.' : /Could not resolve|UnknownHost|timed out|Connection|Could not GET/i.test(out) ? 'Gradle could not download a library – check the internet connection and build again.' : 'The Android build failed – "Copy technical details" has the full output.';
     say('fail', why); return r.status === null ? 1 : r.status;
   } catch (e) { console.error(e && e.stack || e); say('fail', 'The Android build could not be started: ' + (e && e.message || e)); return 1; } finally { cleanup(); }
 })().then((c) => process.exit(c || 0));
