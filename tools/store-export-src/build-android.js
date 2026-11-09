@@ -9,19 +9,38 @@ const root = path.resolve(__dirname, '..'), dir = path.join(root, 'android'), wi
 const aab = process.argv.includes('--aab');
 const slug = (() => { try { return String(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).name || 'app').replace(/-mobile$/, ''); } catch { return 'app'; } })();
 const COMPAT = /Unsupported class file major version|Unsupported Java|requires Java|incompatible with Java|Gradle .* requires|Could not (?:initialize|create) class|BUG! exception|Unsupported (?:Gradle|major)|Failed to apply plugin|minimum supported Gradle|org\.gradle\.api\.internal\.tasks\.TaskDependencyResolveException/i;
-const TARGET = /Failed to find target with hash string|Failed to find Platform SDK|compileSdk(?:Version)? .*(?:not|unsupported)/i;
+const TARGET = /Failed to find target with hash string|Failed to find Platform SDK|Cannot cast object 'android-|does not specify `compileSdk`|compileSdk(?:Version)? .*(?:not|unsupported)/i;
 const tail = (s) => String(s).split(/\r?\n/).filter((l) => l.trim()).slice(-40).join('\n');
 function edit(file, fn) { try { if (fs.existsSync(file)) { const a = fs.readFileSync(file, 'utf8'), b = fn(a); if (b !== a) fs.writeFileSync(file, b); } } catch (e) { console.error('prepare: ' + e.message); } }
 /** installed platforms, best first: whole-number ones (android-36) are what Gradle plugins know how to find, "37.0"-style ones come after */
-function platforms(R) { try { const all = fs.readdirSync(path.join(R.sdk.root, 'platforms')).map((x) => (/^android-(\d+(?:\.\d+)?)$/.exec(x) || [])[1]).filter(Boolean).sort((a, b) => ((/\./.test(b) ? 0 : 1) - (/\./.test(a) ? 0 : 1)) || T.cmp(b, a)); const pick = T.cfg().platform; return pick !== 'auto' && all.includes(pick) ? [pick, ...all.filter((x) => x !== pick)] : all; } catch { return [R.sdk.platform]; } }
+function platforms(R) {
+  /* Platforms the Android Gradle plugin can be pointed at. Folders like "37.0" (Android 17) are used through a small link folder (see overlay()): the
+     plugin addresses a platform by its whole number, the link makes android-37 lead to the real android-37.0. Installed ones come first (they work offline);
+     if none is usable the plugin downloads platform 36 itself. Older than 35 is the last resort – current libraries need 35 or newer. */
+  let names = []; try { names = fs.readdirSync(path.join(R.sdk.root, 'platforms')).map((x) => (/^android-(\d+(?:\.\d+)?)$/.exec(x) || [])[1]).filter(Boolean); } catch { /* none */ }
+  const ints = names.filter((x) => !/\./.test(x)).sort((a, b) => +b - +a), dotted = names.filter((x) => /\./.test(x) && !ints.includes(x.split('.')[0])).sort((a, b) => T.cmp(b, a));
+  let ok = [...dotted, ...ints].filter((x) => parseInt(x, 10) >= 35).sort((a, b) => T.cmp(b, a)); const old = [...ints, ...dotted].filter((x) => parseInt(x, 10) < 35).sort((a, b) => T.cmp(b, a));
+  const pick = T.cfg().platform; if (pick !== 'auto' && ok.includes(pick)) ok = [pick, ...ok.filter((x) => x !== pick)]; if (!ok.some((x) => parseInt(x, 10) === 36)) ok.push('36'); return [...ok, ...old];
+}
+/** A folder next to Vextra's tools that looks like an SDK: every entry of the real SDK is linked in, and android-<N> leads to android-<N>.<M>. Nothing in the real SDK is moved, copied or changed. */
+function overlay(realRoot, plat) {
+  const o = path.join(T.ROOT, 'sdk-overlay'); fs.mkdirSync(path.join(o, 'platforms'), { recursive: true });
+  const rmLink = (p) => { let st; try { st = fs.lstatSync(p); } catch { return; } if (!st.isSymbolicLink()) return; try { fs.unlinkSync(p); } catch { try { fs.rmdirSync(p); } catch { /* leave it */ } } }; // never recursive: a link is removed, what it points to is untouched
+  const link = (target, p) => { rmLink(p); try { fs.symlinkSync(target, p, 'junction'); } catch (e) { if (!fs.existsSync(p)) throw e; } };
+  for (const x of fs.readdirSync(o)) if (x !== 'platforms') rmLink(path.join(o, x)); for (const x of fs.readdirSync(path.join(o, 'platforms'))) rmLink(path.join(o, 'platforms', x));
+  for (const x of fs.readdirSync(realRoot)) if (x !== 'platforms') link(path.join(realRoot, x), path.join(o, x));
+  for (const x of fs.readdirSync(path.join(realRoot, 'platforms'))) link(path.join(realRoot, 'platforms', x), path.join(o, 'platforms', x));
+  const whole = plat.split('.')[0]; if (!fs.existsSync(path.join(realRoot, 'platforms', 'android-' + whole))) link(path.join(realRoot, 'platforms', 'android-' + plat), path.join(o, 'platforms', 'android-' + whole));
+  return o;
+}
 function prepare(R, plat) {
-  const level = String(plat || '').split('.')[0], exact = /\./.test(plat || '');
+  const level = String(plat || '').split('.')[0], dotted = /\./.test(plat || ''); let root = R.sdk.root;
+  if (dotted) { try { root = overlay(R.sdk.root, plat); } catch (e) { console.error('overlay: ' + e.message); root = R.sdk.root; } }
   if (level) {
-    /* compileSdk names the exact platform folder (a "37.0" folder needs the full "android-37.0" name), targetSdk is the whole number */
-    edit(path.join(dir, 'variables.gradle'), (t) => t.replace(/(compileSdkVersion\s*=\s*)(?:\d+|'[^']*'|"[^"]*")/, '$1' + (exact ? "'android-" + plat + "'" : level)).replace(/(targetSdkVersion\s*=\s*)\d+/, '$1' + level));
-    edit(path.join(dir, 'gradle.properties'), (t) => (/android\.suppressUnsupportedCompileSdk/.test(t) ? t.replace(/android\.suppressUnsupportedCompileSdk=.*/, 'android.suppressUnsupportedCompileSdk=' + level + (exact ? ',' + plat : '')) : t.replace(/\s*$/, '\n') + 'android.suppressUnsupportedCompileSdk=' + level + (exact ? ',' + plat : '') + '\n'));
+    edit(path.join(dir, 'variables.gradle'), (t) => t.replace(/(compileSdkVersion\s*=\s*)(?:\d+|'[^']*'|"[^"]*")/, '$1' + level).replace(/(targetSdkVersion\s*=\s*)\d+/, '$1' + level));
+    edit(path.join(dir, 'gradle.properties'), (t) => { const v = level + (dotted ? ',' + plat : ''); return /android\.suppressUnsupportedCompileSdk/.test(t) ? t.replace(/android\.suppressUnsupportedCompileSdk=.*/, 'android.suppressUnsupportedCompileSdk=' + v) : t.replace(/\s*$/, '\n') + 'android.suppressUnsupportedCompileSdk=' + v + '\n'; });
   }
-  const lp = path.join(dir, 'local.properties'); fs.writeFileSync(lp, 'sdk.dir=' + R.sdk.root.replace(/\\/g, '\\\\').replace(/:/g, '\\:') + '\n');
+  const lp = path.join(dir, 'local.properties'); fs.writeFileSync(lp, 'sdk.dir=' + root.replace(/\\/g, '\\\\').replace(/:/g, '\\:') + '\n');
 }
 /** the machine-specific local.properties must never travel to Android Studio on another computer */
 function cleanup() { try { fs.unlinkSync(path.join(dir, 'local.properties')); } catch { /* none */ } }
