@@ -82,7 +82,7 @@
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.remove(); }
       else if (e.key === 'Escape') this.select([]);
       else if (e.key.startsWith('Arrow') && this.sel.length) {
-        e.preventDefault(); const s = e.shiftKey ? 10 : 1;
+        e.preventDefault(); const s = e.shiftKey ? 10 : 1; if (VX.a11y) { const f = this.items()[0]; if (f) VX.a11y.announce('Position ' + Math.round(f.x + (e.key === 'ArrowRight' ? s : e.key === 'ArrowLeft' ? -s : 0)) + ', ' + Math.round(f.y + (e.key === 'ArrowDown' ? s : e.key === 'ArrowUp' ? -s : 0))); }
         for (const it of this.items()) { if (e.key === 'ArrowLeft') it.x -= s; if (e.key === 'ArrowRight') it.x += s; if (e.key === 'ArrowUp') it.y -= s; if (e.key === 'ArrowDown') it.y += s; this.refreshItem(it); }
         this._commitSoon();
       }
@@ -134,7 +134,7 @@
       }
       this.render(); this.commit();
     }
-    select(ids) { this.sel = Array.isArray(ids) ? ids : ids ? [ids] : []; this._applyStageItems(); this._drawOverlay(); this._drawSide(); }
+    select(ids) { this.sel = Array.isArray(ids) ? ids : ids ? [ids] : []; if (VX.a11y && this.sel.length) { const it = this.doc.items.find((i) => i.id === this.sel[0]); VX.a11y.announce(this.sel.length > 1 ? this.sel.length + ' items selected' : (it ? (it.type || 'item') + ' selected' : '')); } this._applyStageItems(); this._drawOverlay(); this._drawSide(); }
 
     /* ----- zoom ----- */
     setZoom(z, auto) { if (!auto) this._auto = false; this.zoom = VX.clamp(z, 0.2, 3); this._applyZoom(); this.hooks.onZoom && this.hooks.onZoom(this.zoom); }

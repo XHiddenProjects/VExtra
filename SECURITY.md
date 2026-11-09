@@ -12,7 +12,7 @@
 | 2.0.x   | ❌ please upgrade |
 | 1.0.x   | ❌ please upgrade |
 
-Current version: **3.7.0** (see `VERSION`). This policy was last reviewed for 3.7.0.
+Current version: **3.8.0** (see `VERSION`). This policy was last reviewed for 3.8.0.
 
 ## Reporting a vulnerability
 
@@ -50,7 +50,7 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
 
-## v3.7.0 notes
+## v3.8.0 notes
 - **Loading page** (`settings.loading`): the title, subtitle, tips and colours you type are HTML-escaped when the page is generated, colours must be `#hex` values, and the logo must be a `data:image/` URL taken from your own sprites. Nothing from these settings is evaluated as code.
 - **Credit footer** for exported websites and UI designs is fixed text with no links or scripts; only its alignment and colours are configurable.
 - **Store Export toolchain:** downloads still use HTTPS to the same fixed list of hosts with SHA-256 verification. The new retry only repeats the same verified request (up to 4 times) after network errors; a download that fails its checksum is never retried or used. Java 27 is the requested JDK.

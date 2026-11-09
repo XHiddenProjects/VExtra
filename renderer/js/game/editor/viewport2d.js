@@ -21,7 +21,7 @@
     fit() { const W = this.canvas.clientWidth, H = this.canvas.clientHeight; const gw = this.project ? this.project.settings.width : 960, gh = this.project ? this.project.settings.height : 540; const z = VX.clamp(Math.min((W - 80) / gw, (H - 80) / gh), 0.1, 2); this.view = { z, x: (W - gw * z) / 2, y: (H - gh * z) / 2 }; this.render(); this.ctx.onView && this.ctx.onView(); }
     focusSelection() { const o = this.objs()[0]; if (!o) return this.fit(); const W = this.canvas.clientWidth, H = this.canvas.clientHeight; this.view.x = W / 2 - o.x * this.view.z; this.view.y = H / 2 - o.y * this.view.z; this.render(); }
     objs() { return this.scene ? this.sel.map((id) => this.scene.objects.find((o) => o.id === id)).filter(Boolean) : []; }
-    select(ids) { this.sel = ids; this.render(); this.ctx.onSelect && this.ctx.onSelect(ids); }
+    select(ids) { this.sel = ids; if (window.VX && VX.a11y && ids && ids.length) VX.a11y.announce(ids.length > 1 ? ids.length + ' objects selected' : 'Object selected'); this.render(); this.ctx.onSelect && this.ctx.onSelect(ids); }
     refresh() { this.render(); }
     render() { if (this._raf) return; this._raf = requestAnimationFrame(() => { this._raf = 0; this._draw(); }); }
 

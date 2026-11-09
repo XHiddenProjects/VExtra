@@ -1,7 +1,7 @@
 {
   "name": "vextra-studio",
   "productName": "Vextra Studio",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "Vextra Studio \u2013 professional web development and 2D/3D game creation in one workspace (Tauri v2)",
   "author": "XHiddenProjects",
   "license": "AGPL-3.0-only",

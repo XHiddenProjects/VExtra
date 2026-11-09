@@ -2,7 +2,22 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.7.0] — current
+## [3.8.0] — current
+
+### Added
+- **Languages:** Settings → Interface → Language – Español, Français, Deutsch, Português, Italiano, 日本語, 简体中文, 한국어, Русский, العربية (right-to-left) or Automatic. Menus, Settings, Welcome and file actions are translated; anything without a translation stays English. Plugins can add languages with `VX.i18n.register`.
+- **Accessibility (the gaps listed in ACCESSIBILITY.md):** landmarks, roles and accessible names for icon buttons and unlabeled fields; dialogs trap focus, restore it on close and are announced; a live announcer for toasts, tab changes and canvas selections; *Skip to the editor* link; visible (optionally extra-thick) keyboard focus; Enter / Space on tabs and tiles.
+- **Keyboard alternatives to dragging:** block graph – `[` / `]` step through blocks, arrow keys move the selection (Shift = 50), Enter opens a bundle; UI designer announces nudges.
+- **Reduce motion** (Settings → Accessibility: System / Always / Never) – stops animations and skips Camera shake in games, also in exported games when the player's system asks for it.
+- **High Contrast Dark / Light themes**, **Interface zoom** (70–200%).
+- Docs: *Languages & accessibility*.
+
+### Changed
+- **Store Export installs everything from scratch.** It no longer looks for Android Studio, `JAVA_HOME`, `GRADLE_HOME` or `ANDROID_HOME`: it downloads Java 27, the latest Gradle and the newest Android SDK (platform, build-tools, licences) into `~/.vextra/toolchain`, rechecks them before every export and, when a newer version exists, **deletes the old one** (JDK, Gradle + its caches, old SDK platforms / build-tools) before installing the new one. Disk space is checked first, interrupted downloads are cleaned up, and a failed update keeps the installed version – setup never stops the export with an error.
+- The Android build writes `mobile/dist/<name>-debug.apk` (or `-release.aab`), removes the machine-specific `local.properties`, and retries with Java 21 and the project's own Gradle if the newest Java does not fit. The `android/` folder opens in Android Studio (or on a Mac) as is; README-MOBILE explains the transfer. Capacitor packages use `latest`.
+- Plugin Store Export 2.3.0.
+
+## [3.7.0]
 
 ### Added
 - **Loading page for every game** (Game toolbar → ⏳ Loading page): shown while a game loads in exported pages and in Play. Customize the title, subtitle, progress style (bar / spinner / dots), colours, logo (one of your sprites), rotating tips, minimum time and the percentage. It has a real progress bar (runtime → pictures → start). The game starts when it is done.
@@ -11,7 +26,6 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 ### Changed
 - **Store Export uses Java 27** (falls back to the newest older release if the download service does not offer it yet). Downloads wait up to 2 minutes for a slow server and retry network errors up to 4 times instead of failing with “timed out”. Store Export plugin 2.2.1.
 
-- **Android Studio first:** if Android Studio is installed, Store Export uses its SDK as it is (the newest platform and build-tools installed there – no internet check, no warning) and, when Java 27 cannot be downloaded, its bundled Java. Update the SDK from Android Studio → SDK Manager. Store Export plugin 2.2.2.
 
 ### Fixed
 - **Spawned objects were invisible in some games** (Marble Lanes pins, Core Defender crawlers…): the Spawn block passed an empty rotation that wiped the object's default, so its 3D rotation became NaN and it was not drawn. Spawned objects now keep their defaults.

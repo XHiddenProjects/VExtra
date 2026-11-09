@@ -192,7 +192,7 @@
     loadScene(ref, opts = {}) {
       const idx = this.findSceneIndex(ref); const sc = this.data.scenes[idx]; if (!sc) { this.log('error', 'No scene to load'); return; }
       this.teardownScene(); this.sceneIndex = idx; this.scene = sc; this.dim = sc.dim || '2d';
-      this.sceneVars = {}; this.camera2d = { x: this.settings.width / 2, y: this.settings.height / 2, zoom: 1, shake: 0, follow: null, lerp: 1, offX: 0, offY: 0 };
+      this.reduceMotion = (typeof VX !== 'undefined' && VX.a11y) ? VX.a11y.reduceMotion() : !!(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches); this.sceneVars = {}; this.camera2d = { x: this.settings.width / 2, y: this.settings.height / 2, zoom: 1, shake: 0, follow: null, lerp: 1, offX: 0, offY: 0 };
       if (sc.camera2d) Object.assign(this.camera2d, { x: sc.camera2d.x ?? this.camera2d.x, y: sc.camera2d.y ?? this.camera2d.y, zoom: sc.camera2d.zoom ?? 1 });
       { const cs = sc.camera2d, vw = +cs.viewW || 0, vh = +cs.viewH || 0; if (vw > 0 || vh > 0) this.camera2d.zoom = Math.min(vw > 0 ? this.settings.width / vw : Infinity, vh > 0 ? this.settings.height / vh : Infinity); }
       const g = sc.gravity || {}; this.gravity = { x: g.x ?? 0, y: g.y ?? (this.dim === '2d' ? 980 : 0), z: g.z ?? 0 }; if (this.dim === '3d') this.gravity = { x: g.x ?? 0, y: g.y ?? -25, z: g.z ?? 0 };

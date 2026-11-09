@@ -546,6 +546,25 @@ The bar fills as the runtime starts and every sprite picture is decoded; the gam
 
 **Websites and UI designs:** Export website adds a footer “Made with Vextra Studio · © <year> XHiddenProjects” to every page (or only the home page); pick its alignment and style in the export dialog. Exported UI designs carry the same footer.`);
 
+  A('language-access', 'Getting started', 'Languages & accessibility', `# Languages & accessibility
+
+## Language
+**Settings → Interface → Language**: Español, Français, Deutsch, Português, Italiano, 日本語, 简体中文, 한국어, Русский and العربية (right-to-left layout), or *Automatic* to follow your system. The core interface (menus, Settings, Welcome, file actions) is translated; text without a translation stays in English. Plugins can add a language:
+
+\`\`\`js
+VX.i18n.register('nl', { name: 'Nederlands', dir: 'ltr', strings: { 'Settings': 'Instellingen', 'Save': 'Opslaan' } });
+\`\`\`
+
+The keys are the English texts. Choose the language in Settings afterwards.
+
+## Accessibility
+- **Screen readers:** landmarks, dialogs (focus moves in, Tab stays inside, Esc closes, focus goes back), names for icon buttons, and a live announcer for toasts, tab changes and selections.
+- **Keyboard:** *Skip to the editor* link, visible focus outline (optional extra-thick), Enter / Space on tabs and tiles. In the **block graph**: \`[\` and \`]\` step through the blocks, **arrow keys** move the selected blocks (Shift = bigger steps), Enter opens a bundle. In the **UI designer**: arrows nudge the selection (Shift = 10 px).
+- **Reduce motion:** Settings → Accessibility (System / Always / Never). Animations stop and the Camera *shake* is skipped in games – also in exported games when the player's system asks for reduced motion.
+- **High contrast:** themes *High Contrast Dark* and *High Contrast Light*, plus **Interface zoom** (70–200%).
+
+See \`ACCESSIBILITY.md\` for what is still missing and how to make your own games accessible.`);
+
   A('store-export', 'Share & publish', 'Store Export', `# Store Export (plugin)
 
 Open a game and press **📦 Store export**. Pick your targets and details, then **Create packages**. With *Install, assign and build automatically* ticked (desktop app) Vextra runs the npm steps for you and shows a **progress bar** with a live log and a Cancel button:
@@ -553,7 +572,7 @@ Open a game and press **📦 Store export**. Pick your targets and details, then
 1. Steam: \`npm install\` → \`npm run build:<your OS>\`
 2. Mobile: \`npm install\` → \`npx cap add android\` (and iOS on a Mac) → \`npm run assets\` → \`npm run patch\` → \`npx cap sync\` → \`npm run build:android\` (debug APK)
 
-If **Android Studio** is installed, its SDK is used as it is (newest installed platform and build-tools; update them in Android Studio → SDK Manager) and its bundled Java is the fallback when Java 27 cannot be downloaded. Android builds are fully automatic: **Java 27**, **Gradle** (latest release) and the **Android SDK** (newest platform + build tools) are found through JAVA_HOME / GRADLE_HOME / ANDROID_HOME or your PATH, and are downloaded and updated by themselves when missing or outdated – into your own folder (~/.vextra/toolchain), without administrator rights. Android Studio is not needed. Downloads come only from the official sites (Adoptium, gradle.org, developer.android.com / dl.google.com) over HTTPS and are verified against their published SHA-256 checksum before use. The export shows a plain checklist (prerequisites first, then each step with a spinner, check mark or cross) instead of a terminal; "Copy technical details" is there if something fails.
+Everything an Android build needs is **installed for you, from scratch** – Vextra never looks for Android Studio, \`JAVA_HOME\` or \`ANDROID_HOME\`. It downloads **Java 27**, the **latest Gradle** and the **newest Android SDK** (platform, build-tools, licences) into \`~/.vextra/toolchain\`, checks them again before every export and, when a newer version exists, **deletes the old one** and installs the new one so storage does not pile up. If a download fails it keeps working with what is already installed, and nothing in this step stops the export with an error. The build creates \`mobile/dist/<name>-debug.apk\`; if the newest Java does not suit the project it retries by itself with Java 21 and the project's own Gradle. The \`mobile/android\` folder is portable: open it in **Android Studio** on any computer (File → Open), or copy the folder to a **Mac**, run \`npm install\` + \`npm run sync\` and open Android Studio or Xcode (\`npx cap open ios\`).
 
 Steam install/build steps are required; the Android steps are skipped with a plain explanation if Java, Gradle or the SDK could not be set up (for example offline), and the project files are still written.
 

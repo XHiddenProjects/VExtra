@@ -39,6 +39,11 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
+## What's new in 3.8.0
+- **10 interface languages** (incl. right-to-left Arabic) in Settings → Language.
+- **Accessibility:** screen-reader labels and dialogs, keyboard moving of blocks, skip link, reduce motion, high-contrast themes, interface zoom.
+- **Store Export installs Java, Gradle and the Android SDK itself**, replaces old versions when updating, and produces an APK in `mobile/dist` that opens in Android Studio or on a Mac.
+
 ## What's new in 3.7.0
 - **Customizable loading page** for every game (title, colours, logo, tips, progress style) with the Vextra Studio credit.
 - Exported websites and UI designs carry a "Made with Vextra Studio · © XHiddenProjects" footer.

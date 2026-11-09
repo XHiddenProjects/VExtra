@@ -11,11 +11,19 @@ Vextra Studio should be usable by as many people as possible – both the **edit
 - **Reduced motion:** the small progress animations slow down when your system asks for reduced motion.
 - **Plain-language blocks:** every block has a text description in the Logic tab, so a graph can be read as text.
 
-**Known gaps (we are working on these)**
-- The visual editors – the block graph, the 2D / 3D viewports and the paint / animation tools – are drawn on a canvas and are **not yet screen-reader friendly**. Most of what they do can also be done from the Inspector panels, which are ordinary form fields.
-- ARIA labels, roles and focus order are incomplete in some panels.
-- There is no dedicated high-contrast theme yet.
-- Drag-and-drop actions (blocks, UI layout) do not all have a keyboard alternative yet. In *Edit UI layout* you can type the exact X / Y and pick the anchor instead of dragging.
+**Added in 3.8.0**
+- Landmarks, roles, accessible names for icon-only buttons and unlabeled fields; dialogs are announced, keep focus inside and give it back on close.
+- A live announcer reads toasts, tab changes and selections in the canvas editors.
+- *Skip to the editor* link and visible keyboard focus (optional extra-thick outline in Settings → Accessibility).
+- **High Contrast Dark / Light** themes and **Interface zoom** (70–200%).
+- **Reduce motion** (system or forced) – animations stop and games skip Camera shake.
+- Keyboard alternatives: in the block graph `[` / `]` step through blocks, arrow keys move them (Shift = bigger steps), Enter opens a bundle; in the UI designer arrows nudge (Shift = 10 px).
+- **Languages:** ten interface languages including right-to-left Arabic.
+
+**Known gaps (still being worked on)**
+- The 2D / 3D viewports and the paint / animation tools are drawn on a canvas: selection is announced, but the picture itself is not described. Everything they do can also be done from the Inspector panels, which are ordinary form fields.
+- Translations cover the core interface; many panels and the documentation are still English only.
+- Screen-reader support was tested with the browser engine's accessibility tree, not yet with every screen reader on every system.
 
 ## Games you make
 

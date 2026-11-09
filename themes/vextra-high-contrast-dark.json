@@ -1,0 +1,40 @@
+{
+ "id": "vextra-high-contrast-dark",
+ "name": "High Contrast Dark",
+ "type": "dark",
+ "colors": {
+  "bg": "#000000",
+  "bg2": "#0a0a0a",
+  "bg3": "#1a1a1a",
+  "border": "#ffffff",
+  "text": "#ffffff",
+  "muted": "#d0d0d0",
+  "accent": "#ffd400",
+  "accentFg": "#000000"
+ },
+ "editor": {
+  "rules": [
+   {
+    "token": "comment",
+    "foreground": "7ca668",
+    "fontStyle": "italic"
+   },
+   {
+    "token": "keyword",
+    "foreground": "569cd6"
+   },
+   {
+    "token": "string",
+    "foreground": "ce9178"
+   },
+   {
+    "token": "number",
+    "foreground": "b5cea8"
+   },
+   {
+    "token": "type",
+    "foreground": "4ec9b0"
+   }
+  ]
+ }
+}

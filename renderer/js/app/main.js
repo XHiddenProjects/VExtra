@@ -100,7 +100,7 @@
   /* ---------- boot ---------- */
   async function boot() {
     await app.loadSettings(); document.body.dataset.mode = app.settings.mode;
-    await VX.theme.load(); VX.theme.apply(app.settings.theme);
+    await VX.theme.load(); VX.theme.apply(app.settings.theme); VX.i18n.init(app.settings.language || 'auto'); VX.a11y.init();
     $('#app').style.setProperty('--sidew', app.settings.sidebarWidth + 'px'); $('#app').style.setProperty('--bottomh', app.settings.bottomHeight + 'px');
     { const mq = window.matchMedia('(max-width: 860px)'); const fit = () => { if (mq.matches) VX.sidebar.collapse(true); }; mq.addEventListener('change', fit); setTimeout(fit, 700); }
     drag($('#side-resizer'), (e) => { const w = VX.clamp(e.clientX - 52, 180, 560); $('#app').style.setProperty('--sidew', w + 'px'); app.set('sidebarWidth', w); });
