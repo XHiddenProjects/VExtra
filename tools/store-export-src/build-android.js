@@ -60,14 +60,13 @@ function collect() {
       const w = path.join(dir, win ? 'gradlew.bat' : 'gradlew'); if (!win) { try { fs.chmodSync(w, 0o755); } catch { /* ignore */ } } if (fs.existsSync(w)) wrap = w;
     }
     const run = () => { r = gradle(wrap || T.gradleBin(R.gradle.home), R); out = (r.stdout || '') + (r.stderr || ''); };
-    /* Gradle 9 cannot run Android Gradle plugin 8 or older: go straight to the matching setup instead of failing first */
-    if (!R.gradle) { const w0 = path.join(dir, win ? 'gradlew.bat' : 'gradlew'); if (!win) { try { fs.chmodSync(w0, 0o755); } catch { /* ignore */ } } if (fs.existsSync(w0)) wrap = w0; else { say('fail', 'The project has no Gradle wrapper – pick a Gradle in the Android tools dialog.'); return 2; } }
-    let agp = 0; try { const m = /com\.android\.tools\.build:gradle:(\d+)/.exec(fs.readFileSync(path.join(dir, 'build.gradle'), 'utf8')); agp = m ? +m[1] : 0; } catch { /* unknown */ }
-    if (agp && agp < 9) { say('run', 'This project uses Android Gradle plugin ' + agp + ' – using Java 21 and the project\'s own Gradle …'); try { await useFallback(); } catch (e) { console.error('fallback: ' + (e && e.message || e)); } }
+    /* the wrapper points at the latest Gradle (services.gradle.org); if the project's Android Gradle plugin cannot run on it, the original version is restored */
+    let wr = null; try { wr = await T.setWrapper(dir); if (wr && wr.changed) say('run', 'Gradle wrapper set to the latest release: ' + wr.url.replace(/^.*gradle-/, 'gradle-').replace(/-bin\.zip$/, '')); } catch { /* keep the project's own */ }
     let fell = !!wrap;
     for (;;) {
       const plat = plats[ti] || R.sdk.platform; prepare(R, plat); say('run', 'Building the Android ' + (aab ? 'bundle' : 'app') + ' (Java ' + R.java.major + ', Gradle ' + (wrap ? 'of the project' : R.gradle && R.gradle.version) + ', Android ' + plat + ') – the first build can take several minutes …');
       run();
+      if (r.status !== 0 && wr && wr.changed && COMPAT.test(out)) { T.restoreWrapper(wr); wr.changed = false; say('run', 'This project\'s Android Gradle plugin needs an older Gradle – using the version the project asks for …'); run(); }
       if (r.status !== 0 && !fell && COMPAT.test(out)) { fell = true; say('run', 'The newest Java / Gradle does not fit this project – trying again with Java 21 and the project\'s own Gradle …'); try { await useFallback(); prepare(R, plat); run(); } catch (e) { console.error('fallback: ' + (e && e.message || e)); } }
       if (r.status !== 0 && TARGET.test(out) && ti + 1 < plats.length) { ti++; say('run', 'Android ' + plat + ' is not usable with this project – trying Android ' + plats[ti] + ' …'); continue; }
       break;

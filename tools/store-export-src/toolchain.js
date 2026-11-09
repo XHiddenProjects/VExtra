@@ -99,7 +99,7 @@ function setKeep(kind, list) { const s = readState(); s.keep = Object.assign({},
 
 /* ---------- what the user chose (scripts/toolchain.config.json, written by Vextra's "Android tools" dialog) ---------- */
 const CFG_FILE = path.join(__dirname, 'toolchain.config.json');
-function cfg() { try { const c = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); return { java: String(c.java || 'managed'), gradle: String(c.gradle || 'managed'), sdk: String(c.sdk || 'auto'), platform: String(c.platform || 'auto') }; } catch { return { java: 'managed', gradle: 'managed', sdk: 'auto', platform: 'auto' }; } }
+function cfg() { try { const c = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); return { java: String(c.java || 'auto'), gradle: String(c.gradle || 'project'), sdk: String(c.sdk || 'auto'), platform: String(c.platform || 'auto') }; } catch { return { java: 'auto', gradle: 'project', sdk: 'auto', platform: 'auto' }; } }
 const realp = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
 
 /* ---------- DETECT: looks at the computer only – nothing is downloaded, installed or changed ---------- */
@@ -154,7 +154,7 @@ function gradleCandidates() {
 function detect() { const studios = studioInstalls(); return { platform: process.platform, arch: process.arch, studios, sdks: sdkCandidates(), javas: javaCandidates(studios), gradles: gradleCandidates(), config: cfg(), toolRoot: ROOT }; }
 
 /* ---------- JAVA ---------- */
-const DEFAULT_JAVA = 27;
+const DEFAULT_JAVA = 21; // Android Gradle plugins run on Java 17–23; 21 is the long-term-support release
 const javaBin = (h) => path.join(h, 'bin', exe('java'));
 const jdkDir = (major) => path.join(ROOT, 'jdk', 'jdk-' + major);
 const homeOf = (d) => (mac && exists(path.join(d, 'Contents', 'Home')) ? path.join(d, 'Contents', 'Home') : d);
@@ -171,9 +171,11 @@ async function latestJava(want) {
   const pk = x.binary.package; return { major, release: x.release_name || String(x.version && x.version.semver), version: (x.version && x.version.semver) || x.release_name, url: pk.link, sha256: pk.checksum, name: pk.name };
 }
 function pruneJava(extra) { const keep = keepOf('java', [DEFAULT_JAVA].concat(extra == null ? [] : extra)); for (const x of ls(path.join(ROOT, 'jdk'))) { const m = /^jdk-(\d+)$/.exec(x); if (!m || !keep.has(m[1])) rmrf(path.join(ROOT, 'jdk', x)); } }
-function chosenJava() { const c = cfg().java; if (!c || c === 'managed') return null; const i = javaInfo(c); return i ? Object.assign(i, { source: 'chosen', dir: c, release: '' }) : null; }
+/** Java that is already on the computer and fits Android builds (17–23): Android Studio's own first, then JAVA_HOME / PATH */
+function autoJava() { let l = []; try { l = javaCandidates(studioInstalls()).filter((j) => (j.source === 'studio' || j.source === 'env' || j.source === 'path') && j.major >= 17 && j.major <= 23); } catch { /* none */ } l.sort((a, b) => (a.source === 'studio' ? 0 : 1) - (b.source === 'studio' ? 0 : 1) || b.major - a.major); const j = l[0]; if (!j) return null; const i = javaInfo(j.home); return i ? Object.assign(i, { source: 'chosen', dir: j.home, release: '', label: j.label }) : null; }
+function chosenJava() { const c = cfg().java; if (!c || c === 'managed') return null; if (c === 'auto') return autoJava(); const i = javaInfo(c); return i ? Object.assign(i, { source: 'chosen', dir: c, release: '' }) : null; }
 async function ensureJava(opts = {}) {
-  if (!opts.major) { const c = cfg().java; if (c && c !== 'managed') { const ch = chosenJava(); if (ch) { emit('jdk', 'ok', 'Using the Java you chose: Java ' + ch.full + ' (' + ch.home + ') – nothing to download'); return ch; } emit('jdk', 'warn', 'The Java you chose could not be started – Java 27 will be downloaded instead'); } }
+  if (!opts.major) { const c = cfg().java; if (c && c !== 'managed') { const ch = chosenJava(); if (ch) { emit('jdk', 'ok', 'Using Java ' + ch.full + (ch.label ? ' – ' + ch.label : '') + ' (' + ch.home + ') – nothing to download'); return ch; } if (c !== 'auto') emit('jdk', 'warn', 'The Java you chose could not be started – Java ' + DEFAULT_JAVA + ' will be downloaded instead'); } }
   const want = +opts.major || DEFAULT_JAVA; cleanTemp(); emit('jdk', 'run', 'Looking for Java …');
   let latest = null; try { latest = await latestJava(want); } catch { /* offline */ }
   const have = managedJava(latest ? latest.major : want) || (latest ? null : managedJava()); const same = have && latest && have.release === latest.release;
@@ -205,7 +207,7 @@ function pruneGradle(extra) {
 }
 function chosenGradle() { const c = cfg().gradle; if (!c || c === 'managed' || c === 'project') return null; if (!exists(gradleBin(c))) return null; const m = /gradle-(\d[\w.-]*)$/.exec(path.basename(c)); return { home: c, version: m ? m[1].replace(/-(bin|all)$/, '') : '?', source: 'chosen' }; }
 async function ensureGradle(opts = {}) {
-  { const c = cfg().gradle; if (c === 'project') { emit('gradle', 'ok', 'The project\'s own Gradle (the Gradle wrapper) will be used – no separate Gradle is installed'); return null; } if (c && c !== 'managed') { const ch = chosenGradle(); if (ch) { emit('gradle', 'ok', 'Using the Gradle you chose: ' + ch.version + ' – nothing to download'); return ch; } emit('gradle', 'warn', 'The Gradle you chose was not found – the latest Gradle will be downloaded instead'); } }
+  { const c = cfg().gradle; if (c === 'project') { emit('gradle', 'ok', 'Gradle: the project\'s wrapper fetches the latest release from services.gradle.org when the app is built'); return null; } if (c && c !== 'managed') { const ch = chosenGradle(); if (ch) { emit('gradle', 'ok', 'Using the Gradle you chose: ' + ch.version + ' – nothing to download'); return ch; } emit('gradle', 'warn', 'The Gradle you chose was not found – the latest Gradle will be downloaded instead'); } }
   const want = opts.version || 'latest'; cleanTemp(); emit('gradle', 'run', 'Looking for Gradle …');
   let latest = null; try { latest = await gradleRelease(want); } catch { /* offline */ }
   const have = managedGradle(latest ? latest.version : want) || (latest ? null : managedGradle(want)); const same = have && latest && cmp(have.version, latest.version) === 0, newer = have && latest && want === 'latest' && cmp(have.version, latest.version) > 0;
@@ -220,6 +222,16 @@ async function ensureGradle(opts = {}) {
   if (!exists(gradleBin(dest))) { rmrf(dest); emit('gradle', 'fail', 'Gradle was unpacked but its launcher is missing.'); throw new Error('bad gradle'); }
   pruneGradle(latest.version); emit('gradle', 'ok', (have ? 'Updated to Gradle ' : 'Installed Gradle ') + latest.version + (have && have.version !== latest.version ? ' (the old version was deleted)' : '')); return { home: dest, version: latest.version, source: 'downloaded' };
 }
+
+/** Points android/gradle/wrapper/gradle-wrapper.properties at the latest Gradle on services.gradle.org (offline: left as it is). Returns the previous distributionUrl so a build can go back to it. */
+async function setWrapper(androidDir) {
+  const f = path.join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'); if (!exists(f)) return null;
+  const text = fs.readFileSync(f, 'utf8'), prev = (/^distributionUrl=(.*)$/m.exec(text) || [])[1] || null; let latest; try { latest = await latestGradle(); } catch { return { file: f, previous: prev, changed: false }; }
+  const url = 'https://services.gradle.org/distributions/gradle-' + latest.version + '-bin.zip', esc = url.replace(/:/g, '\\:'); if (prev && prev.replace(/\\/g, '') === url) return { file: f, previous: prev, changed: false, url };
+  let out = text.replace(/^distributionUrl=.*$/m, 'distributionUrl=' + esc).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); if (latest.sha256) out = out.replace(/\s*$/, '\n') + 'distributionSha256Sum=' + latest.sha256 + '\n';
+  fs.writeFileSync(f, out); return { file: f, previous: prev, changed: true, url };
+}
+function restoreWrapper(w) { if (!w || !w.changed || !w.previous) return; try { let t = fs.readFileSync(w.file, 'utf8').replace(/^distributionUrl=.*$/m, 'distributionUrl=' + w.previous).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); fs.writeFileSync(w.file, t); } catch { /* ignore */ } }
 
 /* ---------- ANDROID SDK ---------- */
 const SDK = path.join(ROOT, 'android-sdk');
@@ -291,12 +303,12 @@ function envWith(javaHome, sdkRoot) {
 }
 /** Everything the build needs, from the managed folder only (run `all` first). */
 function resolve(o = {}) {
-  const java = (!o.javaMajor && chosenJava()) || managedJava(o.javaMajor) || (o.javaMajor ? null : managedJava()), gradle = chosenGradle() || (cfg().gradle === 'project' ? null : managedGradle(o.gradleVersion) || (o.gradleVersion && o.gradleVersion !== 'latest' ? null : managedGradle()));
+  const java = (!o.javaMajor && chosenJava()) || managedJava(o.javaMajor || DEFAULT_JAVA) || (o.javaMajor ? null : managedJava()), gradle = chosenGradle() || (cfg().gradle === 'project' ? null : managedGradle(o.gradleVersion) || (o.gradleVersion && o.gradleVersion !== 'latest' ? null : managedGradle()));
   const cs = chosenSdk(), sr = cs ? cs.root : readState().sdkRoot && exists(readState().sdkRoot) ? readState().sdkRoot : SDK, p = cs ? cs.platform : sdkPlatform(sr), sdk = p ? { root: sr, platform: p, buildTools: sdkBuildTools(sr) } : null;
   return { java, gradle, sdk, env: envWith(java && java.home, sdk && sdk.root) };
 }
 function prune() { pruneJava(); pruneGradle(); pruneSdk(SDK, null); }
-module.exports = { detect, cfg, chosenJava, get, fetchVerified, resolve, envWith, cmp, parseSdkList, parseCmdlineTools, parseRepoXml, unzip, ROOT, gradleBin, sdkPlatform, sdkBuildTools, emit, setEmitId, readState, writeState, ensureJava, ensureGradle, ensureSdk, managedJava, managedGradle, pruneJava, pruneGradle, prune, setKeep, keepOf, DEFAULT_JAVA, latestGradle };
+module.exports = { setWrapper, restoreWrapper, detect, cfg, chosenJava, get, fetchVerified, resolve, envWith, cmp, parseSdkList, parseCmdlineTools, parseRepoXml, unzip, ROOT, gradleBin, sdkPlatform, sdkBuildTools, emit, setEmitId, readState, writeState, ensureJava, ensureGradle, ensureSdk, managedJava, managedGradle, pruneJava, pruneGradle, prune, setKeep, keepOf, DEFAULT_JAVA, latestGradle };
 
 if (require.main === module) {
   (async () => {
