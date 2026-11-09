@@ -96,6 +96,63 @@ function swapIn(src, dest) { const old = exists(dest) ? dest + '.old-' + Date.no
 const keepOf = (kind, extra) => { const k = (readState().keep || {})[kind]; return new Set([...(Array.isArray(k) ? k : []), ...[].concat(extra == null ? [] : extra)].map(String)); };
 function setKeep(kind, list) { const s = readState(); s.keep = Object.assign({}, s.keep, { [kind]: list.map(String) }); writeState(s); }
 
+
+/* ---------- what the user chose (scripts/toolchain.config.json, written by Vextra's "Android tools" dialog) ---------- */
+const CFG_FILE = path.join(__dirname, 'toolchain.config.json');
+function cfg() { try { const c = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); return { java: String(c.java || 'managed'), gradle: String(c.gradle || 'managed'), sdk: String(c.sdk || 'auto'), platform: String(c.platform || 'auto') }; } catch { return { java: 'managed', gradle: 'managed', sdk: 'auto', platform: 'auto' }; } }
+const realp = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
+
+/* ---------- DETECT: looks at the computer only – nothing is downloaded, installed or changed ---------- */
+function studioInstalls() {
+  const h = os.homedir(), env = process.env, found = [], seen = new Set(), dirs = [];
+  const kids = (d, re) => ls(d).filter((x) => re.test(x)).map((x) => path.join(d, x));
+  if (win) {
+    for (const b of [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Programs')].filter(Boolean)) { dirs.push(...kids(b, /^Android Studio/i), ...kids(path.join(b, 'Android'), /^Android Studio/i)); }
+    if (env.LOCALAPPDATA) { const tb = path.join(env.LOCALAPPDATA, 'JetBrains', 'Toolbox', 'apps'); for (const a of ls(tb).filter((x) => /android.?studio/i.test(x))) for (const ch of ls(path.join(tb, a))) for (const v of ls(path.join(tb, a, ch))) dirs.push(path.join(tb, a, ch, v)); }
+  } else if (mac) {
+    for (const b of ['/Applications', path.join(h, 'Applications')]) dirs.push(...kids(b, /^Android Studio.*\.app$/i));
+    const tb = path.join(h, 'Library', 'Application Support', 'JetBrains', 'Toolbox', 'apps'); for (const a of ls(tb).filter((x) => /android.?studio/i.test(x))) for (const ch of ls(path.join(tb, a))) for (const v of ls(path.join(tb, a, ch))) dirs.push(...kids(path.join(tb, a, ch, v), /\.app$/i));
+  } else {
+    for (const b of ['/opt', '/usr/local', h, path.join(h, '.local', 'share', 'JetBrains', 'Toolbox', 'apps'), '/snap/android-studio/current']) dirs.push(...kids(b, /android.?studio/i));
+    dirs.push('/snap/android-studio/current/android-studio');
+  }
+  for (const d of dirs) {
+    const root = realp(d); if (seen.has(root)) continue; const res = mac && root.endsWith('.app') ? path.join(root, 'Contents') : root;
+    const exeOk = win ? exists(path.join(root, 'bin', 'studio64.exe')) || exists(path.join(root, 'bin', 'studio.exe')) : mac ? exists(path.join(res, 'MacOS')) : exists(path.join(root, 'bin', 'studio.sh')) || exists(path.join(root, 'bin', 'studio'));
+    if (!exeOk) continue; seen.add(root);
+    let version = '', build = ''; for (const f of [path.join(res, 'product-info.json'), path.join(res, 'Resources', 'product-info.json')]) { try { const j = JSON.parse(fs.readFileSync(f, 'utf8')); version = j.version || ''; build = j.buildNumber || ''; break; } catch { /* next */ } }
+    if (!version && mac) { try { version = (/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)/.exec(fs.readFileSync(path.join(res, 'Info.plist'), 'utf8')) || [])[1] || ''; } catch { /* none */ } }
+    const jbr = [path.join(res, 'jbr', 'Contents', 'Home'), path.join(res, 'jbr')].find((x) => exists(javaBin(x))) || null;
+    found.push({ path: root, version, build, jbr });
+  }
+  return found;
+}
+function sdkCandidates() {
+  const h = os.homedir(), env = process.env, list = [], seen = new Set();
+  const add = (r, source) => { if (!r) return; const k = realp(r); if (seen.has(k) || !exists(r)) return; seen.add(k); const platforms = ls(path.join(r, 'platforms')).map(platVer).filter(Boolean).sort(cmp).reverse(), buildTools = ls(path.join(r, 'build-tools')).filter((x) => /^\d+(\.\d+)+$/.test(x)).sort(cmp).reverse(), pt = exists(path.join(r, 'platform-tools')); list.push({ root: r, source, platforms, buildTools, platformTools: pt, complete: !!(platforms.length && buildTools.length && pt) }); };
+  add(env.ANDROID_HOME, 'ANDROID_HOME'); add(env.ANDROID_SDK_ROOT, 'ANDROID_SDK_ROOT');
+  if (win && env.LOCALAPPDATA) add(path.join(env.LOCALAPPDATA, 'Android', 'Sdk'), 'Android Studio default');
+  if (mac) add(path.join(h, 'Library', 'Android', 'sdk'), 'Android Studio default');
+  add(path.join(h, 'Android', 'Sdk'), 'Android Studio default'); add(path.join(h, 'Android', 'sdk'), 'Android Studio default');
+  add(SDK, 'Vextra (downloaded)'); return list;
+}
+function javaCandidates(studios) {
+  const list = [], seen = new Set(); const add = (home, label, source) => { if (!home) return; const i = javaInfo(home); if (!i) return; const k = realp(i.home); if (seen.has(k)) return; seen.add(k); list.push({ home: i.home, major: i.major, full: i.full, label, source }); };
+  for (const m of ls(path.join(ROOT, 'jdk')).filter((x) => /^jdk-\d+$/.test(x))) add(homeOf(path.join(ROOT, 'jdk', m)), 'Vextra download (' + m + ')', 'vextra');
+  for (const s of studios) add(s.jbr, 'Android Studio\'s bundled Java (JBR)', 'studio');
+  add(process.env.JAVA_HOME, 'JAVA_HOME', 'env');
+  for (const d of String(process.env.PATH || process.env.Path || '').split(path.delimiter)) { if (d && exists(path.join(d, exe('java')))) { const home = path.dirname(realp(path.join(d, exe('java')))); add(path.dirname(home), 'Java on the PATH', 'path'); } }
+  return list;
+}
+function gradleCandidates() {
+  const list = [], seen = new Set(); const add = (home, label, source) => { if (!home || !exists(gradleBin(home))) return; const k = realp(home); if (seen.has(k)) return; seen.add(k); const m = /gradle-(\d[\w.-]*)$/.exec(path.basename(home)); list.push({ home, version: m ? m[1].replace(/-(bin|all)$/, '') : '?', label, source }); };
+  for (const x of ls(path.join(ROOT, 'gradle')).filter((y) => /^gradle-\d/.test(y))) add(path.join(ROOT, 'gradle', x), 'Vextra download', 'vextra');
+  add(process.env.GRADLE_HOME, 'GRADLE_HOME', 'env');
+  const wd = path.join(os.homedir(), '.gradle', 'wrapper', 'dists'); for (const d of ls(wd)) for (const hsh of ls(path.join(wd, d))) for (const g of ls(path.join(wd, d, hsh)).filter((y) => /^gradle-\d/.test(y))) add(path.join(wd, d, hsh, g), 'Already downloaded by a Gradle wrapper', 'wrapper');
+  return list;
+}
+function detect() { const studios = studioInstalls(); return { platform: process.platform, arch: process.arch, studios, sdks: sdkCandidates(), javas: javaCandidates(studios), gradles: gradleCandidates(), config: cfg(), toolRoot: ROOT }; }
+
 /* ---------- JAVA ---------- */
 const DEFAULT_JAVA = 27;
 const javaBin = (h) => path.join(h, 'bin', exe('java'));
@@ -114,7 +171,9 @@ async function latestJava(want) {
   const pk = x.binary.package; return { major, release: x.release_name || String(x.version && x.version.semver), version: (x.version && x.version.semver) || x.release_name, url: pk.link, sha256: pk.checksum, name: pk.name };
 }
 function pruneJava(extra) { const keep = keepOf('java', [DEFAULT_JAVA].concat(extra == null ? [] : extra)); for (const x of ls(path.join(ROOT, 'jdk'))) { const m = /^jdk-(\d+)$/.exec(x); if (!m || !keep.has(m[1])) rmrf(path.join(ROOT, 'jdk', x)); } }
+function chosenJava() { const c = cfg().java; if (!c || c === 'managed') return null; const i = javaInfo(c); return i ? Object.assign(i, { source: 'chosen', dir: c, release: '' }) : null; }
 async function ensureJava(opts = {}) {
+  if (!opts.major) { const c = cfg().java; if (c && c !== 'managed') { const ch = chosenJava(); if (ch) { emit('jdk', 'ok', 'Using the Java you chose: Java ' + ch.full + ' (' + ch.home + ') – nothing to download'); return ch; } emit('jdk', 'warn', 'The Java you chose could not be started – Java 27 will be downloaded instead'); } }
   const want = +opts.major || DEFAULT_JAVA; cleanTemp(); emit('jdk', 'run', 'Looking for Java …');
   let latest = null; try { latest = await latestJava(want); } catch { /* offline */ }
   const have = managedJava(latest ? latest.major : want) || (latest ? null : managedJava()); const same = have && latest && have.release === latest.release;
@@ -144,7 +203,9 @@ function pruneGradle(extra) {
   for (const x of ls(path.join(GRADLE_HOME_DIR, 'wrapper', 'dists'))) { const m = /^gradle-(\d[\w.-]*?)-(bin|all)$/.exec(x); if (!m || !keep.has(m[1])) rmrf(path.join(GRADLE_HOME_DIR, 'wrapper', 'dists', x)); }
   rmrf(path.join(GRADLE_HOME_DIR, 'daemon', 'old'));
 }
+function chosenGradle() { const c = cfg().gradle; if (!c || c === 'managed' || c === 'project') return null; if (!exists(gradleBin(c))) return null; const m = /gradle-(\d[\w.-]*)$/.exec(path.basename(c)); return { home: c, version: m ? m[1].replace(/-(bin|all)$/, '') : '?', source: 'chosen' }; }
 async function ensureGradle(opts = {}) {
+  { const c = cfg().gradle; if (c === 'project') { emit('gradle', 'ok', 'The project\'s own Gradle (the Gradle wrapper) will be used – no separate Gradle is installed'); return null; } if (c && c !== 'managed') { const ch = chosenGradle(); if (ch) { emit('gradle', 'ok', 'Using the Gradle you chose: ' + ch.version + ' – nothing to download'); return ch; } emit('gradle', 'warn', 'The Gradle you chose was not found – the latest Gradle will be downloaded instead'); } }
   const want = opts.version || 'latest'; cleanTemp(); emit('gradle', 'run', 'Looking for Gradle …');
   let latest = null; try { latest = await gradleRelease(want); } catch { /* offline */ }
   const have = managedGradle(latest ? latest.version : want) || (latest ? null : managedGradle(want)); const same = have && latest && cmp(have.version, latest.version) === 0, newer = have && latest && want === 'latest' && cmp(have.version, latest.version) > 0;
@@ -183,13 +244,15 @@ function pruneSdk(root, sm) {
   for (const x of ['.temp', '.downloadIntermediates']) rmrf(path.join(root, x)); return removed;
 }
 /** An Android SDK that is already on this computer (Android Studio installs one) – used as it is when it is complete; never modified or deleted. */
+function chosenSdk() { const c = cfg(); if (c.sdk === 'auto' || c.sdk === 'managed') return null; const p = sdkPlatform(c.sdk), b = sdkBuildTools(c.sdk); if (!p || !b) return null; return { root: c.sdk, platform: c.platform !== 'auto' && exists(path.join(c.sdk, 'platforms', 'android-' + c.platform)) ? c.platform : p, buildTools: b, existing: true }; }
 function existingSdk() {
+  if (cfg().sdk === 'managed') return null; const ch = chosenSdk(); if (ch) return ch; if (cfg().sdk !== 'auto') emit('sdk', 'warn', 'The Android SDK you chose is not complete – looking for another one');
   const h = os.homedir(), c = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT, win && process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Android', 'Sdk'), mac && path.join(h, 'Library', 'Android', 'sdk'), path.join(h, 'Android', 'Sdk'), path.join(h, 'Android', 'sdk')].filter(Boolean);
   for (const r of c) { if (path.resolve(r) === path.resolve(SDK)) continue; const p = sdkPlatform(r), b = sdkBuildTools(r); if (p && b && exists(path.join(r, 'platform-tools'))) return { root: r, platform: p, buildTools: b, existing: true }; }
   return null;
 }
 async function ensureSdk(jdkIn, opts = {}) {
-  cleanTemp(); const ex = existingSdk(); if (ex) { const st = readState(); st.sdkRoot = ex.root; writeState(st); emit('sdk', 'ok', 'Using the Android SDK that is already installed (Android Studio): platform ' + ex.platform + ', build-tools ' + ex.buildTools + ' – nothing to download'); return ex; }
+  cleanTemp(); const ex = existingSdk(); if (ex) { const st = readState(); st.sdkRoot = ex.root; writeState(st); emit('sdk', 'ok', 'Using the Android SDK that is already installed (' + ex.root + '): platform ' + ex.platform + ', build-tools ' + ex.buildTools + ' – nothing to download'); return ex; }
   { const st = readState(); if (st.sdkRoot) { delete st.sdkRoot; writeState(st); } }
   emit('sdk', 'run', 'Looking for the Android SDK …'); const root = SDK; let mgr = sdkMgr(root);
   if (opts.check) { const p = sdkPlatform(root); emit('sdk', mgr || p ? 'ok' : 'warn', mgr || p ? 'Android SDK installed' + (p ? ' (platform ' + p + ')' : '') + ' – checked for updates before each build; older platforms are deleted when a newer one is installed' : 'The Android SDK is not installed – it will be downloaded automatically'); return mgr ? { root, platform: p } : null; }
@@ -228,18 +291,19 @@ function envWith(javaHome, sdkRoot) {
 }
 /** Everything the build needs, from the managed folder only (run `all` first). */
 function resolve(o = {}) {
-  const java = managedJava(o.javaMajor) || (o.javaMajor ? null : managedJava()), gradle = managedGradle(o.gradleVersion) || (o.gradleVersion && o.gradleVersion !== 'latest' ? null : managedGradle());
-  const sr = readState().sdkRoot && exists(readState().sdkRoot) ? readState().sdkRoot : SDK, p = sdkPlatform(sr), sdk = p ? { root: sr, platform: p, buildTools: sdkBuildTools(sr) } : null;
+  const java = (!o.javaMajor && chosenJava()) || managedJava(o.javaMajor) || (o.javaMajor ? null : managedJava()), gradle = chosenGradle() || (cfg().gradle === 'project' ? null : managedGradle(o.gradleVersion) || (o.gradleVersion && o.gradleVersion !== 'latest' ? null : managedGradle()));
+  const cs = chosenSdk(), sr = cs ? cs.root : readState().sdkRoot && exists(readState().sdkRoot) ? readState().sdkRoot : SDK, p = cs ? cs.platform : sdkPlatform(sr), sdk = p ? { root: sr, platform: p, buildTools: sdkBuildTools(sr) } : null;
   return { java, gradle, sdk, env: envWith(java && java.home, sdk && sdk.root) };
 }
 function prune() { pruneJava(); pruneGradle(); pruneSdk(SDK, null); }
-module.exports = { get, fetchVerified, resolve, envWith, cmp, parseSdkList, parseCmdlineTools, parseRepoXml, unzip, ROOT, gradleBin, sdkPlatform, sdkBuildTools, emit, setEmitId, readState, writeState, ensureJava, ensureGradle, ensureSdk, managedJava, managedGradle, pruneJava, pruneGradle, prune, setKeep, keepOf, DEFAULT_JAVA, latestGradle };
+module.exports = { detect, cfg, chosenJava, get, fetchVerified, resolve, envWith, cmp, parseSdkList, parseCmdlineTools, parseRepoXml, unzip, ROOT, gradleBin, sdkPlatform, sdkBuildTools, emit, setEmitId, readState, writeState, ensureJava, ensureGradle, ensureSdk, managedJava, managedGradle, pruneJava, pruneGradle, prune, setKeep, keepOf, DEFAULT_JAVA, latestGradle };
 
 if (require.main === module) {
   (async () => {
     const cmd = process.argv[2] || 'check', arg = process.argv[3], check = cmd === 'check';
     const guard = (id, p) => p.catch((e) => { if (check) emit(id, 'warn', String(e.message)); else throw e; });
     try {
+      if (cmd === 'detect') { console.log('@@vx-detect ' + JSON.stringify(detect())); return; }
       if (cmd === 'env') { const r = resolve(); console.log(JSON.stringify({ java: r.java && r.java.home, gradle: r.gradle && r.gradle.home, sdk: r.sdk && r.sdk.root }, null, 1)); return; }
       if (cmd === 'prune') { prune(); console.log('pruned'); return; }
       if (cmd === 'jdk' || cmd === 'all' || check) await guard('jdk', ensureJava({ check, major: cmd === 'jdk' ? +arg || 0 : 0 }));
