@@ -89,6 +89,70 @@
       if (d.type === 'key') { const k = d.key; if (d.down) { if (!I.keys.has(k)) I.pressed.add(k); I.keys.add(k); I.emit('keydown', { key: k, code: k }); } else { I.keys.delete(k); I.released.add(k); I.emit('keyup', { key: k, code: k }); } }
       if (d.type === 'pause') g.pause(d.value); if (d.type === 'restart') g.restart(); if (d.type === 'debug') g.debug = !!d.value; if (d.type === 'mute') { g.audio.muted = !!d.value; g.audio.ensure(); }
     });
+    try { VXRT.initTouchControls(g); } catch (e) { g.log && g.log('warn', 'Touch controls: ' + e.message); }
+  };
+
+  /* ---------- on-screen touch controls (phones / tablets) ----------
+     Shown on touch screens only (settings.touch.mode: 'auto' | 'on' | 'off'). They press the same keys a keyboard would, so every game works unchanged:
+     the left stick presses W A S D / the arrow keys the game listens to, the round buttons press the other keys the game uses (space, shift, M …),
+     and dragging anywhere else looks around in first-person games (Locked Mouse block). Games that only use the mouse / touch get no overlay. */
+  const KEY_LABEL = { space: 'Jump', shift: 'Sneak', enter: 'OK', escape: 'Menu', control: 'Ctrl', tab: 'Tab', ' ': 'Jump' };
+  const MOVE = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
+  const VALID_KEY = /^(?:[a-z0-9]|space|shift|enter|escape|tab|control|alt|arrow(?:up|down|left|right)|f\d{1,2})$/;
+  function scanKeys(g) {
+    const keys = new Set(); let look = false;
+    for (const b of Object.values((g.data && g.data.behaviors) || {})) for (const n of ((b.graph && b.graph.nodes) || [])) {
+      if (n.type === 'lockedMouse') look = true;
+      for (const [k, v] of Object.entries(n.params || {})) if (/^(key|testKey|quietKey|keys?\d*)$/i.test(k) && typeof v === 'string') { const a = VXRT.keyAlias(v); if (VALID_KEY.test(a)) keys.add(a); }
+    }
+    return { keys, look };
+  }
+  VXRT.initTouchControls = function (g) {
+    const I = g.input, cfg = Object.assign({ mode: 'auto' }, (g.settings && g.settings.touch) || {});
+    const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+    if (cfg.mode === 'off' || (cfg.mode !== 'on' && !coarse)) return;
+    const sc = scanKeys(g), moveKeys = [...sc.keys].filter((k) => MOVE.has(k)), wasd = moveKeys.some((k) => k.length === 1), arrows = moveKeys.some((k) => k.startsWith('arrow'));
+    const others = [...sc.keys].filter((k) => !MOVE.has(k) && k !== 'any');
+    const buttons = Array.isArray(cfg.buttons) && cfg.buttons.length ? cfg.buttons.map((b) => ({ label: b.label || String(b.key).toUpperCase(), key: VXRT.keyAlias(b.key) })) : others.slice(0, 6).map((k) => ({ label: KEY_LABEL[k] || String(k).toUpperCase().slice(0, 5), key: k }));
+    const stick = moveKeys.length > 0 || cfg.stick === true, look = g.dim === '3d' && sc.look && cfg.look !== false;
+    if (!stick && !buttons.length && !look) return; // mouse / touch only game: nothing to add
+    const vkey = (k, down) => { if (down) { if (!I.keys.has(k)) { I.pressed.add(k); I.emit('keydown', { key: k, code: k, repeat: false }); } I.keys.add(k); } else if (I.keys.has(k)) { I.keys.delete(k); I.released.add(k); I.emit('keyup', { key: k, code: k }); } };
+    const mk = (css, attrs) => { const e = document.createElement('div'); e.style.cssText = css; if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+    const root = mk('position:absolute;inset:0;pointer-events:none;z-index:40;-webkit-tap-highlight-color:transparent;touch-action:none', { 'data-vx-touch': 'root' });
+    const safe = 'max(18px,env(safe-area-inset-bottom))', safeL = 'max(18px,env(safe-area-inset-left))', safeR = 'max(18px,env(safe-area-inset-right))';
+    const down = new Set(), cleanup = [];
+    if (stick) {
+      const R = 66, base = mk('position:absolute;left:' + safeL + ';bottom:' + safe + ';width:' + R * 2 + 'px;height:' + R * 2 + 'px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none', { 'data-vx-touch': 'stick', role: 'group', 'aria-label': 'Move' });
+      const knob = mk('position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none'); base.append(knob);
+      let pid = null; const names = { up: [wasd ? 'w' : null, arrows ? 'arrowup' : null], down: [wasd ? 's' : null, arrows ? 'arrowdown' : null], left: [wasd ? 'a' : null, arrows ? 'arrowleft' : null], right: [wasd ? 'd' : null, arrows ? 'arrowright' : null] };
+      if (!wasd && !arrows) { names.up = ['w']; names.down = ['s']; names.left = ['a']; names.right = ['d']; }
+      const set = (dir, on) => { for (const k of names[dir]) if (k) vkey(k, on); };
+      const apply = (dx, dy) => { const m = Math.hypot(dx, dy), t = 0.32; set('left', dx < -t * R); set('right', dx > t * R); set('up', dy < -t * R); set('down', dy > t * R); const c = m > R ? R / m : 1; knob.style.transform = 'translate(' + dx * c + 'px,' + dy * c + 'px)'; };
+      const reset = () => { pid = null; for (const d of ['up', 'down', 'left', 'right']) set(d, false); knob.style.transform = ''; };
+      const pos = (e) => { const r = base.getBoundingClientRect(); apply(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)); };
+      base.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); pid = e.pointerId; try { base.setPointerCapture(pid); } catch { /* ok */ } pos(e); });
+      base.addEventListener('pointermove', (e) => { if (e.pointerId === pid) { e.preventDefault(); pos(e); } });
+      for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) base.addEventListener(ev, (e) => { if (e.pointerId === pid || ev === 'lostpointercapture') reset(); });
+      cleanup.push(reset); root.append(base);
+    }
+    if (buttons.length) {
+      const grid = mk('position:absolute;right:' + safeR + ';bottom:' + safe + ';display:grid;grid-template-columns:repeat(' + Math.min(2, buttons.length) + ',72px);gap:12px;direction:ltr', { role: 'group', 'aria-label': 'Buttons' });
+      for (const b of buttons) {
+        const el = mk('width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);color:#fff;font:600 13px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none', { 'data-vx-touch': 'btn', role: 'button', 'aria-label': b.label }); el.textContent = b.label;
+        const on = (e) => { e.preventDefault(); e.stopPropagation(); try { el.setPointerCapture(e.pointerId); } catch { /* ok */ } el.style.background = 'rgba(255,255,255,.4)'; down.add(b.key); vkey(b.key, true); };
+        const off = () => { el.style.background = 'rgba(255,255,255,.14)'; down.delete(b.key); vkey(b.key, false); };
+        el.addEventListener('pointerdown', on); for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, off); grid.append(el);
+      }
+      root.append(grid);
+    }
+    if (look) { /* drag anywhere else to look around */
+      const last = new Map(), k = 1.1, c = g.container; const skip = (t) => t && t.closest && t.closest('[data-vx-touch]');
+      const ts = (e) => { for (const t of e.changedTouches) if (!skip(t.target)) last.set(t.identifier, { x: t.clientX, y: t.clientY }); };
+      const tm = (e) => { for (const t of e.changedTouches) { const l = last.get(t.identifier); if (!l) continue; I.emit('lockedmove', { dx: (t.clientX - l.x) * k, dy: (t.clientY - l.y) * k }); l.x = t.clientX; l.y = t.clientY; } };
+      const te = (e) => { for (const t of e.changedTouches) last.delete(t.identifier); };
+      I.listen(c, 'touchstart', ts, { passive: true }); I.listen(c, 'touchmove', tm, { passive: true }); I.listen(c, 'touchend', te); I.listen(c, 'touchcancel', te);
+    }
+    g.container.append(root); I.touchRoot = root; I._clean.push(() => { for (const f of cleanup) f(); for (const k of [...down]) vkey(k, false); root.remove(); });
   };
   VXRT.destroyInput = function (g) { const I = g.input; if (I) { I._clean.forEach((f) => f()); try { document.exitPointerLock(); } catch { /* ignore */ } } };
   VXRT.input_beginFrame = function (g) {

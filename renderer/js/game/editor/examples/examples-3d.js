@@ -6,7 +6,7 @@
 
   /* ---------------------------------------------------------------- 1 · Echo Maze (first person, the stalker hears you) */
   VX.gameExamples.push({ id: 'ex3d-echomaze', name: 'Echo Maze (3D)', type: 'game3d', desc: 'First-person maze: collect the gems, but the Stalker hunts by sound – footsteps, and your real voice if you allow the microphone (hold M to shout when you have no mic).', build() {
-    const p = K.proj('Echo Maze', '3d', '#0b1020'); K.sky(p, 0.5, 0.9); const sc = p.scenes[0]; sc.gravity = { x: 0, y: -25, z: 0 }; sc.camera3d = { mode: 'fps', yaw: 180, fov: 75, pos: { x: 0, y: 1.7, z: 0 }, target: { x: 0, y: 1.7, z: -5 } };
+    const p = K.proj('Echo Maze', '3d', '#0b1020'); p.settings.touch = { buttons: [{ label: 'Shout', key: 'm' }, { label: 'Sneak', key: 'shift' }] }; K.sky(p, 0.5, 0.9); const sc = p.scenes[0]; sc.gravity = { x: 0, y: -25, z: 0 }; sc.camera3d = { mode: 'fps', yaw: 180, fov: 75, pos: { x: 0, y: 1.7, z: 0 }, target: { x: 0, y: 1.7, z: -5 } };
     K.synth(p, 'gem', 'square', 700, 1400, 0.2, 0.3); K.synth(p, 'growl', 'saw', 120, 50, 0.5, 0.4); K.synth(p, 'win', 'square', 392, 1568, 0.9, 0.3);
     const wallMat = K.mat(p, 'Maze wall', { color: '#3a4a6b', roughness: 0.9, metalness: 0, pattern: 'bricks', color2: '#26324d' }), floorMat = K.mat(p, 'Maze floor', { color: '#1a2236', roughness: 1, metalness: 0 });
     const MAP = ['###########', '#S..#.....#', '#.#.#.###.#', '#.#...#...#', '#.#####.#.#', '#...#...#.#', '###.#.###.#', '#...#...#.#', '#.#####.#.#', '#........G#', '###########'], C = 4;
@@ -18,7 +18,7 @@
     /* state: 0 = playing, 1 = caught, 2 = escaped.  alert: 0 = calm, 1 = hunting */
     const rules = K.bhv(p, 'Echo Maze – rules & HUD', ({ block, gv, ex, lab, start, put, flt, snd }) => {
       gv('state', 'set', 0, 0); gv('gems', 'set', 0, 0); gv('total', 'set', gems.length, gems.length); gv('alert', 'set', 0, 0);
-      lab('hud', 'Gems {gems} / {total}', 'topLeft', 24, '#9fe8ff', 14); lab('help', 'WASD move · Shift sneak · mouse look (click to capture) · M shout · mic = your voice', 'bottom', 14, '#7c8db5', 10);
+      lab('hud', 'Gems {gems} / {total}', 'topLeft', 24, '#9fe8ff', 14); lab('help', 'WASD / stick move · Shift sneak · mouse or drag to look · M shout · mic = your voice', 'bottom', 14, '#7c8db5', 10);
       const calm = lab('calm', 'Stalker: calm', 'topRight', 20, '#9fe8b0', 14), hunt = lab('hunt', 'Stalker: hunting!', 'topRight', 20, '#ff9aa8', 14);
       const dead = lab('dead', 'The Stalker heard you.  Click to try again', 'center', 30, '#ffd7d7', 0), won = lab('won', 'All gems collected – you escaped!  Click to play again', 'center', 30, '#ffffff', 0);
       start().to(put('state', 'set', 0)); start().to(put('gems', 'set', 0)); start().to(put('alert', 'set', 0)); start().to(dead, 'out', 'hide'); start().to(won, 'out', 'hide'); start().to(hunt, 'out', 'hide');
