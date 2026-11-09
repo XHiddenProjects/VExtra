@@ -182,8 +182,16 @@ function pruneSdk(root, sm) {
   for (const b of bts.slice(0, -1)) { if (sm) sm(['--uninstall', 'build-tools;' + b]); rmrf(path.join(root, 'build-tools', b)); removed++; }
   for (const x of ['.temp', '.downloadIntermediates']) rmrf(path.join(root, x)); return removed;
 }
+/** An Android SDK that is already on this computer (Android Studio installs one) – used as it is when it is complete; never modified or deleted. */
+function existingSdk() {
+  const h = os.homedir(), c = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT, win && process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Android', 'Sdk'), mac && path.join(h, 'Library', 'Android', 'sdk'), path.join(h, 'Android', 'Sdk'), path.join(h, 'Android', 'sdk')].filter(Boolean);
+  for (const r of c) { if (path.resolve(r) === path.resolve(SDK)) continue; const p = sdkPlatform(r), b = sdkBuildTools(r); if (p && b && exists(path.join(r, 'platform-tools'))) return { root: r, platform: p, buildTools: b, existing: true }; }
+  return null;
+}
 async function ensureSdk(jdkIn, opts = {}) {
-  cleanTemp(); emit('sdk', 'run', 'Looking for the Android SDK …'); const root = SDK; let mgr = sdkMgr(root);
+  cleanTemp(); const ex = existingSdk(); if (ex) { const st = readState(); st.sdkRoot = ex.root; writeState(st); emit('sdk', 'ok', 'Using the Android SDK that is already installed (Android Studio): platform ' + ex.platform + ', build-tools ' + ex.buildTools + ' – nothing to download'); return ex; }
+  { const st = readState(); if (st.sdkRoot) { delete st.sdkRoot; writeState(st); } }
+  emit('sdk', 'run', 'Looking for the Android SDK …'); const root = SDK; let mgr = sdkMgr(root);
   if (opts.check) { const p = sdkPlatform(root); emit('sdk', mgr || p ? 'ok' : 'warn', mgr || p ? 'Android SDK installed' + (p ? ' (platform ' + p + ')' : '') + ' – checked for updates before each build; older platforms are deleted when a newer one is installed' : 'The Android SDK is not installed – it will be downloaded automatically'); return mgr ? { root, platform: p } : null; }
   if (!mgr) {
     needSpace(1500, 'the Android SDK', 'sdk'); emit('sdk', 'run', 'Looking up the latest Android command-line tools …'); const info = await cmdlineToolsInfo();
@@ -199,7 +207,9 @@ async function ensureSdk(jdkIn, opts = {}) {
   let sm = mk(jdk);
   emit('sdk', 'run', 'Accepting the Android SDK licences …'); let lic = sm(['--licenses'], 'y\n'.repeat(80));
   if (lic.status !== 0 && /Unsupported|class file|UnsupportedClassVersion|requires Java|major version/i.test((lic.stderr || '') + (lic.stdout || '')) && jdk.major > 21) { /* the newest Java is too new for sdkmanager: use Java 21 for the SDK steps only (it is deleted again afterwards) */ emit('sdk', 'run', 'Using Java 21 for the SDK tools …'); const j21 = await ensureJava({ major: 21 }); sm = mk(j21); lic = sm(['--licenses'], 'y\n'.repeat(80)); emit('jdk', 'ok', 'Java ' + jdk.full + ' ready'); }
-  emit('sdk', 'run', 'Checking for the latest Android platform …'); const l = sm(['--list']); const latest = parseSdkList((l.stdout || '') + '\n' + (l.stderr || ''));
+  emit('sdk', 'run', 'Checking for the latest Android platform …'); let l = sm(['--list']); let latest = parseSdkList((l.stdout || '') + '\n' + (l.stderr || ''));
+  if (!latest.platform && jdk.major > 21) { /* the Android tools often do not run on the newest Java yet: use Java 21 for the SDK steps */ emit('sdk', 'run', 'Using Java 21 for the Android SDK tools …'); try { const j21 = await ensureJava({ major: 21 }); sm = mk(j21); l = sm(['--list']); latest = parseSdkList((l.stdout || '') + '\n' + (l.stderr || '')); emit('jdk', 'ok', 'Java ' + jdk.full + ' ready'); } catch { /* reported below */ } }
+  if (!latest.platform) { const why = String((l.stderr || '') + (l.stdout || '')).trim().split(/\r?\n/).filter(Boolean).slice(-2).join(' ').slice(0, 200); if (why) console.error('sdkmanager: ' + why); }
   if (!latest.platform) { const p = sdkPlatform(root); if (p) { pruneSdk(root, null); emit('sdk', 'warn', 'Android platform ' + p + ' will be used (could not check for a newer one: no internet?)'); return { root, platform: p, buildTools: sdkBuildTools(root) }; } emit('sdk', 'fail', 'Could not read the list of Android SDK packages (no internet?).'); throw new Error('no list'); }
   const before = sdkPlatform(root), want = ['platform-tools', 'platforms;android-' + latest.platform, ...(latest.buildTools ? ['build-tools;' + latest.buildTools] : [])];
   emit('sdk', 'run', 'Installing Android ' + latest.platform + ' (API level) and build tools …'); let r = sm(['--install', ...want]); if (r.status !== 0) { emit('sdk', 'run', 'Trying again …'); r = sm(['--install', ...want]); }
@@ -219,7 +229,7 @@ function envWith(javaHome, sdkRoot) {
 /** Everything the build needs, from the managed folder only (run `all` first). */
 function resolve(o = {}) {
   const java = managedJava(o.javaMajor) || (o.javaMajor ? null : managedJava()), gradle = managedGradle(o.gradleVersion) || (o.gradleVersion && o.gradleVersion !== 'latest' ? null : managedGradle());
-  const p = sdkPlatform(SDK), sdk = p ? { root: SDK, platform: p, buildTools: sdkBuildTools(SDK) } : null;
+  const sr = readState().sdkRoot && exists(readState().sdkRoot) ? readState().sdkRoot : SDK, p = sdkPlatform(sr), sdk = p ? { root: sr, platform: p, buildTools: sdkBuildTools(sr) } : null;
   return { java, gradle, sdk, env: envWith(java && java.home, sdk && sdk.root) };
 }
 function prune() { pruneJava(); pruneGradle(); pruneSdk(SDK, null); }
