@@ -5,10 +5,10 @@ Vextra Studio should be usable by as many people as possible – both the **edit
 ## The editor
 
 **What works today**
-- **Themes:** seven built-in themes, including a light one (`vextra-light`) and dark ones. Pick one in Settings; themes are plain JSON files in `themes/`, so you can make a high-contrast one.
+- **Themes:** seven built-in themes, including a light one (`vextra-light`) and dark ones. Pick one in Settings; themes are plain JSON files in `themes/`, and two high-contrast ones ship with it.
 - **Editor text size and font:** Settings → Editor (font size, font family, tab size, word wrap).
 - **Keyboard:** the code editor, menus, dialogs and the Help pages can be used from the keyboard. The full list is in Help → Keyboard shortcuts.
-- **Reduced motion:** the small progress animations slow down when your system asks for reduced motion.
+- **Reduced motion:** animations stop when your system (or Settings → Accessibility) asks for it.
 - **Plain-language blocks:** every block has a text description in the Logic tab, so a graph can be read as text.
 
 **Added in 3.8.0**
@@ -19,6 +19,9 @@ Vextra Studio should be usable by as many people as possible – both the **edit
 - **Reduce motion** (system or forced) – animations stop and games skip Camera shake.
 - Keyboard alternatives: in the block graph `[` / `]` step through blocks, arrow keys move them (Shift = bigger steps), Enter opens a bundle; in the UI designer arrows nudge (Shift = 10 px).
 - **Languages:** ten interface languages including right-to-left Arabic.
+
+- **UI layout editor:** every HUD item and touch control can be focused and moved with the arrow keys (Shift = 10 px, Delete resets), and is announced.
+- **Touch controls** (Joystick, Touch Button, Touch Look) have accessible names; the stick and buttons can also be driven by the keyboard, and *Reduce motion* is respected.
 
 **Known gaps (still being worked on)**
 - The 2D / 3D viewports and the paint / animation tools are drawn on a canvas: selection is announced, but the picture itself is not described. Everything they do can also be done from the Inspector panels, which are ordinary form fields.
@@ -34,6 +37,7 @@ Vextra gives you tools to build accessible games; nothing is forced on you, so p
 - **Readable text.** Use Label / Bar blocks (size, colour and anchor are settings) and keep text large and high-contrast against the background. Use **Edit UI layout** to move HUD items away from where the action happens.
 - **Avoid flashing.** Don't flash large areas more than three times per second (screen shake and Shader effects included); give players a way to turn effects off.
 - **Pause and timing.** Use the Pause Game block, and avoid timers that cannot be extended unless the challenge needs it.
+- **Touch.** Add Joystick / Touch Button blocks so phone players can play; make buttons large (72 px or more) and don't make a game need two-finger gestures.
 - **Sound.** Give important sounds a visual twin (a label, an icon or a flash) and let players mute.
 
 ## Report a problem or suggest a fix

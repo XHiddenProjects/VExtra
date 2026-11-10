@@ -15,7 +15,8 @@
   };
 
   /* ------------------------------------------------------------------ the UI layer editor */
-  const DEF = { label: { anchor: 'topLeft', x: 16, y: 12, size: 24 }, bar: { anchor: 'topLeft', x: 16, y: 48, w: 220, h: 18 } };
+  const DEF = { label: { anchor: 'topLeft', x: 16, y: 12, size: 24 }, bar: { anchor: 'topLeft', x: 16, y: 48, w: 220, h: 18 }, joystick: { anchor: 'bottomLeft', x: 28, y: 28, size: 140, knob: 56, color: '#ffffff', knobColor: '#ffffff', opacity: 0.45 }, touchButton: { anchor: 'bottomRight', x: 28, y: 28, size: 72, label: 'Jump', color: '#ffffff', opacity: 0.4 }, touchLook: { anchor: 'right', x: 28, y: 0, size: 120, color: '#ffffff' } };
+  const KINDS = { label: 1, bar: 1, joystick: 1, touchButton: 1, touchLook: 1 }, DEFID = { label: 'hud', bar: 'health', joystick: 'stick', touchButton: 'jump', touchLook: 'look' };
   const cache = new Map();
   function nodesOf(b) {
     if (!b) return [];
@@ -27,7 +28,7 @@
     const out = [], seen = new Set(), ids = new Set(scene.behaviors || []); const lists = [];
     for (const o of scene.objects) { for (const b of o.behaviors || []) ids.add(b); if (o.graph && o.graph.nodes) lists.push(o.graph.nodes); }
     for (const id of ids) lists.push(nodesOf(project.behaviors[id]));
-    const walk = (nodes) => { for (const n of nodes) { if (n.type === 'bundle' && n.graph) { walk(n.graph.nodes || []); continue; } if (n.type !== 'label' && n.type !== 'bar') continue; const p = Object.assign({}, DEF[n.type], n.params || {}); const id = String(p.id || (n.type === 'label' ? 'hud' : 'health')); if (seen.has(id) || p.follow) continue; seen.add(id); const ov = (scene.uiLayout || {})[id]; out.push({ id, type: n.type, p, anchor: ov ? ov.anchor : p.anchor, x: ov ? ov.x : +p.x || 0, y: ov ? ov.y : +p.y || 0, moved: !!ov }); } };
+    const walk = (nodes) => { for (const n of nodes) { if (n.type === 'bundle' && n.graph) { walk(n.graph.nodes || []); continue; } if (!KINDS[n.type]) continue; const p = Object.assign({}, DEF[n.type], n.params || {}); if (n.type === 'touchLook' && (p.mode || 'drag') === 'drag') continue; const id = String(p.id || DEFID[n.type]); if (seen.has(id) || p.follow) continue; seen.add(id); const ov = (scene.uiLayout || {})[id]; out.push({ id, type: n.type, p, anchor: ov ? ov.anchor : p.anchor, x: ov ? ov.x : +p.x || 0, y: ov ? ov.y : +p.y || 0, moved: !!ov }); } };
     for (const l of lists) walk(l); return out;
   }
 
@@ -48,15 +49,28 @@
     draw() {
       const f = this.frame; f.textContent = '';
       for (const [, a] of Object.entries({ tl: [0, 0], tc: [50, 0], tr: [100, 0], ml: [0, 50], mc: [50, 50], mr: [100, 50], bl: [0, 100], bc: [50, 100], br: [100, 100] })) f.append(h('i', { class: 'uil-a', style: `left:${a[0]}%;top:${a[1]}%` }));
-      if (!this.items.length) f.append(h('div', { class: 'uil-empty' }, 'No Label or Bar blocks in this scene yet. Add a Label block (GUI group) to a behaviour on this scene or one of its objects and it appears here.'));
+      if (!this.items.length) f.append(h('div', { class: 'uil-empty' }, 'No Label, Bar, Joystick or Touch Button blocks in this scene yet. Add one (GUI group) to a behaviour on this scene or one of its objects and it appears here.'));
       for (const it of this.items) {
         const a = ANCH[it.anchor] || ANCH.topLeft, ox = it.x * (a[0] === 100 ? -1 : 1), oy = it.y * (a[1] === 100 ? -1 : 1);
         const st = `position:absolute;left:calc(${a[0]}% + ${ox}px);top:calc(${a[1]}% + ${oy}px);transform:translate(-${a[0]}%,-${a[1]}%);`;
         let node;
         if (it.type === 'label') node = h('div', { class: 'uil-it label', style: st + `font:${it.p.bold === false ? 500 : 700} ${+it.p.size || 24}px system-ui,sans-serif;color:${it.p.color || '#fff'};${it.p.bg ? 'background:' + it.p.bg + ';padding:6px 12px;border-radius:8px;' : ''}` }, String(it.p.text ?? it.id));
+        else if (it.type === 'joystick' || it.type === 'touchLook') { const sz = +it.p.size || 140, ks = it.type === 'joystick' ? +it.p.knob || 56 : Math.round(sz * 0.4); node = h('div', { class: 'uil-it stick', style: st + `width:${sz}px;height:${sz}px;border-radius:50%;box-sizing:border-box;background:color-mix(in srgb, ${it.p.color || '#fff'} 28%, transparent);border:2px solid ${it.p.knobColor || it.p.color || '#fff'};` }, h('div', { style: `position:absolute;left:50%;top:50%;width:${ks}px;height:${ks}px;margin:${-ks / 2}px 0 0 ${-ks / 2}px;border-radius:50%;background:${it.p.knobColor || it.p.color || '#fff'}` })); }
+        else if (it.type === 'touchButton') { const sz = +it.p.size || 72; node = h('div', { class: 'uil-it tbtn', style: st + `width:${sz}px;height:${sz}px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:${it.p.shape === 'square' ? 4 : it.p.shape === 'rounded' ? Math.round(sz * 0.22) : sz / 2}px;background:color-mix(in srgb, ${it.p.color || '#fff'} 26%, transparent);border:2px solid ${it.p.borderColor || '#fff'};color:${it.p.textColor || '#fff'};text-shadow:0 1px 4px #000c;font:600 ${Math.max(11, Math.round(sz * 0.2))}px system-ui` }, String(it.p.label ?? '')); }
         else node = h('div', { class: 'uil-it bar', style: st + `width:${+it.p.w || 220}px;height:${+it.p.h || 18}px;` }, h('div', { style: `width:62%;height:100%;background:${it.p.color || '#4cc38a'};border-radius:inherit` }));
         node.title = `${it.type} “${it.id}” – drag to move`; if (this.sel === it.id) node.classList.add('on'); if (it.moved) node.classList.add('moved');
-        node.addEventListener('mousedown', (e) => this.down(e, it)); f.append(node);
+        node.addEventListener('mousedown', (e) => this.down(e, it));
+        node.tabIndex = 0; node.setAttribute('role', 'button'); node.setAttribute('aria-label', `${it.id} (${it.type}) – arrow keys move it, Shift moves 10 pixels, Delete puts it back`);
+        node.addEventListener('focus', () => { this.sel = it.id; });
+        node.addEventListener('keydown', (e) => {
+          const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+          if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delete (this.scene.uiLayout || {})[it.id]; this.ctx.onChange(); this.draw(); return; }
+          if (!d) return; e.preventDefault(); const a = ANCH[it.anchor] || ANCH.topLeft, st = e.shiftKey ? 10 : 1;
+          this.set(it, { anchor: it.anchor, x: it.x + d[0] * st * (a[0] === 100 ? -1 : 1), y: it.y + d[1] * st * (a[1] === 100 ? -1 : 1) });
+          this.info.textContent = `${it.id}: ${it.anchor} offset X ${it.x}, Y ${it.y}`; try { window.VX && VX.a11y && VX.a11y.announce(`${it.id} X ${it.x}, Y ${it.y}`); } catch { /* ignore */ }
+          const again = this.el.querySelector(`[data-uil-id="${CSS.escape(it.id)}"]`); if (again) again.focus();
+        });
+        node.dataset.uilId = it.id; f.append(node);
       }
       this.panelDraw();
     }

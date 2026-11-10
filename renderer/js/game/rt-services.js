@@ -11,6 +11,11 @@
   }
   /** per-scene layout made in the editor's UI layer (scene.uiLayout[id] = { anchor, x, y }); ids of object-owned elements end in :objectId */
   const uiOv = (g, id) => { const L = g.scene && g.scene.uiLayout; return L ? L[String(id).split(':')[0]] || null : null; };
+  /** touch controls are shown on touch screens; Game settings → On-screen touch controls can force them on / off */
+  VXRT.touchOn = (g, show) => { const m = (g.settings && g.settings.touch && g.settings.touch.mode) || 'auto'; if (m === 'off') return false; if (m === 'on' || show === 'always') return true; return !!((window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window); };
+  /** a colour at a given opacity, without making the text / knob on top of it fade too */
+  const tint = (c, a) => (window.CSS && CSS.supports && CSS.supports('background', 'color-mix(in srgb, red 50%, transparent)') ? `color-mix(in srgb, ${c} ${Math.round(U.clamp(a, 0, 1) * 100)}%, transparent)` : c);
+  VXRT.tint = tint;
   const gm = (g) => g.guiMap || (g.guiMap = new Map());
   function register(g, id, node, extra) {
     const m = gm(g); const old = m.get(id); if (old) old.el.remove(); const rec = Object.assign({ el: node, remove() { node.remove(); m.delete(id); g.guiItems.delete(node); } }, extra); m.set(id, rec); g.guiItems.add(node); g.guiEl.append(node); return rec;
@@ -28,6 +33,40 @@
       rec.o = Object.assign(rec.o || {}, o, uiOv(g, id) || {}); const q = rec.o, e = rec.el; Object.assign(e.style, { width: U.num(q.w, 220) + 'px', height: U.num(q.h, 18) + 'px', background: q.bg || 'rgba(0,0,0,.45)', borderRadius: U.num(q.radius, 9) + 'px', border: '1px solid rgba(255,255,255,.25)', display: q.hidden ? 'none' : 'block' });
       rec.fill.style.background = q.color || '#4cc38a'; rec.fill.style.width = U.clamp(rec.value, 0, 1) * 100 + '%'; if (!q.follow) place(e, q); return rec;
     },
+    /** Virtual joystick in the UI layer. o: anchor,x,y,size,knob,color,knobColor,opacity,ring,baseSprite,knobSprite,showOn,hidden. rec.cb(kind, {x,y,force,angle}) is called on start / move / end. */
+    joystick(g, id, o) {
+      let rec = gm(g).get(id); if (rec && !rec.el.isConnected) { gm(g).delete(id); rec = null; }
+      if (!rec) {
+        const base = el('div', 'position:absolute;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:auto;border-radius:50%;box-sizing:border-box'), knob = el('div', 'position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;will-change:transform');
+        base.setAttribute('data-vx-touch', 'stick'); base.setAttribute('role', 'group'); base.setAttribute('aria-label', 'Move'); base.append(knob); rec = register(g, id, base, { knob, x: 0, y: 0, force: 0, angle: 0, active: false, pid: null });
+        const R = () => Math.max(10, U.num(rec.o.size, 140) / 2), out = (kind) => { rec.cb && rec.cb(kind, { x: rec.x, y: rec.y, force: rec.force, angle: rec.angle }); };
+        const move = (e) => { const r = base.getBoundingClientRect(), k = rec.o, rad = R(), dx0 = e.clientX - (r.left + r.width / 2), dy0 = e.clientY - (r.top + r.height / 2), m = Math.hypot(dx0, dy0), c = m > rad ? rad / m : 1, dz = U.clamp(U.num(k.deadzone, 0.12), 0, 0.9); let f = Math.min(1, m / rad); const dxn = dx0 * c, dyn = dy0 * c; knob.style.transform = `translate(${dxn}px,${dyn}px)`; f = f < dz ? 0 : (f - dz) / (1 - dz); const ux = m ? dx0 / m : 0, uy = m ? dy0 / m : 0; rec.x = ux * f; rec.y = uy * f * (k.invertY ? -1 : 1); rec.force = f; rec.angle = (Math.atan2(rec.y, rec.x) * 180 / Math.PI + 360) % 360; out('move'); };
+        const end = () => { if (!rec.active) return; rec.active = false; rec.pid = null; rec.x = rec.y = rec.force = 0; knob.style.transform = ''; out('end'); };
+        base.addEventListener('pointerdown', (e) => { if (rec.pid !== null) return; e.preventDefault(); e.stopPropagation(); rec.pid = e.pointerId; rec.active = true; try { base.setPointerCapture(e.pointerId); } catch { /* ok */ } out('start'); move(e); });
+        base.addEventListener('pointermove', (e) => { if (e.pointerId === rec.pid) { e.preventDefault(); move(e); } });
+        for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) base.addEventListener(ev, (e) => { if (e.pointerId === rec.pid || ev === 'lostpointercapture') end(); });
+        rec.release = end;
+      }
+      rec.o = Object.assign(rec.o || {}, o, uiOv(g, id) || {}); const q = rec.o, e = rec.el, size = U.num(q.size, 140), ks = U.num(q.knob, 56);
+      const img = (sid) => { const sp = sid && g.data.assets && g.data.assets.sprites && g.data.assets.sprites[sid]; const f = sp && sp.frames && sp.frames[0]; return typeof f === 'string' ? f : ''; }, bi = img(q.baseSprite), ki = img(q.knobSprite);
+      const op = U.clamp(U.num(q.opacity, 0.45), 0.05, 1); Object.assign(e.style, { width: size + 'px', height: size + 'px', opacity: bi ? op : 1, background: bi ? `center/contain no-repeat url(${bi})` : tint(q.color || '#ffffff', op * 0.55), border: bi || q.ring === false ? '0' : `2px solid ${tint(q.knobColor || '#fff', Math.min(1, op * 1.6))}`, display: q.hidden || !VXRT.touchOn(g, q.showOn) ? 'none' : 'block' });
+      Object.assign(rec.knob.style, { width: ks + 'px', height: ks + 'px', margin: `${-ks / 2}px 0 0 ${-ks / 2}px`, background: ki ? `center/contain no-repeat url(${ki})` : tint(q.knobColor || '#ffffff', Math.min(1, op * 1.7)), boxShadow: ki ? '' : '0 2px 8px rgba(0,0,0,.35)' });
+      place(e, q); return rec;
+    },
+    /** Round / square button in the UI layer. rec.cb('down' | 'up'). */
+    touchButton(g, id, o) {
+      let rec = gm(g).get(id); if (rec && !rec.el.isConnected) { gm(g).delete(id); rec = null; }
+      if (!rec) {
+        const b = el('div', 'position:absolute;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:auto;display:flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box;font:600 14px system-ui,sans-serif;cursor:pointer'); b.setAttribute('data-vx-touch', 'btn'); b.setAttribute('role', 'button'); rec = register(g, id, b, { down: false, pid: null });
+        const up = () => { if (!rec.down) return; rec.down = false; rec.pid = null; b.style.filter = ''; rec.cb && rec.cb('up'); };
+        b.addEventListener('pointerdown', (e) => { if (rec.pid !== null) return; e.preventDefault(); e.stopPropagation(); rec.pid = e.pointerId; rec.down = true; try { b.setPointerCapture(e.pointerId); } catch { /* ok */ } b.style.filter = 'brightness(1.6)'; rec.cb && rec.cb('down'); });
+        for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, (e) => { if (e.pointerId === rec.pid || ev === 'lostpointercapture') up(); });
+        rec.release = up;
+      }
+      rec.o = Object.assign(rec.o || {}, o, uiOv(g, id) || {}); const q = rec.o, e = rec.el, size = U.num(q.size, 72), sp = q.sprite && g.data.assets && g.data.assets.sprites && g.data.assets.sprites[q.sprite], im = sp && sp.frames && typeof sp.frames[0] === 'string' ? sp.frames[0] : '';
+      Object.assign(e.style, { width: size + 'px', height: size + 'px', borderRadius: q.shape === 'square' ? '4px' : q.shape === 'rounded' ? size * 0.22 + 'px' : '50%', background: im ? `center/contain no-repeat url(${im})` : tint(q.color || '#ffffff', U.clamp(U.num(q.opacity, 0.4), 0.05, 1) * 0.6), opacity: im ? U.clamp(U.num(q.opacity, 0.4) + 0.3, 0.05, 1) : 1, color: q.textColor || '#fff', textShadow: '0 1px 4px rgba(0,0,0,.8)', border: im ? '0' : `2px solid ${tint(q.borderColor || '#fff', 0.7)}`, fontSize: U.num(q.fontSize, Math.max(11, size * 0.2)) + 'px', display: q.hidden || !VXRT.touchOn(g, q.showOn) ? 'none' : 'flex' });
+      e.textContent = q.label ?? ''; e.setAttribute('aria-label', q.label || id); place(e, q); return rec;
+    },
     /** Banner ad in the game GUI. o.service: house | image | html | adsense. */
     ad(g, id, o) {
       let rec = gm(g).get(id); if (rec && !rec.el.isConnected) { gm(g).delete(id); rec = null; } if (!rec) rec = register(g, id, el('div', 'pointer-events:auto;overflow:hidden;z-index:40;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.4)'), {});
@@ -35,7 +74,7 @@
       e.append(VXRT.adContent(g, q, q.onClick), el('span', 'position:absolute;top:0;right:0;background:rgba(0,0,0,.55);color:#fff;font:700 9px system-ui;padding:1px 5px;border-bottom-left-radius:4px;pointer-events:none', 'Ad')); place(e, q); return rec;
     },
     setBar(g, id, v) { const r = gm(g).get(id); if (r) { r.value = v; r.fill.style.width = U.clamp(v, 0, 1) * 100 + '%'; } },
-    show(g, id, on) { const r = gm(g).get(id); if (r) { r.o.hidden = !on; r.el.style.display = on ? 'block' : 'none'; } },
+    show(g, id, on) { const r = gm(g).get(id); if (r) { r.o.hidden = !on; r.el.style.display = on ? (r.el.getAttribute('data-vx-touch') === 'btn' ? 'flex' : 'block') : 'none'; } },
     alert(g, o, done) {
       const kinds = { info: '#6c8cff', success: '#4cc38a', warning: '#f5c451', error: '#ef5b5b' }, c = kinds[o.kind] || kinds.info; const msg = U.tpl(o.message ?? '', guiVars(g)), title = U.tpl(o.title ?? '', guiVars(g));
       if (o.mode === 'modal') {

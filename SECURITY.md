@@ -4,19 +4,16 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.4.x   | ✅ security fixes (current) |
-| 3.3.x   | ⚠️ please upgrade to 3.4.x |
-| 3.2.x   | ⚠️ please upgrade to 3.3.x |
-| 3.1.x   | ⚠️ please upgrade to 3.3.x |
-| 3.0.x   | ❌ please upgrade |
-| 2.0.x   | ❌ please upgrade |
-| 1.0.x   | ❌ please upgrade |
+| 3.8.x   | ✅ security fixes (current) |
+| 3.7.x   | ⚠️ please upgrade to 3.8.x |
+| 3.6.x   | ⚠️ please upgrade to 3.8.x |
+| 3.5.x and older | ❌ please upgrade |
 
 Current version: **3.8.0** (see `VERSION`). This policy was last reviewed for 3.8.0.
 
 ## Reporting a vulnerability
 
-Please **do not** open a public issue for security problems. Email the maintainers (see `author` in `package.json`) with a description, reproduction steps and the affected version. You will get an acknowledgement within 5 working days; fixes are released as patch versions and listed in `CHANGELOG.md`.
+Please **do not** open a public issue for security problems. Use GitHub's **private vulnerability reporting** (the repository's *Security* tab → *Report a vulnerability*); no email address is needed. Include a description, reproduction steps and the affected version. You will get an acknowledgement within 5 working days; fixes are released as patch versions and listed in `CHANGELOG.md`.
 
 ## How Vextra Studio protects you
 
@@ -54,6 +51,9 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 - **Loading page** (`settings.loading`): the title, subtitle, tips and colours you type are HTML-escaped when the page is generated, colours must be `#hex` values, and the logo must be a `data:image/` URL taken from your own sprites. Nothing from these settings is evaluated as code.
 - **Credit footer** for exported websites and UI designs is fixed text with no links or scripts; only its alignment and colours are configurable.
 - **Store Export toolchain:** downloads still use HTTPS to the same fixed list of hosts with SHA-256 verification. The new retry only repeats the same verified request (up to 4 times) after network errors; a download that fails its checksum is never retried or used. Java 27 is the requested JDK.
+- **CodeQL fix (incomplete string escaping):** the Gradle wrapper URL written to `gradle-wrapper.properties` now has backslashes escaped before colons, and replacements use function replacers so `$` sequences in a value are never interpreted.
+- **Touch blocks** (Joystick, Touch Button, Touch Look) only create DOM elements and synthetic key / mouse-move events inside the game; sprites come from your own project and labels are set as text, never HTML.
+- **Loading page:** the minimum display time is clamped to 1.5–10 seconds.
 - **Spawn fix:** an `undefined` override no longer replaces a default value on a spawned object.
 
 ## v3.6.0 notes

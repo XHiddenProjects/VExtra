@@ -12,9 +12,11 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - **High Contrast Dark / Light themes**, **Interface zoom** (70–200%).
 - Docs: *Languages & accessibility*.
 
-- **Mobile support for games:** on touch screens games show on-screen controls built from the keys they use – a stick for WASD / arrow keys, round buttons for the other keys (space, shift, M, 1–4 …) and drag-to-look in first-person games (Locked Mouse). Games that only use mouse / touch (e.g. Sling Tower) get nothing extra. Game settings → *On-screen touch controls*: Automatic / Always (to test on a computer) / Never; `settings.touch.buttons` sets custom buttons. Works in the editor preview, web export and Store Export (Android / iOS). Echo Maze has Shout and Sneak buttons.
+- **Mobile support in the game engine:** new **Joystick**, **Touch Button** and **Touch Look** blocks (GUI group) that live in the **UI layer** – move them in *Edit UI layout* (mouse or arrow keys), restyle them (size, colours, opacity, dead zone, sprites, anchor). Touch Look has a drag mode and a look-stick mode (easier with an emulator) with a higher default sensitivity. All example games use them; games without touch blocks get a fallback overlay; Game settings → On-screen touch controls (Automatic / Always / Never).
 
 ### Changed
+- **Loading page:** the time it is shown can never be below **1.5 seconds** (lower values default to 1.5).
+- **UI layout editor:** items are keyboard-focusable; arrow keys nudge (Shift = 10 px), Delete resets.
 - **Store Export installs everything from scratch.** Java 27 and the latest Gradle are always downloaded into `~/.vextra/toolchain` (`JAVA_HOME` / `GRADLE_HOME` are ignored). **Android SDK:** if Android Studio (or `ANDROID_HOME`) already has a complete SDK it is used as it is – nothing is downloaded and it is never changed; otherwise the newest SDK (platform, build-tools, licences) is installed there. If the SDK tools do not run on Java 27 they are run with Java 21 automatically, rechecks them before every export and, when a newer version exists, **deletes the old one** (JDK, Gradle + its caches, old SDK platforms / build-tools) before installing the new one. Disk space is checked first, interrupted downloads are cleaned up, and a failed update keeps the installed version – setup never stops the export with an error.
 - The Android build writes `mobile/dist/<name>-debug.apk` (or `-release.aab`), removes the machine-specific `local.properties`, and retries with Java 21 and the project's own Gradle if the newest Java does not fit. The `android/` folder opens in Android Studio (or on a Mac) as is; README-MOBILE explains the transfer. Capacitor packages use `latest`.
 - **Android builds sync with Android Studio automatically (no dropdowns):** Vextra looks at the computer by itself – Android Studio's bundled Java (or `JAVA_HOME` / PATH Java 17–23), the Android SDK Studio uses (including newer platforms like Android 17) – and uses them as they are; only what is missing is downloaded (Java 21 LTS, newest SDK). Android builds do not run on Java 27, so the default download is now Java 21.
@@ -23,6 +25,9 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - **ProGuard / R8:** release builds use `proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'`.
 - **Android build fixes:** an installed platform such as **Android 17 (API 37.0)** is used through a link folder (`~/.vextra/toolchain/sdk-overlay`, where `android-37` leads to your `android-37.0`) because the Android Gradle plugin can only name whole-number platforms – your SDK itself is never changed; if a platform cannot be used the next installed one is tried, then platform 36, which the Android plugin fetches itself when missing; projects with Android Gradle plugin 8 or older go straight to Java 21 + the project's own Gradle instead of failing on Gradle 9 first; a missing platform is no longer reported as a licence problem.
 - Plugin Store Export 2.3.0.
+
+### Fixed
+- **Security (CodeQL, `toolchain.js`):** the Gradle wrapper URL now escapes backslashes before colons when written to `gradle-wrapper.properties` (incomplete string escaping).
 
 ## [3.7.0]
 

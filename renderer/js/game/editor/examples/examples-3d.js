@@ -6,7 +6,7 @@
 
   /* ---------------------------------------------------------------- 1 · Echo Maze (first person, the stalker hears you) */
   VX.gameExamples.push({ id: 'ex3d-echomaze', name: 'Echo Maze (3D)', type: 'game3d', desc: 'First-person maze: collect the gems, but the Stalker hunts by sound – footsteps, and your real voice if you allow the microphone (hold M to shout when you have no mic).', build() {
-    const p = K.proj('Echo Maze', '3d', '#0b1020'); p.settings.touch = { buttons: [{ label: 'Shout', key: 'm' }, { label: 'Sneak', key: 'shift' }] }; K.sky(p, 0.5, 0.9); const sc = p.scenes[0]; sc.gravity = { x: 0, y: -25, z: 0 }; sc.camera3d = { mode: 'fps', yaw: 180, fov: 75, pos: { x: 0, y: 1.7, z: 0 }, target: { x: 0, y: 1.7, z: -5 } };
+    const p = K.proj('Echo Maze', '3d', '#0b1020'); K.sky(p, 0.5, 0.9); const sc = p.scenes[0]; sc.gravity = { x: 0, y: -25, z: 0 }; sc.camera3d = { mode: 'fps', yaw: 180, fov: 75, pos: { x: 0, y: 1.7, z: 0 }, target: { x: 0, y: 1.7, z: -5 } };
     K.synth(p, 'gem', 'square', 700, 1400, 0.2, 0.3); K.synth(p, 'growl', 'saw', 120, 50, 0.5, 0.4); K.synth(p, 'win', 'square', 392, 1568, 0.9, 0.3);
     const wallMat = K.mat(p, 'Maze wall', { color: '#3a4a6b', roughness: 0.9, metalness: 0, pattern: 'bricks', color2: '#26324d' }), floorMat = K.mat(p, 'Maze floor', { color: '#1a2236', roughness: 1, metalness: 0 });
     const MAP = ['###########', '#S..#.....#', '#.#.#.###.#', '#.#...#...#', '#.#####.#.#', '#...#...#.#', '###.#.###.#', '#...#...#.#', '#.#####.#.#', '#........G#', '###########'], C = 4;
@@ -59,6 +59,7 @@
       pick.to(put('gems', 'add', 1)).to(ex('gems >= total', 'All gems?')).to(flt('truthy')).to(put('state', 'set', 2), 'pass');
     });
     add(p, 'cube', 'Player', start[0], 1.2, { z: start[1], w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), behaviors: [playerB] });
+    K.touch(p, { buttons: [{ label: 'Shout', key: 'm' }, { label: 'Sneak', key: 'shift' }] });
     return p; } });
 
   /* ---------------------------------------------------------------- 2 · Sky Parkour (third person, kinematic moving platforms, crumbling tiles, checkpoints) */
@@ -124,6 +125,7 @@
       fell.to(snd('fall')); fell.to(ex('spawnX')).to(block('position', { target: 'self', mode: 'set', source: 'signalX' })); fell.to(ex('spawnY')).to(block('position', { target: 'self', mode: 'set', source: 'signalY' })); fell.to(ex('spawnZ')).to(block('position', { target: 'self', mode: 'set', source: 'signalZ' })); fell.to(block('velocity', { target: 'self', mode: 'stop' })); fell.to(put('carryX', 'set', 0)); fell.to(put('carryZ', 'set', 0));
     });
     add(p, 'cube', 'Player', 0, 1.2, { z: 0, w: 0.9, h: 1.6, d: 0.9, color: '#6c8cff', tags: ['player'], material: { metalness: 0.2, roughness: 0.4 }, physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), behaviors: [playerB] });
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 3 · Showroom (hyper-real PBR materials, Realism effect, turntables) */
@@ -171,6 +173,7 @@
       ['w', 'arrowup'].forEach((k) => go(k, -5, 'signalZ')); ['s', 'arrowdown'].forEach((k) => go(k, 5, 'signalZ')); ['d', 'arrowright'].forEach((k) => go(k, 5, 'signalX')); ['a', 'arrowleft'].forEach((k) => go(k, -5, 'signalX'));
     });
     add(p, 'cube', 'Player', 0, 1.2, { z: 14, w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true }), behaviors: [playerB] });
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 4 · Core Defender (first-person arena defence, hitscan turret) */
@@ -238,6 +241,7 @@
       hp.to(block('emit', { target: 'other', count: 16, color: '#ff5a7a', speed: 4, spread: 360, life: 0.5, size: 0.14, gravity: 0 }), 'pass', 'emit'); hp.to(block('destroyer', { target: 'other' }), 'pass'); hp.to(put('score', 'add', 10), 'pass'); hp.to(put('scrap', 'add', 1), 'pass'); hp.to(put('enemies', 'add', -1), 'pass');
     });
     add(p, 'cube', 'Player', 0, 1, { z: 5, w: 0.8, h: 1.6, d: 0.8, color: '#ffffff', visible: false, tags: ['player'], physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true }), behaviors: [playerB] });
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 5 · Marble Lanes (bowling with real physics) */
@@ -318,5 +322,6 @@
       block('mouseClick', { phase: 'click' }).to(ex('state == 2', 'Game over?')).to(flt('truthy')).to(block('restartGame', { scope: 'game' }), 'pass');
     });
     K.scene(p, [rules]);
+    K.touch(p, {});
     return p; } });
 })();

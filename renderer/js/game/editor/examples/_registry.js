@@ -58,6 +58,25 @@
     /** a material asset: returns its id, use it as { matAsset: id } */
     mat(p, name, props) { const id = 'mat_' + name.replace(/\W+/g, '_').toLowerCase(); p.assets.materials = p.assets.materials || {}; p.assets.materials[id] = Object.assign({ id, name, color: '#cccccc', metalness: 0.1, roughness: 0.7, emissive: '#000000', emissiveIntensity: 1, opacity: 1, pattern: 'none', color2: '#444444', repeatX: 1, repeatY: 1, wireframe: false, flat: false, doubleSided: false }, props); return id; },
     /** an invisible object that carries the game's rules as a script */
+    /** Touch controls for a game, made of real blocks (Joystick / Touch Button / Touch Look) in a "Touch controls" behaviour on every scene – they appear in the UI layer and can be moved and restyled.
+     *  The keys the game listens to are read from its Keyboard blocks; o.buttons ([{label,key}]) overrides the button list, o.stick ('wasd'|'arrows'|'both'|false) the stick, o.look (true|false) the drag-to-look. */
+    touch(p, o = {}) {
+      const K = VX.exKit, keys = new Set(); let look = false; const alias = (k) => String(k || '').trim().toLowerCase().replace(/^(left|right|up|down)$/, 'arrow$1').replace(/^spacebar$|^ $/, 'space').replace(/^esc$/, 'escape');
+      for (const b of Object.values(p.behaviors)) for (const n of ((b.graph && b.graph.nodes) || [])) { if (n.type === 'lockedMouse') look = true; const q = n.params || {}; if (n.type === 'keyboard') keys.add(alias(q.key)); if (q.testKey) keys.add(alias(q.testKey)); if (q.quietKey) keys.add(alias(q.quietKey)); }
+      const valid = /^(?:[a-z0-9]|space|shift|enter|escape|tab|control|alt|f\d{1,2})$/, wasd = ['w', 'a', 's', 'd'].some((k) => keys.has(k)), arr = [...keys].some((k) => k.startsWith('arrow'));
+      const stick = o.stick !== undefined ? o.stick : wasd && arr ? 'both' : wasd ? 'wasd' : arr ? 'arrows' : false;
+      const LBL = { space: 'Jump', shift: 'Sneak', enter: 'OK', escape: 'Menu', control: 'Ctrl', tab: 'Tab' };
+      const buttons = o.buttons || [...keys].filter((k) => valid.test(k) && !['w', 'a', 's', 'd'].includes(k)).slice(0, 6).map((k) => ({ label: LBL[k] || k.toUpperCase(), key: k }));
+      const wantLook = o.look !== undefined ? o.look : look;
+      if (!stick && !buttons.length && !wantLook) return null;
+      const id = K.bhv(p, 'Touch controls', ({ block }) => {
+        if (stick) block('joystick', { id: 'stick', keys: stick });
+        buttons.forEach((b, i) => block('touchButton', { id: 'btn_' + b.key, label: b.label, key: b.key, anchor: 'bottomRight', x: 28 + (i % 2) * 84, y: 28 + Math.floor(i / 2) * 84 }));
+        if (wantLook) block('touchLook', { mode: 'both', sensitivity: 3.5 });
+      });
+      for (const sc of p.scenes) { sc.behaviors = sc.behaviors || []; if (!sc.behaviors.includes(id)) sc.behaviors.push(id); }
+      return id;
+    },
     rules(p, dim, code) { return VX.exKit.add(p, dim, 'empty', 'Game rules', 0, 0, { behaviors: [VX.exKit.beh(p, p.name + ' – game rules', code)] }); },
     /** registers a code behaviour in project.behaviors (the same shape the Logic tab creates) and returns its id so an object can list it in `behaviors` */
     beh(p, name, code) { const base = 'b_' + String(name).toLowerCase().replace(/\W+/g, '_').replace(/^_|_$/g, ''); let id = base, n = 2; while (p.behaviors[id]) id = base + '_' + n++; p.behaviors[id] = { id, name, mode: 'code', graph: { nodes: [], wires: [] }, code }; return id; },

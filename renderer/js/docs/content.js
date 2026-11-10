@@ -528,6 +528,8 @@ Library → Games lists ten ready-made games. Open one, press **Play**, then cha
 
   A('loading-page', 'Share & publish', 'Loading page & credit', `# Loading page & credit
 
+The page is always shown for **at least 1.5 seconds**; a shorter (or empty) *Show for at least* value is raised to 1.5 s. Preview does not wait.
+
 Every game starts with a **loading page**: the title, a progress bar and the line “Made with Vextra Studio · © <year> XHiddenProjects”. It is part of exported games, published games and Play.
 
 Open a game and press **⏳ Loading page** in the toolbar to customize it:
@@ -546,7 +548,7 @@ The bar fills as the runtime starts and every sprite picture is decoded; the gam
 
 **Websites and UI designs:** Export website adds a footer “Made with Vextra Studio · © <year> XHiddenProjects” to every page (or only the home page); pick its alignment and style in the export dialog. Exported UI designs carry the same footer.`);
 
-  A('touch-controls', 'Games', 'Phones & tablets (touch controls)', `# Phones & tablets\n\nOn a touch screen every game shows **on-screen controls** built from the keys it uses:\n- a **stick** presses W A S D / the arrow keys,\n- round **buttons** press the other keys (space, shift, M, 1–4 …),\n- **drag anywhere else** to look around in first-person games (games with a *Locked Mouse* block).\n\nGames that only use mouse / touch get nothing extra. Change it in **Game settings → On-screen touch controls** (Automatic, Always – to try it on a computer, Never). Custom buttons: \`project.settings.touch = { buttons: [{ label: 'Shout', key: 'm' }] }\`. Exported websites and Store Export apps (Android / iOS) use the same controls.`);
+  A('touch-controls', 'Games', 'Phones & tablets (touch controls)', `# Phones & tablets\n\nMobile support is part of the **game engine**: three blocks in the **GUI** group, placed in the **UI layer** like a Label or Bar.\n\n- **Joystick** – a stick that presses the keys you choose (default W A S D / arrows). Settings: size, knob size, colours, opacity, dead zone, invert Y, base / knob **sprites**, anchor + offset, *Always show* (otherwise only on touch screens).\n- **Touch Button** – a round / rounded / square button that presses a key (space, shift, M …). Label, colours, size, sprite, anchor.\n- **Touch Look** – look around in first-person games. Mode **Drag** (swipe the screen), **Stick** (a second stick – easiest with an emulator or one finger) or **Both**; area (whole screen / right / left half) and sensitivity (default 3.5). It feeds the *Locked Mouse* → *Camera (look)* chain, so no extra wiring.\n\n**Place and move them:** Game toolbar → **Edit UI layout**. They appear as Joystick / Touch button items; drag them, or focus one and use the **arrow keys** (Shift = 10 px, Delete = back to the block's own position).\n\n**Ready-made:** every example game already has them. Games with no touch blocks still get a simple automatic overlay as a fallback.\n\n**Game settings → On-screen touch controls:** Automatic (touch screens only), Always (try it on a computer) or Never. Exported websites and Store Export apps (Android / iOS) use the same blocks.`);
   A('language-access', 'Getting started', 'Languages & accessibility', `# Languages & accessibility
 
 ## Language

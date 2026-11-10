@@ -3,7 +3,9 @@
 (function () {
   const esc = VX.esc;
   const DEF = { title: '', subtitle: 'Loading…', bg: '', color: '#e8ecf8', accent: '#6c8cff', style: 'bar', logo: '', tips: '', minSec: 1.5, showPercent: true, creditAt: 'bottom' };
-  const get = (project) => { const s = (project.settings = project.settings || {}); const L = Object.assign({}, DEF, s.loading || {}); L.style = ['bar', 'ring', 'dots'].includes(L.style) ? L.style : 'bar'; L.creditAt = L.creditAt === 'top' ? 'top' : 'bottom'; L.minSec = Math.max(0, Math.min(10, +L.minSec || 0)); return L; };
+  /** the loading page is always shown for at least 1.5 s (anything lower, empty or invalid falls back to 1.5) */
+  const MIN_SEC = 1.5, minSecOf = (v) => { v = +v; return Number.isFinite(v) && v >= MIN_SEC ? Math.min(10, v) : MIN_SEC; };
+  const get = (project) => { const s = (project.settings = project.settings || {}); const L = Object.assign({}, DEF, s.loading || {}); L.style = ['bar', 'ring', 'dots'].includes(L.style) ? L.style : 'bar'; L.creditAt = L.creditAt === 'top' ? 'top' : 'bottom'; L.minSec = minSecOf(L.minSec); return L; };
   const logoSrc = (project, id) => { const sp = id && project.assets && project.assets.sprites && project.assets.sprites[id]; const f = sp && sp.frames && sp.frames[0]; return typeof f === 'string' && /^data:image\//.test(f) ? f : ''; };
   /** returns { css, html, script } to put into the page: css in <style>, html first in <body>, script (plain) in <head> */
   function build(project, opts = {}) {
@@ -21,7 +23,7 @@
 #vx-boot .vxl-credit{position:absolute;left:0;right:0;${L.creditAt === 'top' ? 'top' : 'bottom'}:14px;font-size:12px;opacity:.65}
 @keyframes vxl-spin{to{transform:rotate(360deg)}}@keyframes vxl-bounce{0%,80%,100%{transform:scale(.5);opacity:.5}40%{transform:scale(1);opacity:1}}@media (prefers-reduced-motion:reduce){#vx-boot,#vx-boot .vxl-bar i{transition:none}#vx-boot .vxl-ring,#vx-boot .vxl-dots i{animation-duration:3s}}`;
     const html = `<div id="vx-boot" role="status" aria-live="polite" aria-label="Loading">${credit.includes('top') ? credit : ''}${logo ? `<img class="vxl-logo" alt="" src="${esc(logo)}">` : ''}<h1>${esc(title)}</h1><div class="vxl-sub">${esc(L.subtitle)}</div>${spinner}<div class="vxl-pct">${L.showPercent && L.style === 'bar' ? '0%' : ''}</div><div class="vxl-tip"></div><div class="vxl-err"></div>${credit.includes('top') ? '' : credit}</div>`;
-    const min = opts.preview ? 0 : (opts.channel ? 0 : L.minSec) * 1000;
+    const min = opts.preview ? 0 : minSecOf(L.minSec) * 1000;
     const script = `(function(){var t0=Date.now(),tips=${VX.jsLit(tips)},min=${min},showPct=${L.showPercent ? 'true' : 'false'},ti=0,timer=null,p=0;function q(s){return document.querySelector('#vx-boot '+s)}
 window.__vxl={reset:function(){p=0;var b=q('.vxl-bar i');if(b)b.style.width='0'},set:function(v){p=Math.max(p,Math.min(1,v));var b=q('.vxl-bar i');if(b)b.style.width=(p*100)+'%';var c=q('.vxl-pct');if(c&&showPct&&b)c.textContent=Math.round(p*100)+'%'},
 finish:function(){var self=this;return new Promise(function(r){var wait=Math.max(0,min-(Date.now()-t0));setTimeout(function(){self.set(1);setTimeout(r,120)},wait)})},
@@ -40,9 +42,9 @@ document.addEventListener('DOMContentLoaded',function(){tip();if(tips.length>1)t
       { key: 'bg', label: 'Background (blank = game background)', type: 'color', value: C0(L.bg, project.settings.bg || '#10131a') }, { key: 'color', label: 'Text colour', type: 'color', value: C0(L.color, DEF.color) }, { key: 'accent', label: 'Accent colour', type: 'color', value: C0(L.accent, DEF.accent) },
       { key: 'logo', label: 'Logo (one of your sprites)', type: 'select', value: L.logo, options: [['', '(none)']].concat(sprites.map(([id, s]) => [id, s.name || id])) },
       { key: 'tips', label: 'Tips (one per line, shown in turn)', type: 'textarea', rows: 4, value: L.tips, placeholder: 'Press Space to jump\nCollect all the coins' },
-      { key: 'minSec', label: 'Show for at least (seconds)', type: 'number', value: L.minSec }, { key: 'showPercent', label: 'Show the percentage (progress bar)', type: 'checkbox', value: L.showPercent },
+      { key: 'minSec', label: 'Show for at least (seconds – minimum 1.5)', type: 'number', value: L.minSec }, { key: 'showPercent', label: 'Show the percentage (progress bar)', type: 'checkbox', value: L.showPercent },
       { key: 'creditAt', label: 'Credit line position', type: 'select', value: L.creditAt, options: [['bottom', 'Bottom'], ['top', 'Top']], hint: `The loading page always shows “${VX.credit.text()}”. You can move it and change the text colour, not remove it.` }] });
-    if (!v) return false; project.settings.loading = { title: v.title.trim(), subtitle: v.subtitle.trim(), style: v.style, bg: v.bg, color: v.color, accent: v.accent, logo: v.logo, tips: v.tips, minSec: Math.max(0, Math.min(10, v.minSec || 0)), showPercent: v.showPercent, creditAt: v.creditAt }; return true;
+    if (!v) return false; project.settings.loading = { title: v.title.trim(), subtitle: v.subtitle.trim(), style: v.style, bg: v.bg, color: v.color, accent: v.accent, logo: v.logo, tips: v.tips, minSec: minSecOf(v.minSec), showPercent: v.showPercent, creditAt: v.creditAt }; return true;
   }
   const C0 = (c, d) => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : /^#[0-9a-f]{6}$/i.test(d) ? d : '#10131a');
   /** a standalone page that animates the loader, for the preview dialog */

@@ -223,15 +223,17 @@ async function ensureGradle(opts = {}) {
   pruneGradle(latest.version); emit('gradle', 'ok', (have ? 'Updated to Gradle ' : 'Installed Gradle ') + latest.version + (have && have.version !== latest.version ? ' (the old version was deleted)' : '')); return { home: dest, version: latest.version, source: 'downloaded' };
 }
 
+/** Escapes a value for a Java .properties file: the backslash first (so nothing is escaped twice), then the colon. */
+const propEsc = (v) => String(v).replace(/\\/g, '\\\\').replace(/:/g, '\\:');
 /** Points android/gradle/wrapper/gradle-wrapper.properties at the latest Gradle on services.gradle.org (offline: left as it is). Returns the previous distributionUrl so a build can go back to it. */
 async function setWrapper(androidDir) {
   const f = path.join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'); if (!exists(f)) return null;
   const text = fs.readFileSync(f, 'utf8'), prev = (/^distributionUrl=(.*)$/m.exec(text) || [])[1] || null; let latest; try { latest = await latestGradle(); } catch { return { file: f, previous: prev, changed: false }; }
-  const url = 'https://services.gradle.org/distributions/gradle-' + latest.version + '-bin.zip', esc = url.replace(/:/g, '\\:'); if (prev && prev.replace(/\\/g, '') === url) return { file: f, previous: prev, changed: false, url };
-  let out = text.replace(/^distributionUrl=.*$/m, 'distributionUrl=' + esc).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); if (latest.sha256) out = out.replace(/\s*$/, '\n') + 'distributionSha256Sum=' + latest.sha256 + '\n';
+  const url = 'https://services.gradle.org/distributions/gradle-' + latest.version + '-bin.zip', esc = propEsc(url); if (prev && prev.replace(/\\/g, '') === url) return { file: f, previous: prev, changed: false, url };
+  let out = text.replace(/^distributionUrl=.*$/m, () => 'distributionUrl=' + esc).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); if (latest.sha256) out = out.replace(/\s*$/, '\n') + 'distributionSha256Sum=' + latest.sha256 + '\n';
   fs.writeFileSync(f, out); return { file: f, previous: prev, changed: true, url };
 }
-function restoreWrapper(w) { if (!w || !w.changed || !w.previous) return; try { let t = fs.readFileSync(w.file, 'utf8').replace(/^distributionUrl=.*$/m, 'distributionUrl=' + w.previous).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); fs.writeFileSync(w.file, t); } catch { /* ignore */ } }
+function restoreWrapper(w) { if (!w || !w.changed || !w.previous) return; try { let t = fs.readFileSync(w.file, 'utf8').replace(/^distributionUrl=.*$/m, () => 'distributionUrl=' + w.previous).replace(/^distributionSha256Sum=.*\r?\n?/m, ''); fs.writeFileSync(w.file, t); } catch { /* ignore */ } }
 
 /** Newest stable Android Gradle plugin on Google's Maven repository (previews are skipped). */
 async function latestAgp() { const xml = String(await get('https://dl.google.com/android/maven2/com/android/tools/build/gradle/maven-metadata.xml')); const v = [...xml.matchAll(/<version>(\d+\.\d+\.\d+)<\/version>/g)].map((m) => m[1]).sort(cmp); if (!v.length) throw new Error('no Android Gradle plugin version found'); return v[v.length - 1]; }

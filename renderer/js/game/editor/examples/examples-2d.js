@@ -62,6 +62,7 @@
     const colors = ['#ff3df2', '#ff6b6b', '#ffb84d', '#fff35c', '#5cff9d', '#4dd2ff', '#8c7bff'];
     for (let r = 0; r < 7; r++) for (let c = 0; c < 12; c++) add(p, 'rect', 'Brick ' + (r * 12 + c + 1), 90 + c * 71, 70 + r * 30, { w: 68, h: 24, color: colors[r], tags: ['brick'], physics: PH('static', { bounce: 1, friction: 0 }), behaviors: [brickB] });
     add(p, 'ellipse', 'Ball', 480, 470, { w: 16, h: 16, color: '#ffffff', physics: PH('dynamic', { shape: 'circle', bounce: 1, friction: 0, gravityScale: 0, fixedRotation: true }), behaviors: [ballB] });
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 2 · Void Swarm (top-down shooter, waves, bar block) */
@@ -117,6 +118,7 @@
     add(p, 'ellipse', 'Drone', -500, -500, { w: 28, h: 28, color: '#ff4d6d', prefab: true, tags: ['enemy'], physics: PH('kinematic', { sensor: true }), behaviors: [droneB] });
     add(p, 'ellipse', 'Bullet', -500, -500, { w: 9, h: 9, color: '#fff35c', prefab: true, tags: ['bullet'], physics: PH('kinematic', { sensor: true }), behaviors: [bulletB] });
     add(p, 'rect', 'Player', 480, 270, { w: 38, h: 20, color: '#4dd2ff', tags: ['player'], physics: PH('kinematic', { sensor: true }), behaviors: [playerB] });
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 3 · Sling Tower (physics sandbox, drag to launch) */
@@ -181,6 +183,7 @@
       add(p, 'ellipse', 'Boulder', 150, 420, { w: 34, h: 34, color: '#555b66', tags: ['boulder'], physics: PH('dynamic', { shape: 'circle', bounce: 0.3, friction: 0.5, mass: 3 }), behaviors: [ammoB] });
     });
     p.cur = 0;
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 4 · Sky Hopper (kinematic pipes, dynamic bird, parallax, high score) */
@@ -242,6 +245,7 @@
     add(p, 'rect', 'Pipe', -500, -500, { w: 70, h: 500, color: '#3aa545', prefab: true, tags: ['pipe'], physics: PH('kinematic'), order: 2, behaviors: [pipeB] });
     add(p, 'rect', 'Gap', -500, -500, { w: 10, h: 540, color: '#ffffff', alpha: 0, prefab: true, tags: ['gap'], physics: PH('kinematic', { sensor: true }), behaviors: [gapB] });
     add(p, 'ellipse', 'Bird', 220, 250, { w: 34, h: 28, color: '#ffd23f', physics: PH('dynamic', { shape: 'circle', bounce: 0, friction: 0, fixedRotation: true, gravityScale: 0 }), order: 6, behaviors: [birdB] });
+    K.touch(p, {});
     return p; } });
 
   /* ---------------------------------------------------------------- 5 · Echo Pads (memory puzzle with clickable pads and sound) */
@@ -299,5 +303,6 @@
       });
       add(p, 'rect', 'Pad' + i, 405 + (i % 2) * 150, 160 + Math.floor(i / 2) * 150, { w: 140, h: 140, color: c, alpha: 0.4, tags: ['pad'], behaviors: [pad] });
     });
+    K.touch(p, {});
     return p; } });
 })();

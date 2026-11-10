@@ -99,24 +99,28 @@
   const KEY_LABEL = { space: 'Jump', shift: 'Sneak', enter: 'OK', escape: 'Menu', control: 'Ctrl', tab: 'Tab', ' ': 'Jump' };
   const MOVE = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
   const VALID_KEY = /^(?:[a-z0-9]|space|shift|enter|escape|tab|control|alt|arrow(?:up|down|left|right)|f\d{1,2})$/;
+  /** press / release a key as if it came from a keyboard (touch stick, touch buttons) */
+  VXRT.vkey = (g, k, down) => { const I = g.input; if (!I) return; k = VXRT.keyAlias(k); if (down) { if (!I.keys.has(k)) { I.pressed.add(k); I.emit('keydown', { key: k, code: k, repeat: false }); } I.keys.add(k); } else if (I.keys.has(k)) { I.keys.delete(k); I.released.add(k); I.emit('keyup', { key: k, code: k }); } };
+  const TOUCH_BLOCKS = new Set(['joystick', 'touchButton', 'touchLook']);
   function scanKeys(g) {
-    const keys = new Set(); let look = false;
+    const keys = new Set(); let look = false, blocks = false;
     for (const b of Object.values((g.data && g.data.behaviors) || {})) for (const n of ((b.graph && b.graph.nodes) || [])) {
-      if (n.type === 'lockedMouse') look = true;
+      if (n.type === 'lockedMouse') look = true; if (TOUCH_BLOCKS.has(n.type)) blocks = true;
       for (const [k, v] of Object.entries(n.params || {})) if (/^(key|testKey|quietKey|keys?\d*)$/i.test(k) && typeof v === 'string') { const a = VXRT.keyAlias(v); if (VALID_KEY.test(a)) keys.add(a); }
     }
-    return { keys, look };
+    return { keys, look, blocks };
   }
   VXRT.initTouchControls = function (g) {
     const I = g.input, cfg = Object.assign({ mode: 'auto' }, (g.settings && g.settings.touch) || {});
     const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
     if (cfg.mode === 'off' || (cfg.mode !== 'on' && !coarse)) return;
-    const sc = scanKeys(g), moveKeys = [...sc.keys].filter((k) => MOVE.has(k)), wasd = moveKeys.some((k) => k.length === 1), arrows = moveKeys.some((k) => k.startsWith('arrow'));
+    const sc = scanKeys(g); if (sc.blocks) return; /* the game has its own Joystick / Touch Button / Touch Look blocks (UI layer) */
+    const moveKeys = [...sc.keys].filter((k) => MOVE.has(k)), wasd = moveKeys.some((k) => k.length === 1), arrows = moveKeys.some((k) => k.startsWith('arrow'));
     const others = [...sc.keys].filter((k) => !MOVE.has(k) && k !== 'any');
     const buttons = Array.isArray(cfg.buttons) && cfg.buttons.length ? cfg.buttons.map((b) => ({ label: b.label || String(b.key).toUpperCase(), key: VXRT.keyAlias(b.key) })) : others.slice(0, 6).map((k) => ({ label: KEY_LABEL[k] || String(k).toUpperCase().slice(0, 5), key: k }));
     const stick = moveKeys.length > 0 || cfg.stick === true, look = g.dim === '3d' && sc.look && cfg.look !== false;
     if (!stick && !buttons.length && !look) return; // mouse / touch only game: nothing to add
-    const vkey = (k, down) => { if (down) { if (!I.keys.has(k)) { I.pressed.add(k); I.emit('keydown', { key: k, code: k, repeat: false }); } I.keys.add(k); } else if (I.keys.has(k)) { I.keys.delete(k); I.released.add(k); I.emit('keyup', { key: k, code: k }); } };
+    const vkey = (k, down) => VXRT.vkey(g, k, down);
     const mk = (css, attrs) => { const e = document.createElement('div'); e.style.cssText = css; if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
     const root = mk('position:absolute;inset:0;pointer-events:none;z-index:40;-webkit-tap-highlight-color:transparent;touch-action:none', { 'data-vx-touch': 'root' });
     const safe = 'max(18px,env(safe-area-inset-bottom))', safeL = 'max(18px,env(safe-area-inset-left))', safeR = 'max(18px,env(safe-area-inset-right))';
