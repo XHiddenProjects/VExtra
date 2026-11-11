@@ -78,6 +78,7 @@
     }
     setView(v) {
       this.view = v; if (this._pan) { for (const k of ['left', 'right']) if (!this._panSticky) delete this._pan[k]; this.autoPanels(); } ['scene', 'logic', 'assets', 'play'].forEach((k, i) => { this[k + 'View'].style.display = k === v ? '' : 'none'; this.tabBtns[i].classList.toggle('on', k === v); });
+      if (v !== 'logic' && this.liveBox) this.liveToggle(false);
       if (v === 'play') { this.ensurePlay(); this.playPanel.start(); } else if (this.playPanel) this.playPanel.stop();
       if (v === 'logic') { this.renderBehList(); this.loadBehavior(); setTimeout(() => this.graph && this.graph.fit(), 30); }
       if (v === 'scene') { this.ensureViewport(); this.fitSoon(); }
@@ -134,6 +135,18 @@
         b('⚙ Game settings', () => this.gameSettings()), b('⏳ Loading page', () => this.loadingPage()), b('📖 Blocks docs', () => this.opts.openDocs && this.opts.openDocs('logic')), b('⬇ Export HTML', () => this.exportHTML()), b('🌐 Publish', () => VX.cloudUI && VX.cloudUI.publish(), '', 'Host it on a public URL'), b('📦 Store export', () => { const c = window.Forge && Forge.commands.get('store-export.package'); c ? c.run() : VX.ui.toast('Enable the “Store Export” plugin (Plugins panel) to package for Steam, Google Play and the App Store.', 'warn'); }, 'adv', 'Package for Steam / Google Play / App Store'), b([VX.icon('play', 13), 'Play'], () => this.play(), 'primary', 'Run the game')];
     }
     play() { this.setView('play'); }
+    /** Logic tab ▶ Live: runs the game in a small box and shows each block's latest values on the blocks. */
+    liveToggle(on) {
+      on = on === undefined ? !this.liveBox : on;
+      if (!on) { if (this.livePanel) { this.livePanel.stop(); this.livePanel.dispose(); this.livePanel = null; } if (this.liveBox) { this.liveBox.remove(); this.liveBox = null; } this.graph && this.graph.setLive(null); this.liveBtnSync(); return; }
+      if (this.liveBox) return;
+      this.livePanel = new VX.PlayPanel({ project: () => this.project, onLog: (l, t) => VX.bottom && VX.bottom.log && VX.bottom.log(l, t, 'game'), onStop: () => this.liveToggle(false), onLive: (d) => this.graph && this.graph.setLive(d) });
+      const head = h('div', { class: 'live-head' }, h('b', {}, '● Live'), h('span', { class: 'mini' }, 'click the game, then play – values show on the blocks'), h('span', { class: 'sp' }),
+        h('button', { class: 'btn sm', title: 'Restart with your latest changes', onclick: () => { this.graph.setLive(null); this.graph._live = {}; this.livePanel.start(); } }, '↻'), h('button', { class: 'btn sm', title: 'Reset the counters', onclick: () => { this.graph._live = {}; this.graph.world.querySelectorAll('.ge-live').forEach((e) => e.remove()); } }, '⌫'),
+        h('button', { class: 'btn sm', title: 'Stop', onclick: () => this.liveToggle(false) }, '■ Stop'));
+      this.liveBox = h('div', { class: 'live-box' }, head, this.livePanel.el); this.logicView.append(this.liveBox); this.graph._live = {}; this.livePanel.start(); this.liveBtnSync();
+    }
+    liveBtnSync() { if (this.liveBtn) { this.liveBtn.textContent = this.liveBox ? '■ Stop live' : '▶ Live'; this.liveBtn.classList.toggle('on', !!this.liveBox); } }
     ensurePlay() {
       if (this.playPanel) return;
       this.playPanel = new VX.PlayPanel({ project: () => this.project, onLog: (l, t) => VX.bottom && VX.bottom.log && VX.bottom.log(l, t, 'game'), onStop: () => this.setView('scene') }); this.playView.append(this.playPanel.el);
@@ -321,7 +334,7 @@
       const b = this.curB(); this.begToolbar.textContent = ''; this.renderBehList(); if (this.doc) { this.code.releaseDoc && this.code.releaseDoc(this.doc); this.doc = null; }
       if (!b) { this.graph.setGraph({ nodes: [], wires: [] }, { readOnly: true }); this.begToolbar.append(h('span', { class: 'lg-hint' }, 'Select or create a behaviour on the left.')); this.lgBody.className = 'lg-body m-blocks'; this.codeStatus.textContent = ''; this.inspect(); return; }
       const modeBtn = (k, l) => h('button', { class: 'btn sm' + (this.logicMode === k ? ' on' : ''), onclick: () => { this.logicMode = k; this.loadBehavior(); setTimeout(() => this.graph.fit(), 20); } }, l);
-      this.begToolbar.append(h('b', { class: 'lg-name', title: 'Click to rename', onclick: () => this.renameBehavior(b) }, b.name), h('span', { class: 'tag' }, b.mode === 'code' ? 'code script' : 'blocks'), h('span', { class: 'sp' }), h('span', { class: 'adv', style: 'display:inline-flex;gap:4px' }, modeBtn('blocks', '🧩 Blocks'), modeBtn('split', '◫ Split'), modeBtn('code', '﹛﹜ Code'), h('span', { class: 'sep' })),
+      this.begToolbar.append(h('b', { class: 'lg-name', title: 'Click to rename', onclick: () => this.renameBehavior(b) }, b.name), h('span', { class: 'tag' }, b.mode === 'code' ? 'code script' : 'blocks'), h('span', { class: 'sp' }), (this.liveBtn = h('button', { class: 'btn sm' + (this.liveBox ? ' on' : ''), title: 'Run the game and watch the live values on every block', onclick: () => this.liveToggle() }, this.liveBox ? '■ Stop live' : '▶ Live')), h('span', { class: 'adv', style: 'display:inline-flex;gap:4px' }, modeBtn('blocks', '🧩 Blocks'), modeBtn('split', '◫ Split'), modeBtn('code', '﹛﹜ Code'), h('span', { class: 'sep' })),
         ...(b.mode === 'graph' ? [h('button', { class: 'btn sm adv', title: 'Turn this block graph into an editable script', onclick: () => this.toCode() }, '→ Convert to code')] : [b.graphBackup ? h('button', { class: 'btn sm', title: 'Discard script edits and restore the blocks', onclick: () => this.revertToBlocks() }, '↩ Revert to blocks') : null, h('button', { class: 'btn sm primary', title: 'Rebuild blocks from this script (dry run)', onclick: () => this.applyCode() }, '→ Apply code to blocks')]),
         h('button', { class: 'btn sm', onclick: () => this.attachCurrent(b.id), title: 'Attach to the selected object (or this scene)' }, '📎 Attach'), h('button', { class: 'btn sm', onclick: () => this.opts.openDocs && this.opts.openDocs(b.mode === 'code' ? 'scripting' : 'logic') }, '📖'));
       this.lgBody.className = 'lg-body m-' + this.logicMode + (b.mode === 'code' ? ' codemode' : '');

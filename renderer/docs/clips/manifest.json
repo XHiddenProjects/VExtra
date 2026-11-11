@@ -249,7 +249,7 @@
  },
  "pauseGame": {
   "cap": "Pause Game freezes or resumes the game (toggle / pause / resume). Press P: the spinning box stops, press again to continue.",
-  "kb": 16
+  "kb": 17
  },
  "loadLevel": {
   "cap": "Load Level switches to another scene (“next”, a name or a number). Press Space to go to level 2.",

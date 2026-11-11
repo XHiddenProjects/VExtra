@@ -9,7 +9,7 @@
 
   /* ---------------------------------------------------------------- 1 · VR Toy Toss */
   VX.gameExamples.push({ id: 'exvr-toss', name: 'VR Toy Toss (VR)', type: 'game3d', desc: 'Virtual reality: grab the balls with the grip button and throw them at the stacked boxes. Left stick walks, A resets. Headset (WebXR) or split-screen on a computer: the mouse is your right hand (click = trigger, E = grip, W A S D = stick).', build() {
-    const p = K.proj('VR Toy Toss', '3d', '#141a30'); K.sky(p, 0.9, 0.7); const sc = p.scenes[0]; sc.gravity = { x: 0, y: -9.8, z: 0 }; sc.camera3d = { mode: 'fps', yaw: 180, fov: 75, pos: { x: 0, y: 1.6, z: 2 }, target: { x: 0, y: 1.6, z: -5 } };
+    const p = K.proj('VR Toy Toss', '3d', '#141a30'); K.sky(p, 0.9, 0.7); const sc = p.scenes[0]; sc.gravity = { x: 0, y: -9.8, z: 0 }; sc.camera3d = { mode: 'fps', yaw: 0, fov: 75, pos: { x: 0, y: 1.6, z: 2 }, target: { x: 0, y: 1.6, z: -5 } };
     K.synth(p, 'hit', 'noise', 600, 120, 0.25, 0.35); K.synth(p, 'pick', 'triangle', 500, 800, 0.1, 0.25); K.synth(p, 'win', 'square', 523, 1568, 0.8, 0.3);
     const floor = K.mat(p, 'Floor', { color: '#3a4260', roughness: 0.9, pattern: 'checker', color2: '#2c3350' });
     const rules = K.bhv(p, 'VR Toy Toss – rules', ({ block, gv, put, start, snd, key }) => {

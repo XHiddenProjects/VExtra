@@ -75,9 +75,19 @@
     summary(n) { const def = VXRT.blocks[n.type]; if (!def) return ['Missing block type “' + n.type + '”']; const d = VXRT.paramDefaults(def); const out = []; for (const p of def.params || []) { const v = (n.params || {})[p.key]; if (v === undefined || JSON.stringify(v) === JSON.stringify(d[p.key])) continue; out.push(`${p.label}: ${String(Array.isArray(v) ? v.join(',') : v).slice(0, 22)}`); if (out.length >= 3) break; } if (n.type === 'bundle') out.push(((n.graph && n.graph.nodes.length) || 0) + ' blocks inside – double-click'); return out; }
     addBlockCenter(type) { const r = this.canvas.getBoundingClientRect(); const p = this.toWorld(r.left + r.width / 2, r.top + r.height / 2); this.addBlock(type, p.x - NODE_W / 2 + (Math.random() - 0.5) * 60, p.y - 30 + (Math.random() - 0.5) * 60); }
     addBlock(type, x, y, params) { const def = VXRT.blocks[type]; if (!def) return null; const n = { id: VX.uid('n'), type, params: Object.assign({}, VXRT.paramDefaults(def), params || {}), x: Math.round(x / 8) * 8, y: Math.round(y / 8) * 8 }; if (type === 'bundle') n.graph = { nodes: [], wires: [] }; if (type === 'bundleInput' || type === 'bundleOutput') n.params.name = (type === 'bundleInput' ? 'in' : 'out') + (this.graph.nodes.filter((q) => q.type === type).length + 1); this.graph.nodes.push(n); this.sel = new Set([n.id]); this.selWire = null; this.changed(); this.render(); this.drawSide(); return n; }
+    /** Live values: data = { nodeId: { n, ports: { port: 'text' } } } from the running game. Pass null to clear. */
+    setLive(data) { if (!data) { this._live = null; this.world.querySelectorAll('.ge-live').forEach((e) => e.remove()); return; } const L = (this._live ||= {}); for (const id in data) { const o = L[id] || (L[id] = { n: 0, ports: {} }), d = data[id]; o.n += d.n; Object.assign(o.ports, d.ports); o.flash = true; } this.showLive(); }
+    showLive() {
+      if (!this._live) return; for (const el of this.world.querySelectorAll('.ge-node')) {
+        const o = this._live[el.dataset.id]; let box = el.querySelector(':scope > .ge-live'); if (!o) { if (box) box.remove(); continue; }
+        if (!box) { box = h('div', { class: 'ge-live' }); el.append(box); }
+        box.textContent = ''; box.append(h('span', { class: 'n' }, '×' + o.n)); for (const k of Object.keys(o.ports).slice(-4)) box.append(h('div', {}, h('b', {}, k + ' '), o.ports[k]));
+        if (o.flash) { o.flash = false; el.classList.add('live-hit'); clearTimeout(el._lt); el._lt = setTimeout(() => el.classList.remove('live-hit'), 220); }
+      }
+    }
     render() {
       for (const el of [...this.world.querySelectorAll('.ge-node')]) el.remove(); const g = this.graph; this.empty.classList.toggle('hidden', g.nodes.length > 0 || this.readOnly && false);
-      for (const n of g.nodes) this.world.append(this._nodeEl(n)); this.drawWires(); this.applyView();
+      for (const n of g.nodes) this.world.append(this._nodeEl(n)); this.drawWires(); this.applyView(); this.showLive();
     }
     _nodeEl(n) {
       const def = VXRT.blocks[n.type]; const p = this.ports(n); const color = def ? VXRT.catColor(def.cat) : '#ef5b5b'; const rows = Math.max(p.inputs.length, p.outputs.length, 1);

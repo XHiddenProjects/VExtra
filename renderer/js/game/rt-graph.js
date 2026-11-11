@@ -69,8 +69,13 @@
     try { n.def.destroy && n.def.destroy(n, g); } catch { /* ignore */ }
     for (const c of n.cleanups.splice(0)) { try { c(); } catch { /* ignore */ } }
   };
+  /** Live view (editor Logic tab): remembers the latest value on every output and posts a batch to the editor ~7×/s. Off unless the editor asks. */
+  const liveRec = (g, node, port, value) => {
+    const L = g._live || (g._live = {}), r = L[node.id] || (L[node.id] = { n: 0, ports: {} }); r.n++; let t = U.str(value); if (t.length > 34) t = t.slice(0, 33) + '…'; r.ports[port] = t;
+  };
+  VXRT.liveFlush = (g) => { const ch = g.opts && g.opts.channel; if (!g._live || !ch || window.parent === window) return; try { window.parent.postMessage({ vx: 'live', token: ch.token, data: g._live }, ch.origin); } catch { /* ignore */ } g._live = {}; };
   VXRT.send = function (g, node, port, value) {
-    if (node.dead) return; const targets = node.out[port]; if (!targets) return;
+    if (node.dead) return; if (g.liveOn) liveRec(g, node, port, value); const targets = node.out[port]; if (!targets) return;
     if (g.sendDepth > 60) { if (!g._depthWarned) { g._depthWarned = true; g.log('warn', 'Signal loop detected (depth > 60) – check for a cycle without a delay.'); } return; }
     g.sendDepth++;
     try { for (const t of targets) { if (t.node.dead) continue; if (t.self) { (g.selfQ ||= []).push([t, value]); continue; } try { t.node.def.onInput && t.node.def.onInput(t.node, t.port, value, g); } catch (e) { g.nodeError(t.node, e); } } } finally { g.sendDepth--; }

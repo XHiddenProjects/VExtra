@@ -283,7 +283,7 @@
     /* ----- main loop ----- */
     tick(now) {
       let dt = Math.min(0.05, (now - this._last) / 1000); this._last = now; this.fps = this.fps * 0.95 + (1 / Math.max(dt, 0.0001)) * 0.05;
-      this.realDt = dt; if (this.paused) { VXRT.render(this); return; }
+      this.realDt = dt; if (this.paused) { if (this.pending.length) { const p = this.pending.splice(0); for (const fn of p) { try { fn(); } catch (e) { this.log('error', e.message); } } } VXRT.render(this); return; }
       dt *= this.timeScale; this.dt = dt; this.time += dt; this.frame++;
       try {
         VXRT.input_beginFrame(this);

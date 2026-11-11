@@ -18,7 +18,7 @@
         h('button', { class: 'btn sm', onclick: () => this.ctx.onStop && this.ctx.onStop() }, '■ Stop'));
       this.el = h('div', { class: 'play' }, this.bar, this.stage);
       this.sense = new VX.SenseHost((type, value, tr) => this.send(type, value, tr));
-      this.msg = (e) => { if (e.source !== this.frame.contentWindow) return; const d = e.data; if (d && d.vx === 'sense' && this.chan && d.token === this.chan.token) { this.sense.handle(d); return; } if (d && d.vx === 'log' && this.chan && d.token === this.chan.token) this.ctx.onLog && this.ctx.onLog(d.level, d.text); };
+      this.msg = (e) => { if (e.source !== this.frame.contentWindow) return; const d = e.data; if (d && d.vx === 'sense' && this.chan && d.token === this.chan.token) { this.sense.handle(d); return; } if (d && d.vx === 'live' && this.chan && d.token === this.chan.token) { this.ctx.onLive && this.ctx.onLive(d.data); return; } if (d && d.vx === 'log' && this.chan && d.token === this.chan.token) this.ctx.onLog && this.ctx.onLog(d.level, d.text); };
       window.addEventListener('message', this.msg); this.ro = new ResizeObserver(() => this.layout()); this.ro.observe(this.stage);
     }
     /* The game frame is sandboxed without allow-same-origin, so its origin is opaque and "*" is the only possible target. Every message carries a one-time token the game verifies, and carries no secrets. */
@@ -34,7 +34,7 @@
       const my = ++this.token; this.sense && this.sense.destroy(); this.paused = false; this.pb && (this.pb.textContent = '⏸ Pause');
       try {
         this.chan = { token: VX.channel.token(), origin: VX.channel.origin() }; const html = await VX.gameExport.toHTML(this.ctx.project(), { channel: this.chan }); if (my !== this.token) return;
-        this.frame.srcdoc = html; this.layout(); this.frame.onload = () => { this.send('debug', this.debug); this.send('mute', this.muted); this.frame.focus(); };
+        this.frame.srcdoc = html; this.layout(); this.frame.onload = () => { this.send('debug', this.debug); this.send('mute', this.muted); if (this.ctx.onLive) for (const ms of [0, 400, 1200, 2500]) setTimeout(() => { if (my === this.token) this.send('live', true); }, ms); this.frame.focus(); };
         this.ctx.onLog && this.ctx.onLog('info', '▶ Game started');
       } catch (e) { this.ctx.onLog && this.ctx.onLog('error', 'Could not start: ' + e.message); VX.ui.toast('Could not start game: ' + e.message, 'error'); }
     }

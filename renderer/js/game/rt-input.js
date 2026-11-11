@@ -87,7 +87,7 @@
       if (d.type === 'shake') I.emit('shake', { force: 20 });
       if (d.type === 'tilt') { Object.assign(I.motion, d.value || {}); }
       if (d.type === 'key') { const k = d.key; if (d.down) { if (!I.keys.has(k)) I.pressed.add(k); I.keys.add(k); I.emit('keydown', { key: k, code: k }); } else { I.keys.delete(k); I.released.add(k); I.emit('keyup', { key: k, code: k }); } }
-      if (d.type === 'pause') g.pause(d.value); if (d.type === 'restart') g.restart(); if (d.type === 'debug') g.debug = !!d.value; if (d.type === 'mute') { g.audio.muted = !!d.value; g.audio.ensure(); }
+      if (d.type === 'pause') g.pause(d.value); if (d.type === 'restart') g.restart(); if (d.type === 'live') { g.liveOn = !!d.value; clearInterval(g._liveT); if (g.liveOn) g._liveT = setInterval(() => VXRT.liveFlush(g), 140); } if (d.type === 'debug') g.debug = !!d.value; if (d.type === 'mute') { g.audio.muted = !!d.value; g.audio.ensure(); }
     });
     try { VXRT.initTouchControls(g); } catch (e) { g.log && g.log('warn', 'Touch controls: ' + e.message); }
   };

@@ -718,6 +718,10 @@ When the Shader block's effect is **Custom shader file**, a **Custom shader** dr
 
 Use **Bluetooth Connect** from a click or key (the browser shows its own device picker), list the services you need, then wire **connected** into **Read**, **Write** or **Notify**. Give every block the same *Device name*. Common names: \`battery_service\` / \`battery_level\`, \`heart_rate\` / \`heart_rate_measurement\`, or a hex id like \`0xFFE0\`. Failures go to the \`error\` port.
 
+## Watching blocks work (Live)
+
+In the **Logic** tab press **▶ Live**. The game starts in a small box; click it and play. Every block shows the latest value of each output and a counter (×12), and flashes when it fires – ideal for finding out why something does not trigger. **↻** restarts with your latest edits, **⌫** clears the counters, **■ Stop live** closes the box.
+
 ## Reading results that have several parts
 
 Some blocks send several values at once (a joystick, Size, a position). Anywhere text is shown they appear readable (\`x: 3, y: 4\`). To use one part: write \`{value.x}\` in a Label, use the block's own ports (e.g. Size has \`w\`, \`h\`, \`d\`), or add a **Get Field** block.

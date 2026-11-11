@@ -13,8 +13,13 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - **Bluetooth blocks (Mobile Device):** *Bluetooth Connect*, *Bluetooth Read*, *Bluetooth Write* and *Bluetooth Notify* talk to Bluetooth Low Energy devices (heart-rate belts, sensors, LEDs, micro:bit…) through Web Bluetooth. Results can be numbers, text, heart rate, hex or raw bytes; failures go to an `error` port. Works in Chrome, Edge and Android; Safari / iOS / Firefox send `error`.
 - **Get Field block (Logic & Math):** picks one value out of a signal that carries several (`x`, `pos.y`, `0`…).
 - **Component ports:** *Size* now also sends `w`, `h`, `d`; *VR Move* sends `x`, `z` on teleport.
+- **Live values in the Logic tab:** a **▶ Live** button runs the game in a small box next to your blocks and shows, on every block, the latest value of each output and how many times it fired; blocks flash when they fire. ↻ restarts with your latest edits, ⌫ resets the counters.
+- **Exit Game:** a ✕ on the confirmation and on the goodbye screen, and a **Force close** option (no question, no Play again button).
+- Pop-up (modal) alerts now have a ✕ too.
 
 ### Fixed
+- **Pause Game (toggle)** stayed paused: the key press arrived while paused and the change was queued until the game ran again. It now toggles, pauses and resumes immediately.
+- **VR Toy Toss** faced away from the table and boxes (camera turned 180°).
 - **VR / AR Look At (VR Gaze):** the gaze ray started at 0,0,0 in the desktop stereo mode and used an exact hit, so looking at something sometimes did nothing. It now starts at the head, allows a small aiming tolerance and a short grace time before "look away".
 - **No more `[object Object]`:** labels, text, alerts, clipboard, Fetch URL and filters show readable text for values that carry several parts (`x: 3, y: 4`), and `{value.x}` picks one part.
 - **Sky Parkour:** crumbling tiles no longer disappear forever – they fall as before and **come back when you respawn**.
