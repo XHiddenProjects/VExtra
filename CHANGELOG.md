@@ -16,6 +16,8 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - **Live values in the Logic tab:** a **▶ Live** button runs the game in a small box next to your blocks and shows, on every block, the latest value of each output and how many times it fired; blocks flash when they fire. ↻ restarts with your latest edits, ⌫ resets the counters.
 - **Exit Game:** a ✕ on the confirmation and on the goodbye screen, and a **Force close** option (no question, no Play again button).
 - Pop-up (modal) alerts now have a ✕ too.
+- **Block Extras plugin (1.1.0): 13 new custom blocks** – Wrap, Map Range, Round, Random Pick, Counter, Cooldown, Alternate, Sequencer, In Range, Random Color, Stopwatch, Smooth and Typewriter (15 in total with Coin Flip and Clamp), each with a demo clip.
+- **Demo videos for plugin blocks:** a plugin's documentation page now lists all its blocks with their clips, and plugin authors can attach their own: `demo: { video: 'https://…/clip.webm', caption }` on `forge.game.registerBlock` (https or relative `.webm` / `.mp4` only).
 
 ### Fixed
 - **Pause Game (toggle)** stayed paused: the key press arrived while paused and the change was queued until the game ran again. It now toggles, pauses and resumes immediately.

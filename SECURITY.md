@@ -49,6 +49,7 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 
 ## v3.9.0 notes
 - **Bluetooth blocks** use Web Bluetooth: the browser always shows its own picker (needs a click / key / touch and https or localhost), a game can only reach the device you choose and the services listed in the block, and nothing pairs in the background. Connections are closed when the game stops.
+- **Plugin block demo clips:** `demo.video` is accepted only as an `https://` or relative `.webm` / `.mp4` link (never `javascript:` / `data:`), shown muted in a `<video>` element with no autoplay.
 - **Live values view:** only in the editor – the game sends short text previews of block outputs (max 34 characters each) to the editor over the same one-time-token channel as logs; exported games never send them unless the editor asks.
 - **Readable values:** the new text conversion only reads values; it never evaluates anything.
 - **GLB / glTF import:** a built-in parser (no third-party code) reads only the file's own bytes. Limits: 40 MB per file, node depth 64; Draco / Meshopt-compressed files are refused; a `.gltf` may only use embedded `data:` buffers and images (no file or network references); images are decoded by the browser from a `Blob`. A model that cannot be read is replaced by a wireframe box and a console warning – it never stops the game.

@@ -438,6 +438,7 @@ forge.game.registerBlock({
 - Hooks: \`init(node, game)\`, \`onInput(node, port, value, game)\`, \`update(node, dt, game)\` (every frame) and \`destroy(node, game)\`.
 - Parameter types: \`number\`, \`text\`, \`multiline\`, \`bool\`, \`select\` (with \`options\`), \`color\`, \`code\`, \`target\`, \`sound\`, \`sprite\`, \`key\`.
 - **Functions must be self-contained** (no outside variables) because they are copied into exported games.
+- **Demo video:** add \`demo: { video: 'https://example.com/clip.webm', caption: 'What it shows' }\` (an \`https://\` or relative \`.webm\` / \`.mp4\` link). The clip appears in the block's documentation and on your plugin's page, which now lists all its blocks. The built-in **Block Extras** plugin (15 blocks) is a good source of examples.
 
 ## A new object type
 

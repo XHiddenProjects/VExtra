@@ -253,6 +253,7 @@
     const rec = Forge.plugins.get(id); if (!rec) return '';
     const m = rec.manifest; const lines = [`# ${m.name}`, '', `*v${m.version} · ${rec.source === 'builtin' ? 'built-in plugin' : 'your plugin'}*`, '', m.description || '', ''];
     if (m.docs) lines.push(m.docs, '');
+    const bl = window.VXRT ? Object.values(VXRT.blocks).filter((b) => b.plugin === id) : []; if (bl.length && VX.docs && VX.docs.blockMd) { lines.push('## Blocks', '', `${bl.length} block${bl.length === 1 ? '' : 's'} in the **Plugins** category of the Logic tab.`, ''); for (const b of bl) lines.push(VX.docs.blockMd(b), ''); }
     for (const d of Forge.docs.values()) if (d.plugin === id) lines.push(`## ${d.title}`, '', d.markdown, '');
     const c = rec.contrib || {};
     const sect = [['commands', 'Commands', 'Run from the Command Palette (**Ctrl+Shift+P**).'], ['toolbar', 'Toolbar buttons', 'Appear above the editor when they apply.'], ['panels', 'Side panels', 'Open from the activity bar.'], ['statusItems', 'Status bar items', ''], ['components', 'Designer components', 'Find them in the **Create** panel.'], ['blocks', 'Logic blocks', 'Find them under **Plugins** in the block palette of the game editor.'], ['themes', 'Themes', '']];

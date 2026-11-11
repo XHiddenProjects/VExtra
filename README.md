@@ -45,6 +45,7 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 - **Voice commands can use a local model** (Whisper server on your computer) **or a cloud service**, like the AI plugin.
 - **VR and AR demo games** – Toy Toss, Orb Garden, AR Garden, AR Tape Measure – and floating **3D Text**.
 - **Bluetooth blocks** (Connect, Read, Write, Notify), a **Get Field** block, and readable results instead of `[object Object]`.
+- **13 more blocks in the Block Extras plugin** and demo clips for plugin blocks.
 - **Live values** in the Logic tab (▶ Live), Exit Game ✕ + force close, Pause Game toggle fix, VR Toy Toss faces the table.
 - VR / AR *Look At* is more reliable.
 - Sky Parkour's fallen tiles come back when you respawn.

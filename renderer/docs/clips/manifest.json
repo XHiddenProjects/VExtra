@@ -554,5 +554,57 @@
  "getField": {
   "cap": "Get Field picks one value out of a signal that carries several. Size sends width + height together; Get Field “w” takes just the width (here 90).",
   "kb": 16
+ },
+ "wrapnum": {
+  "cap": "Wrap (plugin) loops a number around a range. Space sends 370 into a 0–360 wrap and gets 10.",
+  "kb": 14
+ },
+ "mapnum": {
+  "cap": "Map Range (plugin) converts a number from one range to another. Space sends 75 (of 0–100) and gets 7.5 on a 0–10 scale.",
+  "kb": 15
+ },
+ "roundnum": {
+  "cap": "Round (plugin) rounds to a number of decimals. Space sends 3.14159 and gets 3.14.",
+  "kb": 14
+ },
+ "randompick": {
+  "cap": "Random Pick (plugin) sends a random line from your list. Each Space press shows a different cheer.",
+  "kb": 16
+ },
+ "counter": {
+  "cap": "Counter (plugin) counts signals and fires “reached” at its target. Three Space presses count to 3, then the box turns green.",
+  "kb": 15
+ },
+ "cooldown": {
+  "cap": "Cooldown (plugin) lets one signal through, then blocks new ones for a while. Quick presses: first green, second red (too soon), later one green again.",
+  "kb": 15
+ },
+ "alternate": {
+  "cap": "Alternate (plugin) sends each signal to “a”, then “b”, then “a” again. Space flips the box between green and red.",
+  "kb": 13
+ },
+ "sequencer": {
+  "cap": "Sequencer (plugin) steps through its outputs one signal at a time. Each Space press moves the box to the next colour.",
+  "kb": 15
+ },
+ "inrange": {
+  "cap": "In Range (plugin) checks whether a number lies between a minimum and maximum. Random 0–20 values: 5–15 turns the box green, others red.",
+  "kb": 17
+ },
+ "randomcolor": {
+  "cap": "Random Color (plugin) sends a random bright colour as text. Each Space press shows a new one.",
+  "kb": 16
+ },
+ "stopwatch": {
+  "cap": "Stopwatch (plugin) counts seconds while running (Auto start is on here).",
+  "kb": 16
+ },
+ "smoothnum": {
+  "cap": "Smooth (plugin) glides toward the newest number instead of jumping. Space sends 100 and the value eases up.",
+  "kb": 26
+ },
+ "typewriter": {
+  "cap": "Typewriter (plugin) types text one letter at a time. Space starts it.",
+  "kb": 17
  }
 }

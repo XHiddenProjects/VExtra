@@ -7,7 +7,13 @@
 
   const paramLine = (p) => { const opts = p.options ? ' – ' + p.options.map((o) => '`' + (Array.isArray(o) ? o[0] : o) + '`').join(', ') : ''; return `| ${p.label} | ${p.type === 'select' ? 'choice' : p.type} | ${p.def === undefined || p.def === '' ? '–' : '`' + String(p.def).slice(0, 30) + '`'} |${opts ? ' ' + opts.slice(3).slice(0, 220) : ''} |`; };
   /** the short demo video for a block (clips are made by tools/block-demos/build.js) */
-  function clipMd(def) { const c = window.VX && VX.docClips && VX.docClips[def.id]; return c ? `![video: ${c.replace(/[\]\[()]/g, ' ')}](docs/clips/${encodeURIComponent(def.id)}.webm)\n\n*Demo – ${c.replace(/[\]\[]/g, ' ')}*\n\n` : ''; }
+  function clipMd(def) {
+    const c = window.VX && VX.docClips && VX.docClips[def.id]; const cap = (t) => String(t).replace(/[\]\[()]/g, ' ');
+    if (c) return `![video: ${cap(c)}](docs/clips/${encodeURIComponent(def.id)}.webm)\n\n*Demo – ${cap(c)}*\n\n`;
+    /* plugin blocks may bring their own clip: demo: { video: 'https://…/clip.webm' | 'clips/x.mp4', caption } – only https or relative .webm / .mp4 links */
+    const d = def.demo; if (d && typeof d.video === 'string' && /^(https:\/\/|(?![a-z]+:)[\w./-]+)[^\s()]*\.(webm|mp4)$/i.test(d.video)) return `![video: ${cap(d.caption || def.label)}](${d.video})\n\n*Demo – ${cap(d.caption || def.label)}*\n\n`;
+    return '';
+  }
   function blockMd(def) {
     const ports = VXRT.ports(def, VXRT.paramDefaults(def), null); const pl = (a) => (a.length ? a.map((p) => '`' + p.id + '`').join(', ') : '—');
     let md = `### ${def.label}\n\n\`${def.id}\` ${def.plugin ? '· from plugin **' + def.plugin + '**' : ''}\n\n${def.desc || ''}\n\n${clipMd(def)}**Inputs:** ${pl(ports.inputs)}  \n**Outputs:** ${pl(ports.outputs)}\n\n`;
@@ -67,5 +73,6 @@
     view.nav.querySelectorAll('.docs-link').forEach((a) => a.classList.toggle('on', a.textContent === p.title));
   }
   /** Used by the game editor: open the docs page for a block. */
+  D.blockMd = (def) => blockMd(def);
   D.openBlock = (def) => { D.open('blocks-' + def.cat + '#' + VX.markdown.slug(def.label)); };
 })();
