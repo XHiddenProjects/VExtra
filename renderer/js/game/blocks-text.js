@@ -2,7 +2,7 @@
 (function () {
   const VXRT = window.VXRT, U = VXRT.util, B = VXRT.registerBlock, P = VXRT.P;
   const isNum = (v) => typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && Number.isFinite(+v));
-  const str = (v) => (v === undefined || v === null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+  const str = (v) => U.str(v);
   const listIn = (n, g, v) => (Array.isArray(v) ? v : n.p.list ? g.lists[n.p.list] || [] : v === undefined || v === true ? [] : [v]);
   const LIST = P.text('list', 'Named list (used when no list arrives)', '', { hint: 'Name of a list stored in the game by List Modify' });
 

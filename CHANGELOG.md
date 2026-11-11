@@ -10,8 +10,13 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - **Voice commands with local or cloud models:** Settings → Voice commands now has *How to listen* (Automatic / Engine only / Local model only / Cloud service only), a **Local model** setup (whisper.cpp, Speaches, LocalAI, LM Studio or custom – localhost only) and a **Cloud service** setup (OpenAI, Groq, Mistral or custom https) with presets, key field and a Test button. The Voice Command block has a new **Recognise with** setting to override it per block.
 - **Four VR / AR demo games:** *VR Toy Toss* (grab and throw), *VR Orb Garden* (gaze only – cardboard friendly), *AR Garden* (tap to plant, pinch to resize) and *AR Tape Measure*.
 - **3D Text objects:** a Text object in a 3D scene now shows as floating text (with `{variables}`, colour, size and *Face the camera*) – readable inside a headset where the screen HUD is not.
+- **Bluetooth blocks (Mobile Device):** *Bluetooth Connect*, *Bluetooth Read*, *Bluetooth Write* and *Bluetooth Notify* talk to Bluetooth Low Energy devices (heart-rate belts, sensors, LEDs, micro:bit…) through Web Bluetooth. Results can be numbers, text, heart rate, hex or raw bytes; failures go to an `error` port. Works in Chrome, Edge and Android; Safari / iOS / Firefox send `error`.
+- **Get Field block (Logic & Math):** picks one value out of a signal that carries several (`x`, `pos.y`, `0`…).
+- **Component ports:** *Size* now also sends `w`, `h`, `d`; *VR Move* sends `x`, `z` on teleport.
 
 ### Fixed
+- **VR / AR Look At (VR Gaze):** the gaze ray started at 0,0,0 in the desktop stereo mode and used an exact hit, so looking at something sometimes did nothing. It now starts at the head, allows a small aiming tolerance and a short grace time before "look away".
+- **No more `[object Object]`:** labels, text, alerts, clipboard, Fetch URL and filters show readable text for values that carry several parts (`x: 3, y: 4`), and `{value.x}` picks one part.
 - **Sky Parkour:** crumbling tiles no longer disappear forever – they fall as before and **come back when you respawn**.
 - Text objects placed in 3D scenes were drawn as plain cubes.
 

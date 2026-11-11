@@ -10,6 +10,9 @@
     inputs: ['in'], outputs: ['out'], params: [P.num('value', 'Value', 1, { step: 0.1 }), P.sel('rounding', 'Rounding', [['none', 'None'], ['round', 'Round'], ['floor', 'Round down'], ['ceil', 'Round up']], 'none'), P.num('decimals', 'Decimal places', 0, { min: 0, max: 10, hint: 'Used when rounding is on' }), P.bool('onStart', 'Send once at start', false)],
     init(n, g) { if (n.p.onStart) g.send(n, 'out', NUMR(n)); }, onInput(n, port, v, g) { g.send(n, 'out', NUMR(n)); } });
 
+  B({ id: 'getField', cat: 'logic', label: 'Get Field', desc: 'Picks one value out of a signal that carries several (a joystick, a position, a colour tracker, a list…). Type the field name – x, y, dx, level, size… – or a path like pos.y or 0 (first list item). “out” gets the value; “missing” fires with the whole signal when there is no such field. Anything that carries several values also shows as readable text (x: 3, y: 4), and in labels you can write {value.x}.',
+    inputs: ['in'], outputs: ['out', 'missing'], params: [P.text('path', 'Field', 'x', { hint: 'x · y · pos.y · 0' })],
+    onInput(n, port, v, g) { let o = v; if (typeof o === 'string' && /^\s*[{\[]/.test(o)) { try { o = JSON.parse(o); } catch { /* plain text */ } } const r = o !== null && typeof o === 'object' ? U.path(o, String(n.p.path || '').trim()) : undefined; if (r === undefined) g.send(n, 'missing', v); else g.send(n, 'out', r); } });
   B({ id: 'expression', cat: 'logic', label: 'Expression', desc: 'Evaluates an arithmetic expression. Variables: a, b, c, d, e, f (inputs), value (last "in"), time, dt, any global variable name, and self.x / self.y / self.speed… Functions: sin cos abs min max floor round sqrt pow clamp lerp rand… Operators: + - * / % ^ < > == && || ?:',
     inputs: ['in', 'a', 'b', 'c', 'd', 'e', 'f'], outputs: ['out', 'error'], params: [P.text('expr', 'Expression', 'a * 2 + 1'), P.sel('trigger', 'Calculate when', [['any', 'Any input arrives'], ['in', 'Only "in" arrives']])],
     init(n) { n.st.v = n.st.v || { a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, value: 0 }; },
@@ -60,7 +63,7 @@
     inputs: ['in', 'reset'], outputs: ['pass', 'fail'], params: [P.sel('op', 'Test', ['>', '<', '>=', '<=', '==', '!=', 'between', 'contains', 'changed', 'once', 'every', 'truthy']), P.text('value', 'Value', '0'), P.text('value2', 'Value 2 (between / every N)', '1')],
     onInput(n, port, v, g) {
       const s = n.st; if (port === 'reset') { s.once = false; s.count = 0; s.last = undefined; return; } const op = n.p.op; let ok = false; const a = isNum(v) ? +v : v, b = isNum(n.p.value) ? +n.p.value : n.p.value;
-      if (op === 'between') ok = U.num(v) >= U.num(n.p.value) && U.num(v) <= U.num(n.p.value2); else if (op === 'contains') ok = String(v).includes(String(n.p.value)); else if (op === 'changed') { ok = s.last !== v; s.last = v; } else if (op === 'once') { ok = !s.once; s.once = true; }
+      if (op === 'between') ok = U.num(v) >= U.num(n.p.value) && U.num(v) <= U.num(n.p.value2); else if (op === 'contains') ok = U.str(v).includes(String(n.p.value)); else if (op === 'changed') { ok = s.last !== v; s.last = v; } else if (op === 'once') { ok = !s.once; s.once = true; }
       else if (op === 'every') { s.count = (s.count || 0) + 1; ok = s.count % Math.max(1, U.num(n.p.value, 1)) === 0; } else if (op === 'truthy') ok = U.truthy(v); else ok = { '>': a > b, '<': a < b, '>=': a >= b, '<=': a <= b, '==': a == b, '!=': a != b }[op]; // eslint-disable-line eqeqeq
       g.send(n, ok ? 'pass' : 'fail', v); } });
 
@@ -76,7 +79,7 @@
   B({ id: 'caseSwitch', cat: 'logic', label: 'Case Switch', desc: 'Compares the incoming value with a list of cases and sends the signal out of the matching output (or "default"). In index mode the number picks the output directly.',
     inputs: ['in'], outputs: (p) => [...String(p.cases || '').split(',').map((c, i) => ({ id: 'c' + i, label: c.trim() || 'case ' + (i + 1) })), { id: 'default', label: 'default' }],
     params: [P.text('cases', 'Cases (comma separated)', 'a, b, c'), P.sel('mode', 'Match by', [['value', 'Value equals case'], ['index', 'Number = output index (0-based)']])],
-    onInput(n, port, v, g) { const cases = String(n.p.cases || '').split(',').map((c) => c.trim()); let i = -1; if (n.p.mode === 'index') i = Math.floor(U.num(v, -1)); else i = cases.findIndex((c) => c === String(v) || (isNum(c) && isNum(v) && +c === +v)); g.send(n, i >= 0 && i < cases.length ? 'c' + i : 'default', v); } });
+    onInput(n, port, v, g) { const cases = String(n.p.cases || '').split(',').map((c) => c.trim()); let i = -1; if (n.p.mode === 'index') i = Math.floor(U.num(v, -1)); else i = cases.findIndex((c) => c === U.str(v) || (isNum(c) && isNum(v) && +c === +v)); g.send(n, i >= 0 && i < cases.length ? 'c' + i : 'default', v); } });
 
   B({ id: 'router', cat: 'logic', label: 'Router', desc: 'Sends one input to one of several outputs: chosen by the "select" input, round-robin, random, or to all.',
     inputs: ['in', 'select'], outputs: (p) => Array.from({ length: Math.max(2, Math.min(10, U.num(p.outputs, 3))) }, (_, i) => ({ id: 'o' + i, label: 'out ' + (i + 1) })),

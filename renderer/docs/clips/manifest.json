@@ -105,7 +105,7 @@
  },
  "caseSwitch": {
   "cap": "Case Switch sends the signal out of the output whose name matches the value (cases “a, b, c”). Here “b” takes the middle path.",
-  "kb": 13
+  "kb": 15
  },
  "router": {
   "cap": "Router sends a signal to one of several outputs – here round-robin: each press goes to the next colour.",
@@ -485,7 +485,7 @@
  },
  "vrMove": {
   "cap": "VR Move walks the player around (smooth, snap-turn or teleport) with the controller stick. In the computer fallback use W A S D.",
-  "kb": 20
+  "kb": 19
  },
  "vrGrab": {
   "cap": "VR Grab lets a hand pick up objects with the grip button (here anything tagged “grab”) and throw them when released.",
@@ -497,7 +497,7 @@
  },
  "vrGaze": {
   "cap": "VR Gaze fires when the player looks at an object for a moment (here 1 s) – selection without controllers, ideal for cardboard viewers.",
-  "kb": 23
+  "kb": 24
  },
  "arMode": {
   "cap": "AR Mode starts augmented reality: the camera behind the game (or WebXR on supported phones). Press “Start AR”.",
@@ -533,6 +533,26 @@
  },
  "clampnum": {
   "cap": "Clamp Number (plugin) keeps a number between a minimum and maximum. Random 0–100 values are squeezed into 20–60.",
+  "kb": 16
+ },
+ "bluetoothConnect": {
+  "cap": "Bluetooth Connect pairs with a Bluetooth Low Energy device – the browser shows its own picker, so start it from a key or click. Space connects (a demo band stands in here).",
+  "kb": 19
+ },
+ "bluetoothRead": {
+  "cap": "Bluetooth Read asks a connected device for one value – here the battery level. Space connects, then reads it.",
+  "kb": 16
+ },
+ "bluetoothWrite": {
+  "cap": "Bluetooth Write sends a value to a device (an LED, a motor…). Space connects, then writes the number 128.",
+  "kb": 15
+ },
+ "bluetoothNotify": {
+  "cap": "Bluetooth Notify listens while the device pushes values by itself – here a heart-rate stream. Space connects and starts listening.",
+  "kb": 19
+ },
+ "getField": {
+  "cap": "Get Field picks one value out of a signal that carries several. Size sends width + height together; Get Field “w” takes just the width (here 90).",
   "kb": 16
  }
 }

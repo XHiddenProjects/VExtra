@@ -712,6 +712,15 @@ When the Shader block's effect is **Custom shader file**, a **Custom shader** dr
 | Game Center | local + cloud leaderboards | \`window.VextraNative.gameCenter\` when wrapped |
 | Device Check | detects mobile/tablet/OS/orientation | same |
 | Exit Game | thanks screen | \`window.VextraNative.exit\` |
+| Bluetooth Connect / Read / Write / Notify | needs Chrome or Edge (a mock in the simulator) | Chrome on Android; not iOS / Safari |
+
+## Bluetooth devices
+
+Use **Bluetooth Connect** from a click or key (the browser shows its own device picker), list the services you need, then wire **connected** into **Read**, **Write** or **Notify**. Give every block the same *Device name*. Common names: \`battery_service\` / \`battery_level\`, \`heart_rate\` / \`heart_rate_measurement\`, or a hex id like \`0xFFE0\`. Failures go to the \`error\` port.
+
+## Reading results that have several parts
+
+Some blocks send several values at once (a joystick, Size, a position). Anywhere text is shown they appear readable (\`x: 3, y: 4\`). To use one part: write \`{value.x}\` in a Label, use the block's own ports (e.g. Size has \`w\`, \`h\`, \`d\`), or add a **Get Field** block.
 
 ## The Ad block and its service
 

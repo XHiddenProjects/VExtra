@@ -12,7 +12,16 @@
     truthy: (v) => v !== false && v !== 0 && v !== '' && v !== null && v !== undefined && v !== 'false',
     uid: () => Math.random().toString(36).slice(2, 9),
     hex: (c, d = '#ffffff') => (typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c) ? c : d),
-    tpl: (s, vars) => String(s ?? '').replace(/\{([\w.]+)\}/g, (m, k) => (k in vars ? vars[k] : m)),
+    /** Any value as readable text – never "[object Object]": objects become "x: 1, y: 2", lists "a, b, c", numbers lose floating-point noise. */
+    str: (v, depth = 0) => {
+      if (v === undefined || v === null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v * 1000) / 1000) : String(v); if (typeof v === 'boolean') return String(v);
+      if (typeof v === 'function') return ''; if (depth > 3) return '…'; if (Array.isArray(v)) return v.map((x) => U.str(x, depth + 1)).join(', ');
+      if (typeof v === 'object') { if (v instanceof Date) return v.toISOString(); const k = Object.keys(v); return k.map((key) => key + ': ' + (typeof v[key] === 'object' && v[key] !== null ? '(' + U.str(v[key], depth + 1) + ')' : U.str(v[key], depth + 1))).join(', '); }
+      return String(v);
+    },
+    /** one field of an object / list by path: "x", "pos.y", "items.0" (undefined if missing) */
+    path: (o, p) => { let c = o; for (const k of String(p).split('.')) { if (c === undefined || c === null) return undefined; c = c[k]; } return c; },
+    tpl: (s, vars) => String(s ?? '').replace(/\{([\w.]+)\}/g, (m, k) => { if (k in vars) return U.str(vars[k]); const i = k.indexOf('.'); if (i > 0 && k.slice(0, i) in vars) { const r = U.path(vars[k.slice(0, i)], k.slice(i + 1)); return r === undefined ? m : U.str(r); } return m; }),
     hsl: (h, s = 80, l = 55) => `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`,
   });
 

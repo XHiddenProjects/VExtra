@@ -110,7 +110,7 @@
   /** every frame: head pose (fallback), controller state */
   S.vrFrame = (g) => {
     const v = st(g).vr; if (!v.active || v.frame === g.frame) return v; v.frame = g.frame;
-    if (v.mode === 'stereo') { simHead(g, v); const I = g.input; const kd = (k) => (I.isDown(k) ? 1 : 0); const cam = g.cam3d, y = U.rad(cam.yaw + v.head.yaw + v.rig.yaw), p = U.rad(v.head.pitch); v.pos = v.pos || { x: cam.pos.x, y: cam.pos.y, z: cam.pos.z }; const fwd = { x: -Math.sin(y) * Math.cos(p), y: Math.sin(p), z: -Math.cos(y) * Math.cos(p) }, right = { x: Math.cos(y), y: 0, z: -Math.sin(y) };
+    if (v.mode === 'stereo') { simHead(g, v); const I = g.input; const kd = (k) => (I.isDown(k) ? 1 : 0); const cam = g.cam3d, y = U.rad(cam.yaw + v.head.yaw + v.rig.yaw), p = U.rad(v.head.pitch); v.pos = v.pos || { x: cam.pos.x, y: cam.pos.y, z: cam.pos.z }; v.head.x = v.pos.x; v.head.y = v.pos.y; v.head.z = v.pos.z; /* the head is where the camera is – VR Head and VR Gaze need a real position, not 0,0,0 */ const fwd = { x: -Math.sin(y) * Math.cos(p), y: Math.sin(p), z: -Math.cos(y) * Math.cos(p) }, right = { x: Math.cos(y), y: 0, z: -Math.sin(y) };
       v.ctrl.right = { sim: true, pos: { x: v.pos.x + fwd.x * 0.6 + right.x * 0.25, y: v.pos.y + fwd.y * 0.6 - 0.25, z: v.pos.z + fwd.z * 0.6 + right.z * 0.25 }, dir: fwd, trigger: I.mouse.down ? 1 : 0, grip: kd('e') || (I.mouse.buttons && I.mouse.buttons.has && I.mouse.buttons.has(2) ? 1 : 0), a: kd('q'), b: kd('f'), stickX: kd('d') - kd('a'), stickY: kd('s') - kd('w') };
       v.ctrl.left = v.ctrl.left || { sim: true, trigger: 0, grip: 0, a: 0, b: 0, stickX: 0, stickY: 0, pos: v.ctrl.right.pos, dir: fwd }; Object.assign(v.ctrl.left, { pos: v.ctrl.right.pos, dir: fwd });
     } else if (v.mode === 'webxr') {

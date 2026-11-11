@@ -53,7 +53,7 @@
     const orb = (i) => K.bhv(p, 'Orb ' + i, ({ block, put, snd, start }) => {
       start().to(block('spin', { target: 'self', mode: 'set', speed: 25 + (i % 4) * 15, axis: 'y' }));
       const gaze = block('vrGaze', { target: 'self', seconds: 1, range: 40 }, 'Looked at for a second');
-      gaze.to(snd('near'), 'looking'); const pop = gaze.to(snd('pop'), 'selected'); gaze.to(put('score', 'add', 1), 'selected'); gaze.to(block('emit', { target: 'self', count: 24, color: '#ffffff', speed: 3, spread: 360, life: 0.7, size: 0.08, gravity: 0 }), 'selected'); gaze.to(block('destroyer', { target: 'self', delay: 0.1 }), 'selected');
+      gaze.to(snd('near'), 'looking'); gaze.to(block('size', { target: 'self', mode: 'set', w: '1', h: '1', d: '1', duration: 0.25 }, 'Grow while looked at'), 'looking'); gaze.to(block('size', { target: 'self', mode: 'set', w: '0.7', h: '0.7', d: '0.7', duration: 0.25 }, 'Shrink when you look away'), 'lookAway'); const pop = gaze.to(snd('pop'), 'selected'); gaze.to(put('score', 'add', 1), 'selected'); gaze.to(block('emit', { target: 'self', count: 24, color: '#ffffff', speed: 3, spread: 360, life: 0.7, size: 0.08, gravity: 0 }), 'selected'); gaze.to(block('destroyer', { target: 'self', delay: 0.1 }), 'selected');
     });
     const cols = ['#4db8ff', '#ff6bd6', '#ffd23f', '#4cc38a', '#b388ff'];
     for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2 * 1.5, r = 4 + (i % 3) * 1.5; add(p, 'sphere', 'Orb ' + i, Math.sin(a) * r, 0.8 + (i % 5) * 0.7, { z: -Math.cos(a) * r, w: 0.7, h: 0.7, d: 0.7, color: cols[i % 5], tags: ['orb'], material: { emissive: cols[i % 5], metalness: 0.2, roughness: 0.2 }, behaviors: [orb(i)] }); }

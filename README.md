@@ -44,6 +44,8 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 - **A demo video for every block** in the documentation.
 - **Voice commands can use a local model** (Whisper server on your computer) **or a cloud service**, like the AI plugin.
 - **VR and AR demo games** – Toy Toss, Orb Garden, AR Garden, AR Tape Measure – and floating **3D Text**.
+- **Bluetooth blocks** (Connect, Read, Write, Notify), a **Get Field** block, and readable results instead of `[object Object]`.
+- VR / AR *Look At* is more reliable.
 - Sky Parkour's fallen tiles come back when you respawn.
 
 ## What's new in 3.8.0
