@@ -22,7 +22,7 @@
         else if (d.op === 'mic-stop') { this.micStop(); ok(); }
         else if (d.op === 'cam-start') { const r = await this.camStart(d.facing); ok(r); }
         else if (d.op === 'cam-stop') { this.camStop(); ok(); }
-        else if (d.op === 'speech-start') { this.speechStart(d.lang, d.interim, ok, (m) => this.post('sense-ack', { id: d.id, ok: false, error: m })); }
+        else if (d.op === 'speech-start') { this.speechStart(d.lang, d.interim, ok, (m) => this.post('sense-ack', { id: d.id, ok: false, error: m }), d.engine); }
         else if (d.op === 'speech-stop') { this.speechStop(); ok(); }
       } catch (e) { bad(e, /^cam/.test(d.op) ? 'camera' : 'microphone'); }
     }
@@ -54,28 +54,41 @@
     /* Voice commands. 1) the web engine's own speech recognition (Chrome / Edge / Safari). Embedded engines such as the desktop app's WebView2 have the API but no speech
      * service behind it, so it fails with "network" even when you are online. 2) optional fallback: record short phrases and send them to a speech-to-text
      * service you set in Settings → Voice commands (OpenAI-compatible /audio/transcriptions: OpenAI Whisper, Groq, a local whisper server …). */
-    speechStart(lang, interim, ok, bad) {
-      this.speechStop(); const A = (VX.app && VX.app.settings) || {}, mode = A.speechMode || 'auto', url = String(A.speechUrl || '').trim(), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const NO_ENGINE = 'The speech service of this window is not available. The desktop app\'s web engine has the speech API but no service behind it (that is what "network" means here – it is not your internet). Fix: Settings → Voice commands → add a speech-to-text service (for example OpenAI Whisper or a local whisper server), or open the exported game in Chrome / Edge. Meanwhile use the "say" entry or test keys.';
-      const useService = () => { if (!url) return false; this.serviceStart(lang, url, A, ok, bad); return true; };
-      if (mode === 'service') { if (!useService()) bad('Voice commands are set to "speech service", but no service address is set (Settings → Voice commands).'); return; }
-      if (!SR) { if (mode !== 'browser' && useService()) return; return bad('Speech recognition is not built into this window. ' + (url ? '' : 'Settings → Voice commands lets you add a speech-to-text service. ') + 'You can still use the "say" entry or test keys, or play the game in Chrome / Edge / Safari.'); }
+    /** The speech-to-text service settings for 'cloud' or 'local' (Settings → Voice commands). Local services must be on this computer, cloud ones must use https. */
+    speechCfg(kind) {
+      const A = (VX.app && VX.app.settings) || {}; const local = kind === 'local';
+      const url = String((local ? A.speechLocalUrl : (A.speechCloudUrl || A.speechUrl)) || '').trim(), key = local ? '' : String(A.speechCloudKey || A.speechKey || ''), model = String((local ? A.speechLocalModel : (A.speechCloudModel || A.speechModel)) || '').trim() || (local ? '' : 'whisper-1');
+      if (!url) return { kind, err: local ? 'No local speech model address is set (Settings → Voice commands → Local model).' : 'No cloud speech service address is set (Settings → Voice commands → Cloud service).' };
+      let u; try { u = new URL(url); } catch { return { kind, err: 'The ' + kind + ' speech address is not a valid web address.' }; }
+      const loop = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(u.hostname);
+      if (local && !loop) return { kind, err: 'The local model address must be on this computer (localhost). Use the Cloud service setting for a remote server.' };
+      if (!local && !loop && u.protocol !== 'https:') return { kind, err: 'The cloud speech address must use https:// so your voice is not sent in the clear.' };
+      return { kind, url, key, model };
+    }
+    speechStart(lang, interim, ok, bad, engine) {
+      this.speechStop(); const A = (VX.app && VX.app.settings) || {}; let mode = engine && engine !== 'settings' ? engine : (A.speechMode || 'auto'); if (mode === 'service') mode = String(A.speechUrl || A.speechCloudUrl || '').trim() || !String(A.speechLocalUrl || '').trim() ? 'cloud' : 'local'; const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const NO_ENGINE = 'The speech service of this window is not available. The desktop app\'s web engine has the speech API but no service behind it (that is what "network" means here – it is not your internet). Fix: Settings → Voice commands → set up a local model (for example a local Whisper server) or a cloud service, or open the exported game in Chrome / Edge. Meanwhile use the "say" entry or test keys.';
+      /** a ready service config for this mode ('auto' prefers a local model, then the cloud one) or null */
+      const pick = () => { const kinds = mode === 'cloud' ? ['cloud'] : mode === 'local' ? ['local'] : ['local', 'cloud']; for (const k of kinds) { const c = this.speechCfg(k); if (!c.err) return c; } return null; };
+      const useService = () => { const c = pick(); if (!c) return false; this.serviceStart(lang, c, ok, bad); return true; };
+      if (mode === 'cloud' || mode === 'local') { if (!useService()) bad(this.speechCfg(mode).err); return; }
+      if (!SR) { if (mode !== 'browser' && useService()) return; return bad('Speech recognition is not built into this window. ' + (mode === 'browser' ? '' : 'Settings → Voice commands lets you use a local model or a cloud service. ') + 'You can still use the "say" entry or test keys, or play the game in Chrome / Edge / Safari.'); }
       const r = new SR(), h = (this.sp = { r, on: true, fails: 0, got: false }); r.lang = lang || 'en-US'; r.continuous = true; r.interimResults = !!interim;
       r.onresult = (e) => { h.got = true; h.fails = 0; for (let i = e.resultIndex; i < e.results.length; i++) { const x = e.results[i]; this.post('speech', { text: String(x[0].transcript || '').trim(), final: x.isFinal, conf: x[0].confidence }); } };
       r.onerror = (e) => { if (e.error === 'no-speech' || e.error === 'aborted') return;
-        if (e.error === 'network' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') { h.fails++; if (!h.got && h.fails >= 1) { h.on = false; try { r.abort(); } catch { /* idle */ } if (mode !== 'browser' && url) { this.sp = null; this.serviceStart(lang, url, A, () => this.post('speech-state', { state: 'listening', via: 'service' }), (m) => this.post('speech-state', { state: 'error', error: m })); return; } this.post('speech-state', { state: 'error', error: NO_ENGINE }); return; } if (h.fails < 3) return; h.on = false; this.post('speech-state', { state: 'error', error: 'the speech service stopped answering (check your internet connection)' }); return; }
+        if (e.error === 'network' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') { h.fails++; if (!h.got && h.fails >= 1) { h.on = false; try { r.abort(); } catch { /* idle */ } const alt = mode !== 'browser' && pick(); if (alt) { this.sp = null; this.serviceStart(lang, alt, () => this.post('speech-state', { state: 'listening', via: 'service' }), (m) => this.post('speech-state', { state: 'error', error: m })); return; } this.post('speech-state', { state: 'error', error: NO_ENGINE }); return; } if (h.fails < 3) return; h.on = false; this.post('speech-state', { state: 'error', error: 'the speech service stopped answering (check your internet connection)' }); return; }
         h.on = false; this.post('speech-state', { state: 'error', error: e.error === 'not-allowed' ? 'blocked – allow the microphone' : e.error }); };
       r.onend = () => { if (h.on) setTimeout(() => { try { r.start(); } catch { /* running */ } }, 250); }; r.onstart = () => this.post('speech-state', { state: 'listening' });
       try { r.start(); ok(); } catch (e) { bad('Speech recognition: ' + e.message); }
     }
-    async serviceStart(lang, url, A, ok, bad) {
+    async serviceStart(lang, cfg, ok, bad) {
       let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch (e) { return bad(why(e, 'microphone')); }
       if (typeof MediaRecorder === 'undefined') { stream.getTracks().forEach((t) => t.stop()); return bad('This window cannot record audio (no MediaRecorder).'); }
       const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC(); try { await ctx.resume(); } catch { /* later */ } const an = ctx.createAnalyser(); an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an); const buf = new Float32Array(an.fftSize);
       const s = (this.sp = { svc: true, on: true, stream, ctx, rec: null, chunks: [], speaking: 0, quiet: 0, started: 0, busy: Promise.resolve() }); ok();
-      const send = (blob) => { s.busy = s.busy.then(async () => { if (!s.on || blob.size < 600) return; try { const fd = new FormData(); fd.append('file', blob, 'speech.webm'); fd.append('model', A.speechModel || 'whisper-1'); fd.append('response_format', 'json'); const lg = String(lang || '').split('-')[0]; if (lg) fd.append('language', lg);
-        const res = await fetch(url, { method: 'POST', headers: A.speechKey ? { authorization: 'Bearer ' + A.speechKey } : {}, body: fd }); if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 120)); const j = await res.json(); const text = String(j.text || '').trim(); if (text) this.post('speech', { text, final: true, conf: 1 });
-      } catch (e) { this.post('speech-state', { state: 'error', error: 'speech service: ' + (e && e.message || e) + ' (check the address / key in Settings → Voice commands; the service must allow browser requests – CORS)' }); } }); };
+      const send = (blob) => { s.busy = s.busy.then(async () => { if (!s.on || blob.size < 600) return; try { const fd = new FormData(); fd.append('file', blob, 'speech.webm'); if (cfg.model) fd.append('model', cfg.model); fd.append('response_format', 'json'); const lg = String(lang || '').split('-')[0]; if (lg) fd.append('language', lg);
+        const res = await fetch(cfg.url, { method: 'POST', headers: cfg.key ? { authorization: 'Bearer ' + cfg.key } : {}, body: fd }); if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 120)); const j = await res.json(); const text = String(j.text || '').trim(); if (text) this.post('speech', { text, final: true, conf: 1 });
+      } catch (e) { this.post('speech-state', { state: 'error', error: (cfg.kind === 'local' ? 'local speech model' : 'cloud speech service') + ': ' + (e && e.message || e) + ' (check Settings → Voice commands; the server must allow browser requests – CORS' + (cfg.kind === 'local' ? ' – and be running' : '') + ')' }); } }); };
       const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((m) => MediaRecorder.isTypeSupported(m)) || '';
       const begin = () => { s.chunks = []; const rec = (s.rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)); rec.ondataavailable = (e) => { if (e.data && e.data.size) s.chunks.push(e.data); }; rec.onstop = () => { const b = new Blob(s.chunks, { type: rec.mimeType || 'audio/webm' }); s.chunks = []; send(b); }; rec.start(); s.started = performance.now(); };
       this.post('speech-state', { state: 'listening', via: 'service' });

@@ -4,12 +4,12 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.8.x   | ✅ security fixes (current) |
-| 3.7.x   | ⚠️ please upgrade to 3.8.x |
-| 3.6.x   | ⚠️ please upgrade to 3.8.x |
-| 3.5.x and older | ❌ please upgrade |
+| 3.9.x   | ✅ security fixes (current) |
+| 3.8.x   | ⚠️ please upgrade to 3.9.x |
+| 3.7.x   | ⚠️ please upgrade to 3.9.x |
+| 3.6.x and older | ❌ please upgrade |
 
-Current version: **3.8.0** (see `VERSION`). This policy was last reviewed for 3.8.0.
+Current version: **3.9.0** (see `VERSION`). This policy was last reviewed for 3.9.0.
 
 ## Reporting a vulnerability
 
@@ -46,6 +46,13 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.9.0 notes
+- **GLB / glTF import:** a built-in parser (no third-party code) reads only the file's own bytes. Limits: 40 MB per file, node depth 64; Draco / Meshopt-compressed files are refused; a `.gltf` may only use embedded `data:` buffers and images (no file or network references); images are decoded by the browser from a `Blob`. A model that cannot be read is replaced by a wireframe box and a console warning – it never stops the game.
+- **Voice commands – local and cloud speech services:** a *local model* address must be on this computer (`localhost`, `127.x.x.x`, `[::1]`); a *cloud service* address must use `https://`. Both are checked again when listening starts. The service key is stored on your computer only and is sent only to the address you typed, as a Bearer header. Audio is sent only while a Voice Command block is listening, and these services work only while testing in Vextra – exported games never contain a key and use the player's own browser speech recognition.
+- **3D Text objects** are drawn on a canvas with `fillText` (text only, never HTML); the `{variable}` template is the same one Labels use.
+- **Documentation clips:** the docs play only local `.webm` / `.mp4` files from `docs/clips/` (muted, with controls, no autoplay) and pass the path through the same URL check as images. The clip generator in `tools/block-demos/` is a developer tool and is not part of the app.
+- **XR demo games** (VR / AR) use the existing VR / AR blocks; they request camera or headset access only when you press Enter VR / Start AR.
 
 ## v3.8.0 notes
 - **Loading page** (`settings.loading`): the title, subtitle, tips and colours you type are HTML-escaped when the page is generated, colours must be `#hex` values, and the logo must be a `data:image/` URL taken from your own sprites. Nothing from these settings is evaluated as code.

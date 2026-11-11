@@ -255,7 +255,7 @@ Design sound effects without any files: choose a wave (square, saw, triangle, si
 
 - **Voxel models** – paint cubes in a 3D grid with a colour palette. Perfect for characters and props.
 - **Shape groups** – combine primitives (cube, sphere, cylinder…) with position, rotation, scale and colour per part.
-- **OBJ import** – bring in \`.obj\` meshes (single colour or with the object's material).
+- **OBJ import** – bring in \`.obj\` meshes or \`.glb\` / \`.gltf\` models (colours, textures, normal and emissive maps, transparency – scaled to fit a unit cube; no skeletons, animation or Draco compression).
 
 Then use the model in 3D scenes with the **Model** object type.
 
@@ -520,9 +520,9 @@ Library → Games lists ten ready-made games. Open one, press **Play**, then cha
 
 **2D:** Neon Breakout (bricks, power-ups), Drone Swarm (top-down wave shooter), Sling Smash (physics puzzle), Hopper (platformer), Echo Pads (memory / rhythm).
 
-**3D:** Echo Maze (first person; the Stalker hears your footsteps and your real voice), Sky Parkour (kinematic moving platforms, crumbling tiles, checkpoints), Hyper-Real Showroom (Realism look, keys 1-3 change the light with the **Light** block), Core Defender (arena defence, mouse aim) and Marble Lanes (bowling physics).
+**VR / AR:** VR Toy Toss (grab and throw), VR Orb Garden (look at orbs – works with a cardboard viewer), AR Garden (tap to plant, pinch to resize) and AR Tape Measure. They use floating **3D Text** for the score, because the screen HUD is not visible inside a headset.\n\n**3D:** Echo Maze (first person; the Stalker hears your footsteps and your real voice), Sky Parkour (kinematic moving platforms, crumbling tiles that come back when you respawn, checkpoints), Hyper-Real Showroom (Realism look, keys 1-3 change the light with the **Light** block), Core Defender (arena defence, mouse aim) and Marble Lanes (bowling physics).
 
-**Voice Command in the desktop app:** its web engine has no speech recognition, so open **Settings → Voice commands (games)** and set a speech service (an OpenAI-compatible transcription URL and key). Exported games played in Chrome, Edge or Safari use the browser's own recognition.
+**Voice Command in the desktop app:** its web engine has no speech recognition, so open **Settings → Voice commands (games)**. Pick a **Local model** (a Whisper server on your own computer – whisper.cpp, Speaches / faster-whisper-server, LocalAI, LM Studio; the address must be localhost, nothing leaves your PC) or a **Cloud service** (OpenAI, Groq, Mistral or any https OpenAI-style transcription URL + key), exactly like choosing a provider in the AI plugin. *How to listen* decides what is used (Automatic tries the engine, then your local model, then the cloud service); the Voice Command block's **Recognise with** setting can override it. These services work while testing inside Vextra; exported games played in Chrome, Edge or Safari use the browser's own recognition (a key is never written into an exported game).
 
 **Kinematic bodies:** tick *Kinematic gravity* in the Physics inspector (or the Physics block) to let a kinematic body fall; it still pushes dynamic bodies and is not pushed back.`);
 

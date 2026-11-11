@@ -45,7 +45,7 @@
   S.noises = (g) => { const b = st(g).noise; while (b.length && g.time - b[0].t > 2) b.shift(); return b; };
   /** speech recognition (voice commands). Returns a handle or null when the browser has no speech recognition. */
   S.speech = (opts, onText, onState, g) => {
-    if (g && hosted(g)) { const s = st(g), h = { on: true, stop() { h.on = false; if (s.sp === h) s.sp = null; try { bridge(g).call('speech-stop').catch(() => {}); } catch { /* gone */ } } }; h.onText = onText; h.onState = onState; s.sp = h; bridge(g).call('speech-start', { lang: opts.lang || 'en-US', interim: !!opts.interim }).catch((e) => { h.on = false; onState('error', e.message); }); return h; }
+    if (g && hosted(g)) { const s = st(g), h = { on: true, stop() { h.on = false; if (s.sp === h) s.sp = null; try { bridge(g).call('speech-stop').catch(() => {}); } catch { /* gone */ } } }; h.onText = onText; h.onState = onState; s.sp = h; bridge(g).call('speech-start', { lang: opts.lang || 'en-US', interim: !!opts.interim, engine: opts.engine || 'settings' }).catch((e) => { h.on = false; onState('error', e.message); }); return h; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return null; const r = new SR(); r.lang = opts.lang || 'en-US'; r.continuous = true; r.interimResults = !!opts.interim; const h = { on: true, stop() { h.on = false; try { r.abort(); } catch { /* idle */ } } };
     r.onresult = (e) => { for (let i = e.resultIndex; i < e.results.length; i++) { const res = e.results[i]; onText(String(res[0].transcript || '').trim(), res.isFinal, res[0].confidence); } };
     r.onerror = (e) => { if (e.error === 'no-speech' || e.error === 'aborted') return; h.on = e.error === 'network' ? h.on : false; onState('error', e.error); };

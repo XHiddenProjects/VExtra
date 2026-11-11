@@ -21,7 +21,7 @@
       const side = h('div', { class: 'me-side' }, h('label', { class: 'mini' }, 'Name'), name, h('label', { class: 'mini' }, 'Live preview (drag to orbit, scroll to zoom)'), this.prev.el,
         h('label', { class: 'mini' }, 'Material file (whole model)'), this.matSelect(a, 'matAsset'), h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: () => this.exportOBJ() }, 'Export OBJ')), h('div', { class: 'mini' }, 'Models fit a 1×1×1 box; use the object’s size in the inspector to scale.'));
       this.main = h('div', { class: 'me-main' }); el.append(this.main, side);
-      if (a.kind === 'voxel') this.voxelUI(); else if (a.kind === 'group') this.groupUI(); else this.objUI();
+      if (a.kind === 'voxel') this.voxelUI(); else if (a.kind === 'group') this.groupUI(); else if (a.kind === 'glb' || a.kind === 'gltf') this.glbUI(); else this.objUI();
       this.refresh();
     }
     /** dropdown of the project's material assets (stored as asset id in obj[key]) */
@@ -57,6 +57,11 @@
       this.main.append(h('div', { class: 'row' }, h('b', {}, 'Parts'), h('button', { class: 'btn sm primary', onclick: () => { a.parts.push({ type: 'cube', x: 0, y: a.parts.length * 0.6, z: 0, w: 1, h: 0.5, d: 1, rx: 0, ry: 0, rz: 0, color: '#6c8cff' }); draw(); this.ch(); this.refresh(); } }, '＋ Add shape'), h('span', { class: 'mini' }, 'Parts are combined and scaled to fit a unit box.')), list); draw();
     }
     /* ---------------- obj ---------------- */
+    glbUI() {
+      const a = this.a, kb = a.kind === 'glb' ? Math.round(((a.data || '').length * 3) / 4 / 1024) : Math.round((a.text || '').length / 1024);
+      this.main.append(h('div', { class: 'row' }, h('b', {}, a.kind === 'glb' ? 'GLB model' : 'glTF model'), h('span', { class: 'mini' }, `${kb} KB`), h('button', { class: 'btn sm', onclick: async () => { const f = (await VX.pickBrowserFile('.glb,.gltf', false))[0]; if (!f) return; try { if (/\.glb$/i.test(f.name)) { const d = await VX.readFileAsDataURL(f); VXRT.glbChunks(await f.arrayBuffer()); a.kind = 'glb'; a.data = d; delete a.text; } else { const t = await VX.readFileAsText(f); JSON.parse(t); a.kind = 'gltf'; a.text = t; delete a.data; } this.ch(); this.refresh(); VX.ui.toast('Model replaced', 'ok'); } catch (e) { VX.ui.toast('Could not read ' + f.name + ': ' + e.message, 'error'); } } }, 'Replace…')),
+        h('div', { class: 'mini' }, 'Static meshes, colours, textures, normal / emissive maps and transparency are shown. Skeletons, animations and Draco / Meshopt compression are not supported. The model is scaled to a unit cube – use the object’s size to scale it.'));
+    }
     objUI() {
       const a = this.a, ta = h('textarea', { class: 'me-obj', spellcheck: 'false', oninput: (e) => { a.text = e.target.value; this.ch(); this.refresh(); } }, a.text || '');
       const stats = h('div', { class: 'mini' }, ''); const upd = () => { const t = ta.value; stats.textContent = `${(t.match(/^v /gm) || []).length} vertices · ${(t.match(/^f /gm) || []).length} faces`; }; ta.addEventListener('input', upd); upd();

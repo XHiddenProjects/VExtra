@@ -30,6 +30,76 @@
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); g.computeBoundingBox();
     const b = g.boundingBox, s = 1 / Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z, 1e-6); g.translate(-(b.max.x + b.min.x) / 2, -(b.max.y + b.min.y) / 2, -(b.max.z + b.min.z) / 2); g.scale(s, s, s); return g;
   };
+
+  /* ---------- glTF 2.0 / GLB (static meshes, materials and textures; no skins, animation, Draco or Meshopt) ---------- */
+  const GL_CT = { 5120: [Int8Array, 1], 5121: [Uint8Array, 1], 5122: [Int16Array, 2], 5123: [Uint16Array, 2], 5125: [Uint32Array, 4], 5126: [Float32Array, 4] }, GL_N = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+  const b64bytes = (b64) => { const bin = atob(b64), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
+  const dataUri = (u) => { const m = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(u); if (!m) throw new Error('only embedded (data:) files are supported – export the glTF as a single .glb'); return { mime: m[1], bytes: m[2] ? b64bytes(m[3]) : new TextEncoder().encode(decodeURIComponent(m[3])) }; };
+  /** Splits a .glb file into its JSON and binary chunk. */
+  VXRT.glbChunks = function (buf) {
+    const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x46546c67) throw new Error('not a .glb file'); if (dv.getUint32(4, true) !== 2) throw new Error('only glTF 2.0 is supported');
+    let off = 12, json = null, bin = null; const end = Math.min(dv.getUint32(8, true), buf.byteLength);
+    while (off + 8 <= end) { const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true); const body = buf.slice(off + 8, off + 8 + len); if (type === 0x4e4f534a) json = JSON.parse(new TextDecoder().decode(body)); else if (type === 0x004e4942 && !bin) bin = body; off += 8 + len + ((4 - (len % 4)) % 4); }
+    if (!json) throw new Error('the .glb has no JSON part'); return { json, bin };
+  };
+  /** Builds a THREE.Group from glTF JSON (+ binary chunk). The group is scaled / centred to fit a unit cube. */
+  VXRT.buildGLTF = function (T, json, bin) {
+    const need = (json.extensionsRequired || []).filter((x) => /draco|meshopt/i.test(x)); if (need.length) throw new Error('compressed models (' + need[0] + ') are not supported – export without compression');
+    const buffers = (json.buffers || []).map((b, i) => (b.uri ? dataUri(b.uri).bytes : new Uint8Array(bin || new ArrayBuffer(0), 0, Math.min(b.byteLength, bin ? bin.byteLength : 0))));
+    const viewBytes = (i) => { const v = json.bufferViews[i], b = buffers[v.buffer]; return new Uint8Array(b.buffer, b.byteOffset + (v.byteOffset || 0), v.byteLength); };
+    const read = (ai) => {
+      const a = json.accessors[ai], [Ctor, size] = GL_CT[a.componentType], n = GL_N[a.type], out = new (a.componentType === 5126 || a.normalized ? Float32Array : Ctor)(a.count * n);
+      if (a.bufferView != null) {
+        const v = json.bufferViews[a.bufferView], bytes = viewBytes(a.bufferView), dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), stride = v.byteStride || size * n, base = a.byteOffset || 0;
+        const get = { 5120: 'getInt8', 5121: 'getUint8', 5122: 'getInt16', 5123: 'getUint16', 5125: 'getUint32', 5126: 'getFloat32' }[a.componentType], div = a.normalized ? { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 }[a.componentType] || 1 : 1;
+        for (let i = 0; i < a.count; i++) for (let k = 0; k < n; k++) { const x = dv[get](base + i * stride + k * size, true); out[i * n + k] = a.normalized ? Math.max(x / div, -1) : x; }
+      }
+      return out;
+    };
+    const texCache = new Map(), tex = (ti, srgb) => {
+      if (ti == null || !json.textures || !json.textures[ti]) return null; const key = ti + (srgb ? 's' : 'l'); if (texCache.has(key)) return texCache.get(key);
+      const t = json.textures[ti], im = json.images && json.images[t.source]; if (!im) return null; let blob;
+      try { if (im.uri) { const d = dataUri(im.uri); blob = new Blob([d.bytes], { type: d.mime || 'image/png' }); } else if (im.bufferView != null) blob = new Blob([viewBytes(im.bufferView)], { type: im.mimeType || 'image/png' }); else return null; } catch { return null; }
+      const img = new Image(), url = URL.createObjectURL(blob), tx = new T.Texture(img); img.onload = () => { tx.needsUpdate = true; URL.revokeObjectURL(url); }; img.src = url;
+      const sm = t.sampler != null && json.samplers ? json.samplers[t.sampler] || {} : {}, wrap = (w) => (w === 33071 ? T.ClampToEdgeWrapping : w === 33648 ? T.MirroredRepeatWrapping : T.RepeatWrapping);
+      tx.wrapS = wrap(sm.wrapS); tx.wrapT = wrap(sm.wrapT); tx.flipY = false; tx.anisotropy = 4; if (srgb && T.SRGBColorSpace) tx.colorSpace = T.SRGBColorSpace; texCache.set(key, tx); return tx;
+    };
+    const matCache = new Map(), material = (mi, hasColors) => {
+      const key = (mi == null ? 'd' : mi) + (hasColors ? 'c' : ''); if (matCache.has(key)) return matCache.get(key); const d = mi == null ? {} : json.materials[mi] || {}, pb = d.pbrMetallicRoughness || {}, bc = pb.baseColorFactor || [1, 1, 1, 1];
+      const m = new T.MeshStandardMaterial({ color: new T.Color(bc[0], bc[1], bc[2]), metalness: pb.metallicFactor == null ? 1 : pb.metallicFactor, roughness: pb.roughnessFactor == null ? 1 : pb.roughnessFactor, side: d.doubleSided ? T.DoubleSide : T.FrontSide, vertexColors: !!hasColors });
+      const map = tex(pb.baseColorTexture && pb.baseColorTexture.index, true); if (map) m.map = map; const mr = tex(pb.metallicRoughnessTexture && pb.metallicRoughnessTexture.index, false); if (mr) { m.metalnessMap = mr; m.roughnessMap = mr; }
+      const nm = tex(d.normalTexture && d.normalTexture.index, false); if (nm) { m.normalMap = nm; const sc = d.normalTexture.scale == null ? 1 : d.normalTexture.scale; m.normalScale = new T.Vector2(sc, sc); }
+      const em = tex(d.emissiveTexture && d.emissiveTexture.index, true); const ef = d.emissiveFactor || [0, 0, 0]; m.emissive = new T.Color(ef[0], ef[1], ef[2]); if (em) { m.emissiveMap = em; if (!ef[0] && !ef[1] && !ef[2]) m.emissive.setRGB(1, 1, 1); }
+      if (d.alphaMode === 'BLEND') { m.transparent = true; m.opacity = bc[3]; } else if (d.alphaMode === 'MASK') { m.alphaTest = d.alphaCutoff == null ? 0.5 : d.alphaCutoff; }
+      m.userData.fromGLB = true; matCache.set(key, m); return m;
+    };
+    const root = new T.Group(), made = new Map();
+    const mesh = (mi) => {
+      const me = json.meshes[mi], g = new T.Group(); g.name = me.name || '';
+      for (const pr of me.primitives || []) {
+        if (pr.mode != null && pr.mode !== 4 && pr.mode !== 5 && pr.mode !== 6) continue; const at = pr.attributes || {}; if (at.POSITION == null) continue;
+        const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(read(at.POSITION), 3)); let colors = null;
+        if (at.NORMAL != null) geo.setAttribute('normal', new T.BufferAttribute(read(at.NORMAL), 3)); if (at.TEXCOORD_0 != null) geo.setAttribute('uv', new T.BufferAttribute(read(at.TEXCOORD_0), 2));
+        if (at.COLOR_0 != null) { const a = read(at.COLOR_0), n = GL_N[json.accessors[at.COLOR_0].type]; colors = n === 3 ? a : (() => { const c = new Float32Array((a.length / 4) * 3); for (let i = 0, j = 0; i < a.length; i += 4, j += 3) { c[j] = a[i]; c[j + 1] = a[i + 1]; c[j + 2] = a[i + 2]; } return c; })(); geo.setAttribute('color', new T.BufferAttribute(colors, 3)); }
+        let idx = pr.indices != null ? read(pr.indices) : null; if (!idx) { const c = geo.getAttribute('position').count; idx = new Uint32Array(c); for (let i = 0; i < c; i++) idx[i] = i; }
+        if (pr.mode === 5 || pr.mode === 6) { const t = []; for (let i = 2; i < idx.length; i++) { if (pr.mode === 5) t.push(i % 2 ? idx[i - 1] : idx[i - 2], i % 2 ? idx[i - 2] : idx[i - 1], idx[i]); else t.push(idx[0], idx[i - 1], idx[i]); } idx = Uint32Array.from(t); }
+        geo.setIndex(new T.BufferAttribute(idx instanceof Uint32Array ? idx : Uint32Array.from(idx), 1)); if (at.NORMAL == null) geo.computeVertexNormals();
+        const m = new T.Mesh(geo, material(pr.material, !!colors)); m.castShadow = m.receiveShadow = true; m.userData.keepColor = true; g.add(m);
+      }
+      return g;
+    };
+    const node = (ni, depth) => {
+      if (depth > 64) return null; const nd = json.nodes[ni], o = new T.Object3D(); o.name = nd.name || '';
+      if (nd.matrix) o.applyMatrix4(new T.Matrix4().fromArray(nd.matrix)); else { if (nd.translation) o.position.fromArray(nd.translation); if (nd.rotation) o.quaternion.fromArray(nd.rotation); if (nd.scale) o.scale.fromArray(nd.scale); }
+      if (nd.mesh != null && json.meshes && json.meshes[nd.mesh]) o.add(mesh(nd.mesh)); for (const c of nd.children || []) { const ch = node(c, depth + 1); if (ch) o.add(ch); } return o;
+    };
+    const sc = (json.scenes && json.scenes[json.scene || 0]) || { nodes: (json.nodes || []).map((_, i) => i).filter((i) => !(json.nodes || []).some((n) => (n.children || []).includes(i))) };
+    for (const ni of sc.nodes || []) { const o = node(ni, 0); if (o) root.add(o); }
+    root.updateMatrixWorld(true); const box = new T.Box3().setFromObject(root); if (box.isEmpty()) throw new Error('the model has no meshes');
+    const sz = new T.Vector3(), c = new T.Vector3(); box.getSize(sz); box.getCenter(c); const k = 1 / Math.max(sz.x, sz.y, sz.z, 1e-6), wrap = new T.Group(); root.position.sub(c); const holder = new T.Group(); holder.add(root); holder.scale.setScalar(k); wrap.add(holder); return wrap;
+  };
+  const glbMem = new WeakMap();
+  VXRT.glbBytes = function (as) { if (glbMem.has(as)) return glbMem.get(as); const d = String(as.data || ''), i = d.indexOf(','), u8 = b64bytes(i >= 0 ? d.slice(i + 1) : d), buf = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength); glbMem.set(as, buf); return buf; };
   /** Voxel model -> merged geometry with per-vertex colours, hidden faces culled. */
   VXRT.voxelGeometry = function (T, model) {
     const key = (x, y, z) => x + ',' + y + ',' + z, set = new Map(); for (const [x, y, z, c] of model.voxels || []) set.set(key(x, y, z), c);
@@ -126,6 +196,10 @@
       const as = (env.assets || (env.data && env.data.assets) || {}).models?.[p.model]; root = new T.Group();
       if (as) { const part = buildModel(T, as, o, env); root.add(part); }
       else { const m = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshStandardMaterial({ color: '#ff5577', wireframe: true })); root.add(m); }
+    } else if (o.type === 'text') {
+      /* 3D text: a flat plane showing the text (kept up to date every frame, so {score} etc. work). Great for VR / AR, where the screen HUD is not visible. */
+      const cv = document.createElement('canvas'); cv.width = 1024; cv.height = Math.max(64, Math.round(1024 * (U.num(o.h, 1) / Math.max(0.01, U.num(o.w, 1))))); const tx = new T.CanvasTexture(cv); if (T.SRGBColorSpace) tx.colorSpace = T.SRGBColorSpace;
+      const m = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, side: T.DoubleSide, toneMapped: false })); m.userData.txt = { cv, tx, last: null }; m.castShadow = m.receiveShadow = false; root = m; try { VXRT.refreshText3D(env || {}, o, m); } catch { /* drawn on the first frame */ }
     } else if (VXRT.objectTypes && VXRT.objectTypes[o.type] && VXRT.objectTypes[o.type].build) {
       try { root = VXRT.objectTypes[o.type].build(T, o, env) || new T.Group(); } catch (e) { console.warn('Object type ' + o.type + ' build failed: ' + e.message); root = new T.Group(); }
     } else {
@@ -137,6 +211,10 @@
     const g = new T.Group();
     if (as.kind === 'voxel') { const geo = VXRT.voxelGeometry(T, as); const mat = makeMaterial(T, o, env, true); const m = new T.Mesh(geo, mat); m.userData.baseMat = mat; m.castShadow = m.receiveShadow = true; g.add(m); }
     else if (as.kind === 'obj') { const geo = VXRT.parseOBJ(T, as.text || ''); const mat = makeMaterial(T, o, env); const m = new T.Mesh(geo, mat); m.userData.baseMat = mat; m.castShadow = m.receiveShadow = true; g.add(m); }
+    else if (as.kind === 'glb' || as.kind === 'gltf') {
+      try { let json, bin = null; if (as.kind === 'glb') { const c = VXRT.glbChunks(VXRT.glbBytes(as)); json = c.json; bin = c.bin; } else json = JSON.parse(as.text || '{}'); g.add(VXRT.buildGLTF(T, json, bin)); }
+      catch (e) { console.warn('3D model "' + (as.name || '') + '" could not be loaded: ' + e.message); const m = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0xff3366, wireframe: true })); g.add(m); }
+    }
     else if (as.kind === 'group') {
       for (const part of as.parts || []) {
         const sub = Object.assign({ type: 'cube', x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, w: 1, h: 1, d: 1, color: '#cccccc', alpha: 1, material: {}, props: {} }, part);
@@ -194,11 +272,19 @@
   /** the camera mode that is really being drawn: 'fps' or 'follow' can be switched with the view key, so c.mode alone can be wrong */
   VXRT.camMode = function (g) { const c = g.cam3d; if (!c) return 'fixed'; if ((c.mode === 'fps' || c.mode === 'follow') && c.follow && c.follow.alive && g.camView !== undefined) return g.camView === 0 ? 'fps' : 'follow'; return c.mode; };
   VXRT.cycleCamView = function (g) { const c = g.cam3d; if (!c || !(c.follow && c.follow.alive) || !(c.mode === 'fps' || c.mode === 'follow')) return; if (g.camView === undefined) g.camView = c.mode === 'fps' ? 0 : 1; g.camView = (g.camView + 1) % 3; g.camViewName = ['1st person', '3rd person – back', '3rd person – front'][g.camView]; g.camViewT = 1.6; g.emit('cameraView', ['first', 'back', 'front'][g.camView]); };
+  /** redraw a 3D text object when its text (with {variables} filled in) changed; optionally turn it to face the camera */
+  VXRT.refreshText3D = function (g, o, mesh) {
+    const m = mesh || o.obj3d, t = m.userData.txt, p = o.props || {}, str = U.tpl(p.text ?? 'Text', Object.assign({}, g.vars, g.sceneVars || {})), key = str + '|' + o.color + '|' + p.size + '|' + p.align + '|' + p.bold + '|' + (p.bg || '');
+    if (t.last !== key) { t.last = key; const cx = t.cv.getContext('2d'), W = t.cv.width, H = t.cv.height; cx.clearRect(0, 0, W, H); if (p.bg) { cx.fillStyle = p.bg; cx.beginPath(); cx.roundRect ? cx.roundRect(0, 0, W, H, 40) : cx.rect(0, 0, W, H); cx.fill(); }
+      const px = U.clamp(U.num(p.size, 28), 6, 200) * 2.4; cx.font = `${p.bold === false ? 400 : 700} ${px}px ${p.font || 'system-ui, sans-serif'}`; cx.fillStyle = o.color || '#ffffff'; cx.textBaseline = 'middle'; const al = p.align || 'center'; cx.textAlign = al; const x = al === 'left' ? 24 : al === 'right' ? W - 24 : W / 2;
+      const lines = String(str).split('\n'); lines.forEach((ln, i) => cx.fillText(ln, x, H / 2 + (i - (lines.length - 1) / 2) * px * 1.2, W - 48)); t.tx.needsUpdate = true; }
+    if (p.billboard && g.camera3d) { const c = g.camera3d.position; m.rotation.set(0, Math.atan2(c.x - o.x, c.z - o.z), 0); }
+  };
   VXRT.render3D = function (g, dt) {
     const T = g.THREE; if (!g.renderer3d || !g.scene3d) return; const c = g.cam3d, cam = g.camera3d;
     // sync objects
     for (const o of g.objects) {
-      if (!o.obj3d) continue; VXRT.syncTransform3D(T, o); const vis = o.visible && o.enabled; if (o.obj3d.visible !== vis) o.obj3d.visible = vis;
+      if (!o.obj3d) continue; VXRT.syncTransform3D(T, o); if (o.type === 'text' && o.obj3d.userData.txt) VXRT.refreshText3D(g, o); const vis = o.visible && o.enabled; if (o.obj3d.visible !== vis) o.obj3d.visible = vis;
       if (o.dirty3d) { o.dirty3d = false; if (o.obj3d) { g.scene3d.remove(o.obj3d); VXRT.onObjectAdded(g, o); } continue; }
       if (o.obj3d.isMesh || o.obj3d.type === 'Group') o.obj3d.traverse((m) => {
         if (!m.isMesh) return; const mat = m.userData.baseMat; if (mat) {

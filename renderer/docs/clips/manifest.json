@@ -1,0 +1,538 @@
+{
+ "keyboard": {
+  "cap": "Keyboard fires when a key is pressed (down), released (up) or held. Set “Key” to the key you want – here Space.",
+  "kb": 14
+ },
+ "collision": {
+  "cap": "Collision fires when this object touches another – set “With” to a tag or name. Here the box slides into a wall.",
+  "kb": 16
+ },
+ "mouseMove": {
+  "cap": "Mouse Move sends the pointer position as it moves. Feed it into Position (source: signalXY) and the box follows the mouse.",
+  "kb": 13
+ },
+ "always": {
+  "cap": "Always runs every frame while it is enabled. Here it feeds a Spin block, so the box turns without any input.",
+  "kb": 18
+ },
+ "timer": {
+  "cap": "Timer sends a signal every “interval” seconds (here 0.8 s). Wire it to anything that should repeat.",
+  "kb": 15
+ },
+ "once": {
+  "cap": "Once fires a single time – when the scene starts (or after a delay). Perfect for setting things up.",
+  "kb": 13
+ },
+ "mouseClick": {
+  "cap": "Mouse Click fires when the mouse button is clicked – anywhere, or only on this object (set “On” to self). It also sends the click position.",
+  "kb": 15
+ },
+ "mouseWheel": {
+  "cap": "Mouse Wheel sends “up” or “down” when you scroll. Here scrolling up grows the box and down shrinks it.",
+  "kb": 13
+ },
+ "gesture": {
+  "cap": "Gesture recognises a swipe, tap, double tap or pinch with mouse or finger. A swipe left pushes the box left.",
+  "kb": 11
+ },
+ "lockedMouse": {
+  "cap": "Locked Mouse captures the mouse (click the game) and sends how far it moved (dx, dy) – the basis of mouse-look in first-person games.",
+  "kb": 18
+ },
+ "controller": {
+  "cap": "Controller listens to a gamepad button or stick (here button 0 = A / Cross). Plug in a pad and press it.",
+  "kb": 13
+ },
+ "inView": {
+  "cap": "In View fires when the object enters or leaves the camera view. Here the box slides off the right edge.",
+  "kb": 15
+ },
+ "sensor": {
+  "cap": "Sensor watches any value – a position, a variable – and fires when it crosses a limit. Here: when x is greater than 650.",
+  "kb": 15
+ },
+ "mailbox": {
+  "cap": "Mailbox receives messages sent by a Message block (here on the channel “hello”), from any object or scene.",
+  "kb": 15
+ },
+ "custom": {
+  "cap": "Custom Trigger runs your own JavaScript: call fire(value) whenever you want to send a signal. Here it fires every 0.8 s.",
+  "kb": 17
+ },
+ "number": {
+  "cap": "Number outputs a fixed value whenever a signal arrives. Use it to turn “something happened” into a number.",
+  "kb": 15
+ },
+ "expression": {
+  "cap": "Expression calculates a formula from its inputs a, b, c … Here a * 2 + 1 with a = 5 gives 11.",
+  "kb": 13
+ },
+ "customBehavior": {
+  "cap": "Custom Block runs your own JavaScript on every incoming signal; “value” is the signal, return the answer. Here it squares 4.",
+  "kb": 16
+ },
+ "globalVariable": {
+  "cap": "Global Variable stores a value any object can read. Each Space press adds 1 to “score”; its out port sends the new value.",
+  "kb": 16
+ },
+ "objectVariable": {
+  "cap": "Object Variable is a value that belongs to one object (like “health”). Each press subtracts 10 from this box’s health.",
+  "kb": 16
+ },
+ "ease": {
+  "cap": "Ease turns “start” into a smooth 0 → 1 curve (here quadOut over 1 s). Wired to Alpha, the box fades smoothly instead of jumping.",
+  "kb": 13
+ },
+ "repeater": {
+  "cap": "Repeater turns one signal into several (count 4, every 0.3 s) – handy for bursts, volleys or retries.",
+  "kb": 15
+ },
+ "random": {
+  "cap": "Random sends a random number (here 0–100, whole numbers) or makes a chance decision. Press Space for a new value.",
+  "kb": 17
+ },
+ "filter": {
+  "cap": "Filter lets a signal through only if it passes a test. Here only random numbers above 50 get through to “pass”.",
+  "kb": 17
+ },
+ "switch": {
+  "cap": "Switch is a gate: signals pass only while it is on. A turns it off, S turns it on – Space only works while it is on.",
+  "kb": 16
+ },
+ "toggleSwitch": {
+  "cap": "Toggle Switch alternates between its two outputs each time it gets “next”: out1 turns the box red, out2 blue.",
+  "kb": 14
+ },
+ "caseSwitch": {
+  "cap": "Case Switch sends the signal out of the output whose name matches the value (cases “a, b, c”). Here “b” takes the middle path.",
+  "kb": 13
+ },
+ "router": {
+  "cap": "Router sends a signal to one of several outputs – here round-robin: each press goes to the next colour.",
+  "kb": 14
+ },
+ "logicGate": {
+  "cap": "Logic Gate combines two true/false inputs. With AND, the “true” output fires only when both A and B were pressed.",
+  "kb": 15
+ },
+ "sound": {
+  "cap": "Sound plays a sound (or stops / mutes it). Add sounds in the Assets tab; here the box pulses while it plays.",
+  "kb": 16
+ },
+ "emit": {
+  "cap": "Emit Particles shoots a burst of particles (colour, speed, spread, life…). Press Space for a burst from the box.",
+  "kb": 15
+ },
+ "spawn": {
+  "cap": "Spawn creates copies of a template object (here “Coin”). Each press spawns one that flies up.",
+  "kb": 13
+ },
+ "attacher": {
+  "cap": "Attach glues another object to this one so they move together. Press Space to attach the ball, then the box carries it away.",
+  "kb": 13
+ },
+ "physics": {
+  "cap": "Physics gives an object a body: gravity, bounce, friction, collisions. Press Space to make the box dynamic – it falls and bounces.",
+  "kb": 13
+ },
+ "joint": {
+  "cap": "Joint ties this object to an anchor like a rope or spring (distance + stiffness). Press Space to hang the box from the anchor – it swings.",
+  "kb": 13
+ },
+ "proximity": {
+  "cap": "Proximity fires when another object comes within a radius (here 150 px of the player). Great for doors, enemies and pick-ups.",
+  "kb": 16
+ },
+ "pushMotor": {
+  "cap": "Push Motor keeps pushing an object in a direction (speed or acceleration). Press Space to start the engine.",
+  "kb": 13
+ },
+ "spinMotor": {
+  "cap": "Spin Motor turns an object continuously (degrees per second). With “autoStart” it spins from the moment the game starts.",
+  "kb": 17
+ },
+ "impulse": {
+  "cap": "Impulse gives an object a sudden push – the classic jump. Press Space to kick the box upward.",
+  "kb": 11
+ },
+ "pointAt": {
+  "cap": "Point At turns an object to face a target – here the mouse. Move the pointer and the arrow follows.",
+  "kb": 15
+ },
+ "enabled": {
+  "cap": "Enabled switches an object on or off (hidden, no physics, no logic). Space toggles the other box on and off.",
+  "kb": 12
+ },
+ "material": {
+  "cap": "Material changes how a 3D object looks: colour, metalness, roughness, glow, texture, opacity. Space turns the sphere shiny red.",
+  "kb": 16
+ },
+ "flip": {
+  "cap": "Flip mirrors an object horizontally and/or vertically. The arrow flips left ↔ right with each Space press.",
+  "kb": 11
+ },
+ "extractor": {
+  "cap": "Extractor reads a property of an object (x, y, angle, size…) and sends it out. Press Space to read the box’s x.",
+  "kb": 14
+ },
+ "displayOrder": {
+  "cap": "Display Order decides which object is drawn in front. Press Space to bring the blue box in front of the red one.",
+  "kb": 12
+ },
+ "blending": {
+  "cap": "Blending changes how colours mix with what is behind: normal, add (glow), multiply, screen. Space switches the circle to “add”.",
+  "kb": 13
+ },
+ "light": {
+  "cap": "Light changes a light source’s brightness and colour. Space makes the lamp brighter and warmer.",
+  "kb": 20
+ },
+ "text": {
+  "cap": "Text builds a string; {value} is replaced by the incoming signal. Here the number 5 becomes “Score: 5!”.",
+  "kb": 13
+ },
+ "toNumber": {
+  "cap": "To Number turns text into a number (or sends “invalid”). “42 coins” → 42, symbols stripped.",
+  "kb": 13
+ },
+ "textCompare": {
+  "cap": "Text Compare tests two texts (equals, contains, starts with, regex…) and sends true or false.",
+  "kb": 14
+ },
+ "numberList": {
+  "cap": "Number List makes a list of numbers – typed out or a range. Here 1 to 5 step 1.",
+  "kb": 14
+ },
+ "listModify": {
+  "cap": "List Modify adds, removes, inserts or replaces items in a named list. Each Space adds “kiwi” to the fruit list.",
+  "kb": 17
+ },
+ "listOrder": {
+  "cap": "List Order sorts, shuffles, reverses or picks a random item from a list. Here it sorts the fruit A → Z.",
+  "kb": 16
+ },
+ "listEach": {
+  "cap": "List Each walks through a list one item at a time (every 0.5 s here) – “item” fires for each one, then “done”.",
+  "kb": 15
+ },
+ "listCount": {
+  "cap": "List Count tells you how many items a list has (all, numbers only or unique) and whether it is empty.",
+  "kb": 14
+ },
+ "label": {
+  "cap": "Label draws text on the screen (HUD). Use {variable} to show live values – each Space press adds 1 to the score.",
+  "kb": 15
+ },
+ "bar": {
+  "cap": "Bar draws a progress / health bar from a variable (here “health”, max 100). Each press takes 20 off.",
+  "kb": 14
+ },
+ "joystick": {
+  "cap": "Joystick adds an on-screen stick for phones and tablets (it holds W A S D or arrow keys). Drag it – the box follows. Move it in the UI layer.",
+  "kb": 21
+ },
+ "touchButton": {
+  "cap": "Touch Button is an on-screen button that presses a key (here Space). Tap it and the keyboard trigger fires.",
+  "kb": 15
+ },
+ "touchLook": {
+  "cap": "Touch Look turns a drag (or a look-stick) into camera movement – “dx / dy” show how far you dragged. In 3D it feeds the camera look.",
+  "kb": 17
+ },
+ "alert": {
+  "cap": "Alert shows a pop-up message (toast or modal) – success, warning, error… Press Space to see it.",
+  "kb": 13
+ },
+ "cursor": {
+  "cap": "Cursor replaces the mouse pointer with a ring, cross, emoji or your own image while playing.",
+  "kb": 13
+ },
+ "pauseGame": {
+  "cap": "Pause Game freezes or resumes the game (toggle / pause / resume). Press P: the spinning box stops, press again to continue.",
+  "kb": 16
+ },
+ "loadLevel": {
+  "cap": "Load Level switches to another scene (“next”, a name or a number). Press Space to go to level 2.",
+  "kb": 14
+ },
+ "restartGame": {
+  "cap": "Restart Game starts the scene (or whole game) again. The box drifts away; Space brings everything back to the start.",
+  "kb": 14
+ },
+ "fetchUrl": {
+  "cap": "Fetch URL loads data from the web (GET/POST) and sends the result. Space fetches a GitHub “zen” quote.",
+  "kb": 16
+ },
+ "saveValue": {
+  "cap": "Save Value stores a value on this device (a high score…) and loads it back later. S saves 99, L loads it.",
+  "kb": 15
+ },
+ "gameSave": {
+  "cap": "Game Save stores the whole game state in a slot and restores it. Right moves the box, S saves, L loads – the box jumps back.",
+  "kb": 15
+ },
+ "leaderboard": {
+  "cap": "Leaderboard submits scores and shows the top list. Space submits 120 points, L shows the board.",
+  "kb": 15
+ },
+ "achievement": {
+  "cap": "Achievement unlocks a badge once and shows a toast (“already” fires if it was earned before). Press Space.",
+  "kb": 14
+ },
+ "level": {
+  "cap": "Level tells you about the current level: its number, name and how many there are – or marks it complete.",
+  "kb": 14
+ },
+ "gamePhysics": {
+  "cap": "Game Physics changes the world: gravity, time scale (slow motion), debug view. Space switches gravity on – the box falls.",
+  "kb": 13
+ },
+ "userInfo": {
+  "cap": "User Info reads facts about the player’s device: platform, language, screen size, dark mode, time zone… Space shows the platform.",
+  "kb": 17
+ },
+ "clipboard": {
+  "cap": "Clipboard copies text to the clipboard or pastes it. C copies “Hello!”, V pastes it back into the label.",
+  "kb": 16
+ },
+ "cloud": {
+  "cap": "Cloud saves and loads your game online with the player’s account (sign in first). Here it reports whether the player is signed in.",
+  "kb": 17
+ },
+ "fullScreen": {
+  "cap": "Full Screen enters or leaves full-screen mode (a browser needs a click or key to allow it). Space toggles it.",
+  "kb": 15
+ },
+ "shake": {
+  "cap": "Shake fires when the phone is shaken (on a computer press H to test). Use it for “shake to reset” or dice rolls.",
+  "kb": 14
+ },
+ "ad": {
+  "cap": "Ad shows an interstitial, rewarded or banner ad (house ads built in; plug in your own provider). Space shows one.",
+  "kb": 14
+ },
+ "vibrate": {
+  "cap": "Vibrate buzzes the phone (a pattern in milliseconds, e.g. 150 or 100,50,100). The flash stands in for the buzz here.",
+  "kb": 14
+ },
+ "accelerometer": {
+  "cap": "Accelerometer reads how the phone is tilted. On a computer the arrow keys pretend to tilt it. Tilt left/right and the box rolls.",
+  "kb": 12
+ },
+ "gameCenter": {
+  "cap": "Game Center (Apple) / Play Games (Google) sign-in, scores and achievements. On a computer it reports that it is not available.",
+  "kb": 16
+ },
+ "deviceCheck": {
+  "cap": "Device Check asks about the device – mobile, tablet, iOS, touch, landscape, dark mode… and sends yes or no.",
+  "kb": 14
+ },
+ "touchCheck": {
+  "cap": "Touch Check detects fingers on the screen – touching, how many, or touching this object. While held, the box turns green.",
+  "kb": 15
+ },
+ "exitGame": {
+  "cap": "Exit Game closes the game window / app (with a goodbye message). Space asks to quit.",
+  "kb": 13
+ },
+ "position": {
+  "cap": "Position moves an object: “set” jumps to x/y, “add” moves by an amount; with a duration it glides smoothly. Press Space to slide 200 px right.",
+  "kb": 13
+ },
+ "rotation": {
+  "cap": "Rotation turns an object to an angle (set) or by an angle (add), optionally smoothly. Space turns the box 90°.",
+  "kb": 14
+ },
+ "alpha": {
+  "cap": "Alpha sets how see-through an object is (0 invisible – 1 solid). Space fades the box to 25 %.",
+  "kb": 11
+ },
+ "size": {
+  "cap": "Size changes width / height (/ depth in 3D) – set, add or multiply, instantly or smoothly. Space doubles the box.",
+  "kb": 12
+ },
+ "animation": {
+  "cap": "Animation plays a sprite animation – or a ready-made preset like bounce or pulse that works on any object. Space starts “pulse”.",
+  "kb": 13
+ },
+ "velocity": {
+  "cap": "Velocity sets or changes how fast an object moves (px/s). Space sends the box flying right; pressing again sets it back.",
+  "kb": 13
+ },
+ "spin": {
+  "cap": "Spin turns an object around an axis continuously (degrees per second). Space starts a 180°/s spin.",
+  "kb": 16
+ },
+ "colors": {
+  "cap": "Colors changes an object’s colour – set a colour, blend toward it, shift the hue or pick randomly. Space picks a random colour.",
+  "kb": 13
+ },
+ "shader": {
+  "cap": "Shader applies a screen / object effect (grayscale, blur, glitch, wavy, pixelize…). Space turns on “wavy”.",
+  "kb": 12
+ },
+ "textCase": {
+  "cap": "Text Case converts upper/lower/title/camel/snake case. “hello big world” becomes “HELLO BIG WORLD”.",
+  "kb": 15
+ },
+ "textLength": {
+  "cap": "Text Length counts characters, words or lines. “The quick brown fox” has 4 words.",
+  "kb": 13
+ },
+ "textSanitize": {
+  "cap": "Text Sanitize cleans user text: trim, collapse spaces, strip HTML, limit length. “  <b>Hi</b>   there ” → “Hi there”.",
+  "kb": 14
+ },
+ "textList": {
+  "cap": "Text List splits text into a list (one item per line or by a separator) and sends it plus the count.",
+  "kb": 15
+ },
+ "destroyer": {
+  "cap": "Destroy removes an object (optionally with a burst). Press Space and the box pops.",
+  "kb": 11
+ },
+ "camera": {
+  "cap": "Camera moves, zooms, follows or shakes the view. Press Space for a screen shake (also: follow, zoom, look-at in 3D).",
+  "kb": 12
+ },
+ "message": {
+  "cap": "Message sends a text/value to other objects (target + channel). Here the box sends “hello”; the green Friend has a Mailbox that reacts.",
+  "kb": 14
+ },
+ "rayCast": {
+  "cap": "Ray Cast shoots an invisible line and reports what it hits and how far. Press Space: the ray goes right, hits the wall and sends the distance.",
+  "kb": 17
+ },
+ "calendar": {
+  "cap": "Calendar reads the real clock – date, time, weekday, hour… Here it shows the current time, refreshed every second.",
+  "kb": 15
+ },
+ "clock": {
+  "cap": "Clock is a stopwatch, countdown or real-time clock. Here a countdown from 10 starts automatically and shows mm:ss.",
+  "kb": 15
+ },
+ "bundle": {
+  "cap": "A Bundle packs several blocks into one reusable block. This one doubles its input: 21 goes in, 42 comes out. Double-click a bundle to open it.",
+  "kb": 16
+ },
+ "bundleInput": {
+  "cap": "Inside a bundle, New Input creates an input socket (here “in1”) on the outside of the bundle. What arrives there comes out of this block.",
+  "kb": 15
+ },
+ "bundleOutput": {
+  "cap": "Inside a bundle, New Output creates an output socket (here “out1”). Whatever you send into it leaves the bundle there.",
+  "kb": 15
+ },
+ "microphone": {
+  "cap": "Microphone listens to the mic and sends the loudness (0–100) and pitch; “loud” fires above a limit. Here the level is shown live – press M to fake a loud sound.",
+  "kb": 20
+ },
+ "voiceCommand": {
+  "cap": "Voice Command listens for spoken words (“jump”, “fire”…). Say one – or here press Space to send “jump” as if you said it.",
+  "kb": 17
+ },
+ "soundDetector": {
+  "cap": "Sound Detector recognises claps, double claps, whistles, shouts and silence from the microphone.",
+  "kb": 24
+ },
+ "voiceNoise": {
+  "cap": "Voice Noise turns your voice (or a test key, M) into noise other objects can hear. Press M: the red Guard hears it and walks over.",
+  "kb": 17
+ },
+ "makeNoise": {
+  "cap": "Make Noise sends a noise out from an object (footsteps or one-off). Press M to make noise – the Guard goes to where it came from.",
+  "kb": 13
+ },
+ "hearing": {
+  "cap": "Hearing lets an object react to noises: it faces and walks toward the source and remembers it. This Guard hears the box when M is pressed.",
+  "kb": 13
+ },
+ "cameraFeed": {
+  "cap": "Camera Feed shows the webcam in the corner, as an overlay or behind the game (here: corner).",
+  "kb": 17
+ },
+ "motionSensor": {
+  "cap": "Motion Sensor detects movement in the webcam image: how much, where (x, y) and swipe directions. The number rises as the picture moves.",
+  "kb": 30
+ },
+ "colorTracker": {
+  "cap": "Color Tracker finds a colour in the webcam image and follows it (position and size). Hold a coloured object up to steer.",
+  "kb": 15
+ },
+ "lightSensor": {
+  "cap": "Light Sensor measures how bright the webcam image is and tells you when it gets dark or bright.",
+  "kb": 16
+ },
+ "faceTracker": {
+  "cap": "Face Tracker finds a face in the webcam image and sends its position and size (needs a browser with face detection).",
+  "kb": 15
+ },
+ "photoSnap": {
+  "cap": "Photo Snap takes a picture from the webcam (with a flash) and stores it in a variable or downloads it. Space = click!",
+  "kb": 21
+ },
+ "vrMode": {
+  "cap": "VR Mode adds the “Enter VR” button and switches to a headset (WebXR) or split-screen view (cardboard / computer).",
+  "kb": 22
+ },
+ "vrHead": {
+  "cap": "VR Head follows the player’s head: position, turning (yaw/pitch/roll) and nod / shake gestures. Turn your head (here the arrow keys) and the number changes.",
+  "kb": 25
+ },
+ "vrController": {
+  "cap": "VR Controller tracks a hand controller – trigger, grip, A / B, stick and position – and can attach an object to the hand. Here the mouse is the right hand.",
+  "kb": 28
+ },
+ "vrMove": {
+  "cap": "VR Move walks the player around (smooth, snap-turn or teleport) with the controller stick. In the computer fallback use W A S D.",
+  "kb": 20
+ },
+ "vrGrab": {
+  "cap": "VR Grab lets a hand pick up objects with the grip button (here anything tagged “grab”) and throw them when released.",
+  "kb": 22
+ },
+ "vrHaptic": {
+  "cap": "VR Haptic buzzes a controller (strength + length). Press Space – on a headset your hand feels it.",
+  "kb": 25
+ },
+ "vrGaze": {
+  "cap": "VR Gaze fires when the player looks at an object for a moment (here 1 s) – selection without controllers, ideal for cardboard viewers.",
+  "kb": 23
+ },
+ "arMode": {
+  "cap": "AR Mode starts augmented reality: the camera behind the game (or WebXR on supported phones). Press “Start AR”.",
+  "kb": 21
+ },
+ "arSurface": {
+  "cap": "AR Surface finds the floor / table and shows a reticle where you are pointing; it sends the hit position.",
+  "kb": 29
+ },
+ "arPlace": {
+  "cap": "AR Place puts an object where you tap on the surface (move the object, or spawn copies). Tap the screen to place the box.",
+  "kb": 27
+ },
+ "arScale": {
+  "cap": "AR Scale lets the player resize and turn an object with two fingers (pinch to zoom, twist to rotate).",
+  "kb": 26
+ },
+ "arLight": {
+  "cap": "AR Light reads how bright the room is from the camera and lights the 3D objects to match.",
+  "kb": 22
+ },
+ "arShadowFloor": {
+  "cap": "AR Shadow Floor adds an invisible floor that only shows shadows, so virtual objects look like they sit on the real surface.",
+  "kb": 25
+ },
+ "arDistance": {
+  "cap": "AR Distance measures how far an object is from the camera (or from another object) and tells you when it is near.",
+  "kb": 24
+ },
+ "coinflip": {
+  "cap": "Coin Flip (plugin) sends a signal out of “heads” or “tails” at random. Press Space: heads turns the box green, tails red.",
+  "kb": 13
+ },
+ "clampnum": {
+  "cap": "Clamp Number (plugin) keeps a number between a minimum and maximum. Random 0–100 values are squeezed into 20–60.",
+  "kb": 16
+ }
+}

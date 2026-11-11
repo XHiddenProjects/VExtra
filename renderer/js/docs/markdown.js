@@ -6,6 +6,8 @@
   function inline(t) {
     const codes = []; t = t.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
     t = esc(t);
+    /* ![video: caption](docs/clips/x.webm) – a short silent demo clip (only local .webm / .mp4 files) */
+    t = t.replace(/!\[video:\s*([^\]]*)\]\(([^)\s]+\.(?:webm|mp4))\)/g, (m, a, u) => `<figure class="doc-clip"><video src="${esc(safeUrl(u.replace(/&amp;/g, '&')))}" controls loop muted playsinline preload="metadata" aria-label="${a.replace(/"/g, '&quot;')}"></video></figure>`);
     t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, a, u) => `<img alt="${a}" src="${esc(safeUrl(u.replace(/&amp;/g, '&')))}">`);
     t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, a, u) => { u = u.replace(/&amp;/g, '&'); return /^(doc|docs):/.test(u) ? `<a href="#" data-doc="${esc(u.replace(/^docs?:/, ''))}">${a}</a>` : `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${a}</a>`; });
     t = t.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?])/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');

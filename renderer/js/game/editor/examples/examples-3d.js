@@ -85,11 +85,15 @@
       stay.to(ex('self.vx', 'My X speed')).to(gv('carryX', 'set')); stay.to(ex('self.vz', 'My Z speed')).to(gv('carryZ', 'set'));
       const off = block('collision', { with: 'tag:player', phase: 'exit' }, 'Player left'); off.to(put('carryX', 'set', 0)); off.to(put('carryZ', 'set', 0));
     }));
-    /* a red tile: shakes the sound, then falls away 0.7 s after you land on it */
-    const crumble = K.bhv(p, 'Crumbling tile', ({ block, snd }) => {
+    /* a red tile: makes a sound, falls away 0.7 s after you land on it, and comes back to where it was whenever you respawn (the player sends "respawn" to every crumble tile) */
+    const crumble = (x, y, z) => K.bhv(p, 'Crumbling tile', ({ block, snd }) => {
       const hit = block('collision', { with: 'tag:player', phase: 'enter', side: 'top' }, 'Stepped on'); hit.to(snd('crumble'));
       const t = hit.to(block('timer', { interval: 0.7, repeat: false, autoStart: false, delay: 0 }, 'Crumble delay'), 'out', 'start');
-      t.to(block('velocity', { target: 'self', mode: 'set', y: '-10' })); t.to(block('destroyer', { target: 'self', delay: 3 }));
+      t.to(block('velocity', { target: 'self', mode: 'set', y: '-10' }));
+      const stopT = t.to(block('timer', { interval: 2, repeat: false, autoStart: false, delay: 0 }, 'Stop falling'), 'out', 'start'); stopT.to(block('velocity', { target: 'self', mode: 'stop' }));
+      const back = block('mailbox', { channel: 'respawn' }, 'Player respawned');
+      back.to(block('position', { target: 'self', mode: 'set', x: String(x), y: String(y), z: String(z) }, 'Back in place')); back.to(block('velocity', { target: 'self', mode: 'stop' }));
+      for (const tm of [t, stopT]) { back.to(tm, 'out', 'stop'); back.to(tm, 'out', 'reset'); }
     });
     /* a checkpoint platform: remembers where to respawn, plays a chime once */
     const checkpoint = (i) => K.bhv(p, 'Checkpoint ' + i, ({ block, gv, ex, put, snd }) => {
@@ -103,7 +107,7 @@
     plat('Start', 0, 0, 0, 7, 7, { matAsset: grass, tags: ['checkpoint'] }); plat('Step 1', 0, 1.2, -9, 4, 4); plat('Step 2', 5, 2.4, -15, 4, 4); plat('Step 3', 10, 3.6, -21, 4, 4, { tags: ['checkpoint'], behaviors: [checkpoint(1)] });
     [['Mover A', 14, 4.6, -28, 'x'], ['Mover B', 22, 5.2, -28, 'z'], ['Mover C', 28, 6.4, -35, 'x']].forEach(([n, x, y, z, axis]) => plat(n, x, y, z, 4, 4, { color: '#ffb84d', matAsset: undefined, physics: PH('kinematic', { friction: 0 }), tags: ['mover'], behaviors: [mover(axis)] }));
     plat('Rest', 34, 7, -40, 5, 5, { tags: ['checkpoint'], matAsset: grass, behaviors: [checkpoint(2)] });
-    for (let i = 0; i < 5; i++) plat('Tile ' + i, 34 - (i + 1) * 3.4, 7.4 + i * 0.5, -46 - i * 3.2, 3, 3, { color: '#ff6b6b', matAsset: undefined, physics: PH('kinematic', { friction: 0 }), tags: ['crumble'], behaviors: [crumble] });
+    for (let i = 0; i < 5; i++) plat('Tile ' + i, 34 - (i + 1) * 3.4, 7.4 + i * 0.5, -46 - i * 3.2, 3, 3, { color: '#ff6b6b', matAsset: undefined, physics: PH('kinematic', { friction: 0 }), tags: ['crumble'], behaviors: [crumble(34 - (i + 1) * 3.4, 7.4 + i * 0.5, -46 - i * 3.2)] });
     plat('Top', 14, 11.4, -66, 8, 8, { matAsset: grass, tags: ['checkpoint'], behaviors: [checkpoint(3)] }); add(p, 'cone', 'Goal', 14, 14, { z: -66, w: 1.6, h: 3, d: 1.6, color: '#ffd23f', material: { emissive: '#aa8800', metalness: 0.6, roughness: 0.2 }, tags: ['goal'], behaviors: [goalB] });
     [[0, 1.4, -9], [5, 2.6, -15], [10, 3.8, -21], [14, 5.4, -28], [22, 6, -28], [28, 7.2, -35], [34, 8, -40], [31, 8.8, -49], [24, 10, -56], [14, 12, -66]].forEach(([x, y, z], i) => add(p, 'cylinder', 'Coin ' + i, x, y + 0.4, { z, w: 0.7, h: 0.1, d: 0.7, color: '#ffd23f', rx: 90, tags: ['coin'], behaviors: [coinB], material: { emissive: '#aa8800', metalness: 0.8, roughness: 0.2 } }));
     for (let i = 0; i < 18; i++) add(p, 'sphere', 'Cloud ' + i, -30 + (i * 17) % 90, -6 + (i % 4) * -2, { z: -(i * 13) % 100 + 10, w: 8 + (i % 3) * 3, h: 3, d: 6, color: '#ffffff', alpha: 0.9, tags: ['decor'] });
@@ -122,7 +126,7 @@
       block('proximity', { target: 'tag:goal', radius: 2.2, mode: 'enter' }, 'Goal in reach').to(put('state', 'set', 1));
       /* fell off: back to the last checkpoint */
       const fell = block('sensor', { target: 'self', property: 'y', op: '<', value: -15, mode: 'edge' }, 'Fell!');
-      fell.to(snd('fall')); fell.to(ex('spawnX')).to(block('position', { target: 'self', mode: 'set', source: 'signalX' })); fell.to(ex('spawnY')).to(block('position', { target: 'self', mode: 'set', source: 'signalY' })); fell.to(ex('spawnZ')).to(block('position', { target: 'self', mode: 'set', source: 'signalZ' })); fell.to(block('velocity', { target: 'self', mode: 'stop' })); fell.to(put('carryX', 'set', 0)); fell.to(put('carryZ', 'set', 0));
+      fell.to(snd('fall')); fell.to(block('message', { target: 'tag:crumble', channel: 'respawn', payload: '1' }, 'Tiles come back')); fell.to(ex('spawnX')).to(block('position', { target: 'self', mode: 'set', source: 'signalX' })); fell.to(ex('spawnY')).to(block('position', { target: 'self', mode: 'set', source: 'signalY' })); fell.to(ex('spawnZ')).to(block('position', { target: 'self', mode: 'set', source: 'signalZ' })); fell.to(block('velocity', { target: 'self', mode: 'stop' })); fell.to(put('carryX', 'set', 0)); fell.to(put('carryZ', 'set', 0));
     });
     add(p, 'cube', 'Player', 0, 1.2, { z: 0, w: 0.9, h: 1.6, d: 0.9, color: '#6c8cff', tags: ['player'], material: { metalness: 0.2, roughness: 0.4 }, physics: PH('dynamic', { shape: 'box', friction: 0, fixedRotation: true, mass: 1 }), behaviors: [playerB] });
     K.touch(p, {});

@@ -2,7 +2,23 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.8.0] — current
+## [3.9.0] — current
+
+### Added
+- **GLB / glTF models:** import `.glb` (or self-contained `.gltf`) in Assets → Models. Meshes, node transforms, base colour, vertex colours, textures, normal / emissive / metal-rough maps and transparency are shown in the editor and in exported games; the model is scaled to a unit cube. Not supported (yet): skeletons, animations, Draco / Meshopt compression.
+- **A short demo video for every block** in the documentation (all 134 blocks, including plugin blocks). Each clip shows the block's wiring next to the real game running it, with a one-line "how to use". Clips are made by `node tools/block-demos/build.js` (see `tools/block-demos/`).
+- **Voice commands with local or cloud models:** Settings → Voice commands now has *How to listen* (Automatic / Engine only / Local model only / Cloud service only), a **Local model** setup (whisper.cpp, Speaches, LocalAI, LM Studio or custom – localhost only) and a **Cloud service** setup (OpenAI, Groq, Mistral or custom https) with presets, key field and a Test button. The Voice Command block has a new **Recognise with** setting to override it per block.
+- **Four VR / AR demo games:** *VR Toy Toss* (grab and throw), *VR Orb Garden* (gaze only – cardboard friendly), *AR Garden* (tap to plant, pinch to resize) and *AR Tape Measure*.
+- **3D Text objects:** a Text object in a 3D scene now shows as floating text (with `{variables}`, colour, size and *Face the camera*) – readable inside a headset where the screen HUD is not.
+
+### Fixed
+- **Sky Parkour:** crumbling tiles no longer disappear forever – they fall as before and **come back when you respawn**.
+- Text objects placed in 3D scenes were drawn as plain cubes.
+
+### Changed
+- Version 3.9.0.
+
+## [3.8.0]
 
 ### Added
 - **Languages:** Settings → Interface → Language – Español, Français, Deutsch, Português, Italiano, 日本語, 简体中文, 한국어, Русский, العربية (right-to-left) or Automatic. Menus, Settings, Welcome and file actions are translated; anything without a translation stays English. Plugins can add languages with `VX.i18n.register`.

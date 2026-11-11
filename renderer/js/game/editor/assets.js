@@ -42,7 +42,7 @@
     if (kind === 'shaders') return h('div', { class: 'as-glyph' }, '🔆');
     if (kind === 'animations') return h('div', { class: 'as-glyph' }, '🎬');
     if (kind === 'materials') { const d = h('div', { class: 'as-glyph as-mat', style: `background:radial-gradient(circle at 35% 30%, #fff8, ${a.color || '#ccc'} 55%, #0008)` }); if (a.emissive && a.emissive !== '#000000') d.style.boxShadow = `0 0 12px ${a.emissive}`; return d; }
-    return h('div', { class: 'as-glyph' }, a.kind === 'voxel' ? '🧱' : a.kind === 'obj' ? '📐' : '🧩');
+    return h('div', { class: 'as-glyph' }, a.kind === 'voxel' ? '🧱' : a.kind === 'obj' ? '📐' : a.kind === 'glb' || a.kind === 'gltf' ? '🗿' : '🧩');
   }
 
   class AssetManager {
@@ -93,7 +93,7 @@
       VX.ui.modal({ title: 'Default ' + kind, body, wide: true });
     }
     async import() {
-      const kind = this.tab; const accept = kind === 'sprites' ? 'image/*' : kind === 'sounds' ? 'audio/*' : kind === 'materials' ? '.vxmat,.json,.mtl' : kind === 'animations' ? '.vxanim,.json' : kind === 'shaders' ? '.glsl,.frag,.vert,.vxshader,.txt' : '.obj';
+      const kind = this.tab; const accept = kind === 'sprites' ? 'image/*' : kind === 'sounds' ? 'audio/*' : kind === 'materials' ? '.vxmat,.json,.mtl' : kind === 'animations' ? '.vxanim,.json' : kind === 'shaders' ? '.glsl,.frag,.vert,.vxshader,.txt' : '.obj,.glb,.gltf';
       const files = await VX.pickBrowserFile(accept, true); if (!files || !files.length) return;
       for (const f of files) {
         const name = f.name.replace(/\.[^.]+$/, '');
@@ -103,6 +103,8 @@
           else if (kind === 'materials') { const a = Object.assign({ id: uid('mat'), name, color: '#cccccc', metalness: 0.1, roughness: 0.7 }, VX.parseMaterialFile(await VX.readFileAsText(f), f.name)); a.id = uid('mat'); this.A.materials[a.id] = a; }
           else if (kind === 'animations') { const j = JSON.parse(await VX.readFileAsText(f)); const a = Object.assign({ duration: 1, loop: 'once', tracks: [] }, j, { id: uid('anm'), name: j.name || name }); this.A.animations[a.id] = a; }
           else if (kind === 'shaders') { const a = { id: uid('shd'), name, code: await VX.readFileAsText(f) }; this.A.shaders[a.id] = a; }
+          else if (/\.glb$/i.test(f.name)) { if (f.size > 40e6) throw new Error('file is over 40 MB'); const data = await VX.readFileAsDataURL(f); if (f.size > 8e6) VX.ui.toast('Large model (' + (f.size / 1e6).toFixed(1) + ' MB) – it will bloat the project file', 'warn'); const chk = VXRT.glbChunks(await f.arrayBuffer()); VXRT.buildGLTF(window.THREE, chk.json, chk.bin); const a = { id: uid('mdl'), name, kind: 'glb', data }; this.A.models[a.id] = a; }
+          else if (/\.gltf$/i.test(f.name)) { const text = await VX.readFileAsText(f); VXRT.buildGLTF(window.THREE, JSON.parse(text), null); const a = { id: uid('mdl'), name, kind: 'gltf', text }; this.A.models[a.id] = a; }
           else { const text = await VX.readFileAsText(f); const a = { id: uid('mdl'), name, kind: 'obj', text }; this.A.models[a.id] = a; }
         } catch (e) { VX.ui.toast('Could not import ' + f.name + ': ' + e.message, 'error'); }
       }

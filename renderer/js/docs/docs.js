@@ -6,9 +6,11 @@
   const GROUPS = ['Start here', 'Websites', 'UI designer', 'Making games', 'Block reference', 'Scripting', 'Plugins', 'Share & publish', 'Reference'];
 
   const paramLine = (p) => { const opts = p.options ? ' – ' + p.options.map((o) => '`' + (Array.isArray(o) ? o[0] : o) + '`').join(', ') : ''; return `| ${p.label} | ${p.type === 'select' ? 'choice' : p.type} | ${p.def === undefined || p.def === '' ? '–' : '`' + String(p.def).slice(0, 30) + '`'} |${opts ? ' ' + opts.slice(3).slice(0, 220) : ''} |`; };
+  /** the short demo video for a block (clips are made by tools/block-demos/build.js) */
+  function clipMd(def) { const c = window.VX && VX.docClips && VX.docClips[def.id]; return c ? `![video: ${c.replace(/[\]\[()]/g, ' ')}](docs/clips/${encodeURIComponent(def.id)}.webm)\n\n*Demo – ${c.replace(/[\]\[]/g, ' ')}*\n\n` : ''; }
   function blockMd(def) {
     const ports = VXRT.ports(def, VXRT.paramDefaults(def), null); const pl = (a) => (a.length ? a.map((p) => '`' + p.id + '`').join(', ') : '—');
-    let md = `### ${def.label}\n\n\`${def.id}\` ${def.plugin ? '· from plugin **' + def.plugin + '**' : ''}\n\n${def.desc || ''}\n\n**Inputs:** ${pl(ports.inputs)}  \n**Outputs:** ${pl(ports.outputs)}\n\n`;
+    let md = `### ${def.label}\n\n\`${def.id}\` ${def.plugin ? '· from plugin **' + def.plugin + '**' : ''}\n\n${def.desc || ''}\n\n${clipMd(def)}**Inputs:** ${pl(ports.inputs)}  \n**Outputs:** ${pl(ports.outputs)}\n\n`;
     if (def.params && def.params.length) { md += '| Setting | Type | Default | Notes |\n|---|---|---|---|\n' + def.params.map(paramLine).join('\n') + '\n\n';
       for (const p of def.params) if (p.options && p.options.some((o) => Array.isArray(o) && o[2])) md += '**' + p.label + '**\n\n' + p.options.map((o) => (Array.isArray(o) && o[2] ? '- **' + o[1] + '** – ' + o[2] : null)).filter(Boolean).join('\n') + '\n\n'; }
     return md;
