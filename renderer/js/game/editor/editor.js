@@ -152,7 +152,7 @@
       this.playPanel = new VX.PlayPanel({ project: () => this.project, onLog: (l, t) => VX.bottom && VX.bottom.log && VX.bottom.log(l, t, 'game'), onStop: () => this.setView('scene') }); this.playView.append(this.playPanel.el);
     }
     async exportHTML() {
-      try { const name = (this.project.settings.title || 'game').replace(/[^\w.-]+/g, '_') + '.html'; const html = await VX.gameExport.toHTML(this.project); if (window.native && native.saveAs) { const r = await native.saveAs(name, html); if (r) VX.ui.toast('Exported ' + (r.split ? r.split(/[\\/]/).pop() : name), 'ok'); } else VX.download(name, html, 'text/html'); } catch (e) { VX.ui.toast('Export failed: ' + e.message, 'error'); }
+      try { const name = (this.project.settings.title || 'game').replace(/[^\w.-]+/g, '_') + '.html'; const html = await VX.gameExport.toHTML(this.project); if (window.native && native.saveAs) { const r = await native.saveAs(name, html); if (r) VX.ui.toast('Exported ' + (r.split ? r.split(/[\\/]/).pop() : name), 'ok'); } else VX.download(name, html, 'text/html'); const xr = VX.gameExport.xrKinds(this.project); if (xr.vr || xr.ar) setTimeout(() => VX.ui.toast((xr.vr && xr.ar ? 'VR + AR' : xr.vr ? 'VR' : 'AR') + ' game: WebXR only works on https (or localhost). Host the file with 🌐 Publish, or use 📦 Store export for Meta Quest, Android and Steam packages.', 'info'), 600); } catch (e) { VX.ui.toast('Export failed: ' + e.message, 'error'); }
     }
     /** customize the loading page that every exported / played game shows (it always carries the Vextra Studio credit), then preview it */
     async loadingPage() {

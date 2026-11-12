@@ -259,6 +259,19 @@ Design sound effects without any files: choose a wave (square, saw, triangle, si
 
 Then use the model in 3D scenes with the **Model** object type.
 
+## Exporting VR and AR games to stores
+
+Open the game and press **📦 Store export** (enable the *Store Export* plugin). It detects VR and AR blocks and offers matching packages:
+
+| Target | What you get for a VR / AR game |
+|---|---|
+| **Meta Quest – Meta Horizon Store** | \`meta/\`: the game as an installable web app, a Bubblewrap Quest project, placeholder store artwork (square, landscape, portrait, icon) and \`README-META.md\` with the Horizon Developer Dashboard steps (release channel, data use checkup, age and VR comfort ratings). Host \`meta/www\` on https first (🌐 Publish works). |
+| **Android VR / AR (WebXR)** | \`xr/\`: the same kind of package for **Android phones with ARCore** (real AR surface tracking). Follow \`README-XR.md\`. |
+| **Google Play / App Store** | A phone web view has no WebXR, so VR runs as phone VR (gyroscope, side-by-side view) and AR shows the camera. The project gets the camera, gyroscope and ARCore entries (Android) and the camera / motion texts (iOS). |
+| **Steam** | Electron has no WebXR, so the game opens in the player's own Edge or Chrome (full screen, SteamVR / OpenXR). Without a browser it opens as a normal window. Set *VR Support* on the Steamworks page. |
+
+Choose *VR / AR* in the form to override the detection. A plain **⬇ Export HTML** of a VR / AR game works too, but WebXR only runs on **https** (or localhost).
+
 ## Live link with Blender
 
 The Blender add-on (v1.1) can talk to Vextra directly, so you never export and import by hand:

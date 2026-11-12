@@ -66,7 +66,14 @@ try {
 </script></body></html>`;
   }
 
+  /** Does the game use VR / AR blocks? -> { vr, ar } (reads the block types of every behaviour) */
+  function xrKinds(project) {
+    const reg = (window.VXRT && VXRT.blocks) || {}, vr = [], ar = []; for (const b of Object.values(reg)) { if (b && b.cat === 'vr') vr.push(b.id); if (b && b.cat === 'ar') ar.push(b.id); }
+    const { assets, ...rest } = project; let t = ''; try { t = JSON.stringify(rest); } catch (e) { /* ignore */ }
+    return { vr: vr.some((i) => t.includes('"type":"' + i + '"')), ar: ar.some((i) => t.includes('"type":"' + i + '"')) };
+  }
   VX.gameExport = {
+    xrKinds,
     toHTML,
     async download(project, name) { const html = await toHTML(project); const fname = (name || project.settings.title || 'game').replace(/[^\w.-]+/g, '_') + '.html'; VX.download(fname, html, 'text/html'); return fname; },
     async toFile(project, path) { const html = await toHTML(project); await native.writeFile(path, html); return path; },

@@ -1,4 +1,4 @@
-/** @forge-plugin {"id":"store-export","name":"Store Export","version":"2.3.0","description":"Package a game and (on the desktop app) install, assign and build it automatically, with a progress bar, for for Steam (Electron), Google Play (Android) and the App Store (iOS)."} */
+/** @forge-plugin {"id":"store-export","name":"Store Export","version":"2.5.0","description":"Package a game and (on the desktop app) install, assign and build it automatically, with a progress bar, for for Steam (Electron), Google Play (Android) and the App Store (iOS)."} */
 /** @forge-docs
  * ## Using Store Export
  * Open a game and press **📦 Store export** in its toolbar (or run **Store Export: Package game…** from the Command Palette). A project folder must be open so the files have somewhere to go.
@@ -12,6 +12,16 @@
  * | **Steam** | An Electron project (`steam/`) with Windows/macOS/Linux builds, optional Steamworks, `steamcmd` build files | A Steamworks account + App ID, `steamcmd` |
  *
  * Every folder has its own **README** with the exact commands, and `STORE-CHECKLIST.md` lists the store assets (screenshots, descriptions, age ratings, privacy policy) you must prepare.
+ *
+ * ### VR and AR games
+ * Store Export detects VR / AR blocks (VR Mode, AR Mode, VR Controller, AR Place …) and packages the game to match:
+ *
+ * | Target | VR / AR behaviour |
+ * |---|---|
+ * | **Meta Quest (Horizon Store)** | \`meta/\`: a PWA + a ready-made **Bubblewrap** (Trusted Web Activity) Quest project, placeholder store artwork and a Horizon Store submission guide. Runs in the headset's WebXR engine, so real VR (controllers, room-scale) works. Needs your game hosted on **https**. |
+ * | **Android VR / AR (WebXR)** | \`xr/\`: the same kind of package for **Android phones with ARCore**. These run in a real WebXR browser engine, so real VR (controllers, room-scale) and real AR (surface tracking) work. Needs your game hosted on **https** (the 🌐 Publish button gives you an address). |
+ * | **Google Play / App Store (Capacitor)** | A web view has no WebXR, so the game falls back to **phone VR** (gyroscope, side-by-side view for a headset holder) and **camera AR**. The project gets the right camera / motion permissions, gyroscope and ARCore entries and iOS usage texts. |
+ * | **Steam (Electron)** | Electron has no WebXR, so a VR game starts in the player's own Edge / Chrome (full-screen, OpenXR / SteamVR) served from a tiny local server; the Electron window is the fallback. |
  *
  * ### What this does *not* do
  * It does not sign, build or upload anything – signing keys and store accounts are yours, and Apple only builds on a Mac. It prepares projects that build with a few commands. Package versions in the generated `package.json` files are starting points; update them if your tools complain.
@@ -38,6 +48,128 @@ async function makeCanvases(project, o) {
   return { iconOnly, fg, bg, splash };
 }
 
+
+/* ───────────── VR / AR ───────────── */
+const VR_IDS = ['vrMode', 'vrHead', 'vrController', 'vrMove', 'vrGrab', 'vrHaptic', 'vrGaze'], AR_IDS = ['arMode', 'arPlace', 'arSurface', 'arDistance', 'arLight', 'arScale', 'arShadowFloor'];
+/** Which immersive features does the game use? -> { vr, ar, threeD } (looks at the block types in every behaviour and at the registry's vr / ar categories) */
+function xrKinds(project) {
+  const reg = (window.VXRT && VXRT.blocks) || {}, vr = new Set(VR_IDS), ar = new Set(AR_IDS);
+  for (const b of Object.values(reg)) { if (b && b.cat === 'vr') vr.add(b.id); if (b && b.cat === 'ar') ar.add(b.id); }
+  const { assets, ...rest } = project; let text = ''; try { text = JSON.stringify(rest); } catch { /* circular */ }
+  const has = (set) => { for (const id of set) if (text.includes('"type":"' + id + '"')) return true; return false; };
+  return { vr: has(vr), ar: has(ar), threeD: (project.scenes || []).some((sc) => sc.dim === '3d') };
+}
+const xrWord = (k) => (k.vr && k.ar ? 'VR + AR' : k.vr ? 'VR' : k.ar ? 'AR' : 'none');
+const xmlEsc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+/** The WebXR package: a PWA (`www/`) to host over https plus two Bubblewrap projects (Meta Quest, Android phones). */
+function xrFiles(o, slug, html, kind) {
+  const f = {}, host = o.webHost || 'your-game.example.com', origin = 'https://' + host;
+  const page = html.replace(/<head>/i, '<head>\n<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="' + o.color + '"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">')
+    .replace(/<\/body>\s*<\/html>\s*$/i, "<script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(function(){});</script></body></html>");
+  f['www/index.html'] = page;
+  f['www/manifest.webmanifest'] = JSONF({ name: o.name, short_name: o.name.slice(0, 12), id: '/', start_url: './index.html', scope: './', display: 'fullscreen', display_override: ['fullscreen', 'standalone'], orientation: o.orientation === 'any' ? 'any' : o.orientation, background_color: o.color, theme_color: o.color, categories: ['games'],
+    icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }] });
+  f['www/sw.js'] = "// Offline cache: the game is a single page, so cache it after the first visit.\nconst V = " + JSON.stringify('vx-' + o.version) + ";\nself.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest'])).then(() => self.skipWaiting())); });\nself.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((k) => Promise.all(k.filter((x) => x !== V).map((x) => caches.delete(x)))).then(() => self.clients.claim())); });\nself.addEventListener('fetch', (e) => { if (e.request.method !== 'GET') return; e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); caches.open(V).then((ch) => ch.put(e.request, c)); return r; }).catch(() => caches.match(e.request))); });\n";
+  f['www/.well-known/assetlinks.json'] = JSONF([{ relation: ['delegate_permission/common.handle_all_urls'], target: { namespace: 'android_app', package_name: o.id, sha256_cert_fingerprints: ['REPLACE_WITH_YOUR_SIGNING_KEY_SHA256_FINGERPRINT'] } }]);
+  const twa = (quest) => ({ packageId: o.id, host, name: o.name, launcherName: o.name.slice(0, 12), display: 'fullscreen', orientation: o.orientation === 'any' ? 'default' : o.orientation, themeColor: o.color, themeColorDark: o.color, navigationColor: o.color, navigationColorDark: o.color, backgroundColor: o.color,
+    enableNotifications: false, startUrl: '/index.html', iconUrl: origin + '/icons/icon-512.png', maskableIconUrl: origin + '/icons/icon-maskable-512.png', webManifestUrl: origin + '/manifest.webmanifest', appVersionName: o.version, appVersionCode: o.code, fallbackType: 'customtabs', features: {}, alphaDependencies: { enabled: false }, enableSiteSettingsShortcut: false, isChromeOSOnly: false, isMetaQuest: !!quest,
+    signingKey: { path: './android.keystore', alias: 'android' }, minSdkVersion: 24, splashScreenFadeOutDuration: 300 });
+  const meta = kind === 'meta';
+  f['twa-manifest.json'] = JSONF(twa(meta));
+  const common = `- \`www/\` – your game as an installable web app (PWA: manifest, offline cache, icons). **Upload this folder to an https web host** (or use Vextra's 🌐 Publish and copy the files). WebXR only works on https (or localhost).
+- \`twa-manifest.json\` – the Bubblewrap (Trusted Web Activity) project settings for the Android app.
+
+## 1. Host the game
+Put the contents of \`www/\` at the **root** of ${origin} (so \`${origin}/index.html\` and \`${origin}/manifest.webmanifest\` open). ${o.webHost ? '' : '**You did not enter a web address, so the manifest uses the placeholder `your-game.example.com` – replace it in `twa-manifest.json` (fields `host`, `iconUrl`, `maskableIconUrl`, `webManifestUrl`).**'}
+
+## 2. Build the app (Bubblewrap)
+Needs Node.js (Java and the Android SDK are downloaded by Bubblewrap on first run).
+\`\`\`
+npx @bubblewrap/cli build        # first run: installs the JDK / Android SDK, asks you to create a signing key, then creates a signed .apk and .aab
+\`\`\`
+**Back up the signing key** (\`android.keystore\`) – every update needs the same key.
+
+## 3. Verify the site (Digital Asset Links)
+So the app opens full-screen without a browser bar, publish \`www/.well-known/assetlinks.json\` at \`${origin}/.well-known/assetlinks.json\` with the **SHA-256 fingerprint** of your signing key (\`npx @bubblewrap/cli fingerprint\` prints it). Replace \`REPLACE_WITH_YOUR_SIGNING_KEY_SHA256_FINGERPRINT\`.
+`;
+  if (meta) {
+    f['README-META.md'] = `# ${o.name} – Meta Quest (Meta Horizon Store)
+
+Generated by Vextra Studio **Store Export**. Detected in your game: **${xrWord(o.xrKinds)}**.
+
+A normal Android web view and Electron have **no WebXR**. This package runs your game as a web app inside the headset's WebXR engine, so controllers, head tracking, haptics and room-scale work.
+
+${common}
+## 4. Try it on a headset
+- Quick check: open ${origin}/ in the **Meta Quest Browser** – the VR Mode block (started from a click) offers the headset.
+- As an app: turn on developer mode for your headset, connect it by USB and run \`adb install <the built .apk>\`. \`twa-manifest.json\` has \`"isMetaQuest": true\`, which makes the Android project launch as a Quest VR app.
+
+## 5. Publish in the Meta Horizon Store
+1. Create a developer organisation and an app in the **Meta Horizon Developer Dashboard** (developers.meta.com/horizon) and pick your target headsets.
+2. Upload the built \`.apk\` to a release channel (start with an internal / alpha channel and test it on a real headset).
+3. Fill in the store listing from \`store-assets/\` (square, landscape and portrait cover art and an icon made from your colour and icon – **replace them with real artwork and check the dashboard for the current sizes**), screenshots and a trailer.
+4. Complete the forms: age rating, **Data Use Checkup** (what you collect), privacy policy URL, VR comfort rating (movement type, seated / standing / room-scale), supported input (controllers / hands).
+5. Submit for review. Meta tests performance (steady frame rate), comfort and that the app does not need anything outside the headset.
+
+## Tips
+- Keep 3D light: few draw calls, small textures (the model optimizer in tools/ helps) – Quest hardware is mobile-class.
+- Test with controllers AND with the thumbsticks: the VR Move block gives smooth, snap-turn and teleport movement.
+- Hand tracking is requested as an optional feature; do not claim it in the listing unless your game supports it.
+`;
+  } else {
+    f['README-XR.md'] = `# ${o.name} – Android VR / AR (WebXR)
+
+Generated by Vextra Studio **Store Export**. Detected in your game: **${xrWord(o.xrKinds)}**.
+
+A plain Android / iOS web view (Capacitor) has **no WebXR**, so it only runs the *phone* fallbacks (gyroscope VR, camera AR). This package runs the game as a web app in Chrome's engine, so AR gets real surface tracking (ARCore) and VR supports headsets that run Android browsers.
+
+${common}
+## Android phones (AR and phone VR)
+- AR needs a phone with **ARCore** (Google Play Services for AR) and **Chrome**; the AR Mode block then uses real surface tracking (hit-test). Without ARCore it falls back to the camera view.
+- Upload the \`.aab\` to Google Play Console as usual. The listing can use the “Augmented reality” category and the AR feature declaration.
+- Try it without a store: open ${origin}/ in Chrome on an ARCore phone.
+`;
+  }
+  return f;
+}
+
+/** Steam: Electron has no WebXR, so a VR / AR game opens in the player's own Edge / Chrome (OpenXR → SteamVR) served from a tiny local server (a secure context). */
+const XR_LAUNCH = `// Opens the game in a WebXR-capable browser: a tiny local http server (127.0.0.1 = secure context for WebXR) + the system's Edge / Chrome in app mode.
+//   VX_BROWSER=<path to chrome / edge>   overrides the browser that is looked for.      VX_BROWSER_ARGS="--flag1 --flag2"  adds flags (tests).
+const http = require('http'), fs = require('fs'), path = require('path'), cp = require('child_process');
+const exists = (p) => { try { return !!p && fs.existsSync(p); } catch { return false; } };
+function findBrowser() {
+  if (exists(process.env.VX_BROWSER)) return process.env.VX_BROWSER;
+  const e = process.env, list = process.platform === 'win32' ? [
+    (e['ProgramFiles(x86)'] || '') + '\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe', (e.ProgramFiles || '') + '\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe',
+    (e.ProgramFiles || '') + '\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe', (e['ProgramFiles(x86)'] || '') + '\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe', (e.LOCALAPPDATA || '') + '\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe',
+  ] : process.platform === 'darwin' ? ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'] : ['/usr/bin/microsoft-edge', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
+  return list.find(exists) || null;
+}
+function serve(dir) {
+  return new Promise((res, rej) => {
+    const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+    const srv = http.createServer((req, rsp) => {
+      let u = decodeURIComponent((req.url || '/').split('?')[0]); if (u === '/') u = '/index.html'; const f = path.normalize(path.join(dir, u));
+      if (!f.startsWith(dir + path.sep) || !exists(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end('Not found'); }
+      rsp.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Permissions-Policy': 'xr-spatial-tracking=*, camera=*, gyroscope=*, accelerometer=*' }); fs.createReadStream(f).pipe(rsp);
+    });
+    srv.on('error', rej); srv.listen(0, '127.0.0.1', () => res(srv));
+  });
+}
+/** Returns { ok, reason, close() }. onExit runs when the player closes the browser window. */
+async function launch(wwwDir, profileDir, onExit) {
+  const browser = findBrowser(); if (!browser) return { ok: false, reason: 'No Edge or Chrome was found. VR / AR needs one of them (install Microsoft Edge or Google Chrome).' };
+  const srv = await serve(path.resolve(wwwDir)), url = 'http://127.0.0.1:' + srv.address().port + '/';
+  const extra = (process.env.VX_BROWSER_ARGS || '').split(/\\s+/).filter(Boolean);
+  const child = cp.spawn(browser, ['--app=' + url, '--start-fullscreen', '--no-first-run', '--no-default-browser-check', '--user-data-dir=' + profileDir, '--autoplay-policy=no-user-gesture-required', ...extra], { stdio: 'ignore' });
+  child.on('exit', () => { try { srv.close(); } catch { /* closed */ } if (onExit) onExit(); }); child.on('error', () => { try { srv.close(); } catch { /* closed */ } if (onExit) onExit(); });
+  return { ok: true, url, browser, close() { try { child.kill(); } catch { /* gone */ } try { srv.close(); } catch { /* closed */ } } };
+}
+module.exports = { findBrowser, serve, launch };
+`;
+
 function mobileFiles(o, slug) {
   const land = o.orientation === 'landscape', port = o.orientation === 'portrait';
   const f = {};
@@ -46,7 +178,7 @@ function mobileFiles(o, slug) {
   f['scripts/patch-native.js'] = [
     "// Best-effort patches after `cap add`: orientation + version numbers. Safe to run repeatedly.",
     "const fs = require('fs'), path = require('path');",
-    'const cfg = ' + JSON.stringify({ orientation: o.orientation, version: o.version, code: o.code }) + ';',
+    'const cfg = ' + JSON.stringify({ orientation: o.orientation, version: o.version, code: o.code, name: o.name, vr: !!o.xrKinds.vr, ar: !!o.xrKinds.ar }) + ';',
     "const read = (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null);",
     "const edit = (p, fn) => { const s = read(p); if (s === null) return console.log('skip (not found): ' + p); const n = fn(s); if (n !== s) { fs.writeFileSync(p, n); console.log('patched ' + p); } };",
     "const man = path.join('android', 'app', 'src', 'main', 'AndroidManifest.xml');",
@@ -57,6 +189,13 @@ function mobileFiles(o, slug) {
     "const dirs = { landscape: ['UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight'], portrait: ['UIInterfaceOrientationPortrait'] }[cfg.orientation];",
     "if (dirs) edit(plist, (s) => s.replace(/(<key>UISupportedInterfaceOrientations<\\/key>\\s*<array>)[\\s\\S]*?(<\\/array>)/, (m, a, b) => a + dirs.map((d) => '<string>' + d + '</string>').join('') + b));",
     "edit(plist, (s) => s.replace(/(<key>CFBundleShortVersionString<\\/key>\\s*<string>)[^<]*/, '$1' + cfg.version));",
+    "/* VR / AR: sensors, camera and ARCore entries (a web view has no WebXR, so VR uses the gyroscope and AR the camera) */",
+    "const need = [];",
+    "if (cfg.vr || cfg.ar) need.push('<uses-feature android:name=\"android.hardware.sensor.accelerometer\" android:required=\"false\" />', '<uses-feature android:name=\"android.hardware.sensor.gyroscope\" android:required=\"false\" />');",
+    "if (cfg.ar) need.push('<uses-permission android:name=\"android.permission.CAMERA\" />', '<uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />', '<uses-feature android:name=\"android.hardware.camera.ar\" android:required=\"false\" />');",
+    "if (need.length) edit(man, (s) => { const add = need.filter((l) => !s.includes(l.match(/android:name=\"([^\"]+)\"/)[1])); return add.length ? s.replace('<application', add.join('\\n    ') + '\\n    <application') : s; });",
+    "if (cfg.ar) edit(man, (s) => (s.includes('com.google.ar.core') ? s : s.replace(/(<application[^>]*>)/, '$1\\n        <meta-data android:name=\"com.google.ar.core\" android:value=\"optional\" />')));",
+    "if (cfg.ar || cfg.vr) edit(plist, (s) => { const esc = cfg.name.replace(/[<>&]/g, ''), add = []; if (cfg.ar && !/NSCameraUsageDescription/.test(s)) add.push('<key>NSCameraUsageDescription</key><string>' + esc + ' uses the camera to show augmented reality.</string>'); if (!/NSMotionUsageDescription/.test(s)) add.push('<key>NSMotionUsageDescription</key><string>' + esc + ' uses the motion sensors to follow your head and hands.</string>'); return add.length ? s.replace(/<\\/dict>\\s*<\\/plist>/, add.join('') + '</dict></plist>') : s; });",
     "/* release build: optimised ProGuard / R8 rules */",
     "for (const g of ['build.gradle', 'build.gradle.kts']) edit(path.join('android', 'app', g), (s) => { const kts = g.endsWith('.kts'), line = kts ? 'proguardFiles(getDefaultProguardFile(\"proguard-android-optimize.txt\"), \"proguard-rules.pro\")' : \"proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\"; if (/proguardFiles/.test(s)) return s.replace(/^([ \\t]*)proguardFiles[^\\n]*$/m, (m, i) => i + line); return s.replace(/(release\\s*\\{)/, (m) => m + '\\n            ' + line); });",
     "/* Gradle wrapper: latest release from services.gradle.org (needs internet; skipped when offline) */",
@@ -90,7 +229,8 @@ Re-export from Vextra (it overwrites \`www/index.html\`), then \`npm run sync\`.
 - \`npm run open:ios\` → select the *App* target → Signing & Capabilities → choose your Team. Bundle identifier: \`${o.id}\`.
 - **Product → Archive → Distribute App → App Store Connect**. Then finish the listing in App Store Connect and submit for review.
 
-## Notes
+${o.xrKinds.vr || o.xrKinds.ar ? `## VR / AR in this app
+- This game uses **${xrWord(o.xrKinds)}**. A phone web view has no WebXR, so **VR** runs as phone VR (gyroscope + side-by-side view for a headset holder) and **AR** shows the camera behind your 3D objects. The patch script adds the camera, gyroscope and ARCore entries (Android) and the camera / motion texts (iOS).\n- For **real** headset VR (Meta Quest, controllers) or ARCore surface tracking use the **xr/** package (see README-XR.md in it) – it runs the game in a WebXR browser engine.\n\n` : ''}## Notes
 - Audio starts after the first tap/click (browser rule) – the engine handles this.
 - Test on real devices; web-view performance varies, especially for 3D on older phones.
 - The Ad, Game Center and Vibrate blocks use web fallbacks. For real ads or Game Center, add a Capacitor plugin and call it from a custom block.
@@ -103,9 +243,10 @@ function steamFiles(o, slug) {
   f['package.json'] = JSONF({ name: slug, productName: o.name, version: o.version, description: o.name, author: o.publisher, main: 'main.js', private: true,
     scripts: { start: 'electron .', 'build:win': 'electron-builder --win --dir', 'build:mac': 'electron-builder --mac --dir', 'build:linux': 'electron-builder --linux --dir', 'build:all': 'electron-builder -wml --dir', upload: 'node scripts/upload.js' },
     devDependencies: { electron: '^33.0.0', 'electron-builder': '^25.0.0' }, optionalDependencies: { 'steamworks.js': '^0.4.0' }, allowScripts: { electron: true, esbuild: true, sharp: true },
-    build: { appId: o.id, productName: o.name, directories: { output: 'dist', buildResources: 'build' }, files: ['main.js', 'preload.js', 'www/**/*', 'package.json'], asar: true, win: { target: 'dir', icon: 'build/icon.png', signAndEditExecutable: false }, mac: { target: 'dir', icon: 'build/icon.png', category: 'public.app-category.games' }, linux: { target: 'dir', icon: 'build/icon.png', category: 'Game' } } });
+    build: { appId: o.id, productName: o.name, directories: { output: 'dist', buildResources: 'build' }, files: ['main.js', 'preload.js', 'xr-launch.js', 'www/**/*', 'package.json'], asar: true, win: { target: 'dir', icon: 'build/icon.png', signAndEditExecutable: false }, mac: { target: 'dir', icon: 'build/icon.png', category: 'public.app-category.games' }, linux: { target: 'dir', icon: 'build/icon.png', category: 'Game' } } });
   f['main.js'] = [
-    "const { app, BrowserWindow, Menu, globalShortcut } = require('electron');",
+    "const { app, BrowserWindow, Menu, globalShortcut, dialog } = require('electron');",
+    'const XR = ' + (o.xrKinds.vr || o.xrKinds.ar ? 'true' : 'false') + '; // VR / AR game: Electron has no WebXR, so the game opens in Edge / Chrome (see xr-launch.js)',
     "const path = require('path');",
     'const STEAM_APP_ID = ' + (o.steamId ? JSON.stringify(o.steamId) : 'null') + ';',
     "let steam = null;",
@@ -117,9 +258,16 @@ function steamFiles(o, slug) {
     "  const toggle = () => win.setFullScreen(!win.isFullScreen());",
     "  win.webContents.on('before-input-event', (e, i) => { if (i.type === 'keyDown' && (i.key === 'F11' || (i.alt && i.key === 'Enter'))) { toggle(); e.preventDefault(); } });",
     "}",
-    "app.whenReady().then(create);",
+    "app.whenReady().then(async () => {",
+    "  if (XR) {",
+    "    try { const r = await require('./xr-launch.js').launch(path.join(__dirname, 'www'), path.join(app.getPath('userData'), 'xr-profile'), () => app.quit()); if (r.ok) { app.on('before-quit', () => r.close()); return; } dialog.showErrorBox(" + JSON.stringify(o.name) + ", r.reason + ' The game will open in a normal window without VR / AR.'); }",
+    "    catch (e) { console.log('VR launcher failed: ' + e.message); }",
+    "  }",
+    "  create();",
+    "});",
     "app.on('window-all-closed', () => app.quit());", '',
   ].join('\n');
+  if (o.xrKinds.vr || o.xrKinds.ar) f['xr-launch.js'] = XR_LAUNCH;
   f['preload.js'] = "// Exposes nothing by default. Add a contextBridge here if you need Steam features in the game.\n";
   f['steam/app_build.vdf'] = `"appbuild"\n{\n\t"appid" "${o.steamId || 'YOUR_APP_ID'}"\n\t"desc" "${o.name} ${o.version}"\n\t"buildoutput" "../steam-output"\n\t"contentroot" "../dist"\n\t"setlive" ""\n\t"preview" "0"\n\t"local" ""\n\t"depots"\n\t{\n\t\t"${d}" "depot_win.vdf"\n\t\t"${d + 1}" "depot_mac.vdf"\n\t\t"${d + 2}" "depot_linux.vdf"\n\t}\n}\n`;
   for (const [n, id, dir] of [['win', d, 'win-unpacked'], ['mac', d + 1, 'mac'], ['linux', d + 2, 'linux-unpacked']]) f[`steam/depot_${n}.vdf`] = `"DepotBuildConfig"\n{\n\t"DepotID" "${id}"\n\t"contentroot" "../dist/${dir}"\n\t"FileMapping"\n\t{\n\t\t"LocalPath" "*"\n\t\t"DepotPath" "."\n\t\t"recursive" "1"\n\t}\n}\n`;
@@ -160,14 +308,13 @@ STEAM_USER=yourbuilduser npm run upload
 \`\`\`
 5. In Steamworks, set the build live on a branch, complete the store page and submit for review (see STORE-CHECKLIST.md).
 
-## Notes
-- Achievements/leaderboards from the game's blocks are Vextra's own services; to use Steam's, call \`steam\` from \`preload.js\` and expose it with \`contextBridge\`.
+${o.xrKinds.vr || o.xrKinds.ar ? `## VR / AR on Steam\n- This game uses **${xrWord(o.xrKinds)}**. Electron has no WebXR, so \`main.js\` starts the game in the player's own **Microsoft Edge or Google Chrome** (full-screen app window, served from a local server on 127.0.0.1, which counts as a secure context). With SteamVR (or another OpenXR runtime) running, the game's VR Mode block then enters real VR. If no Edge / Chrome is installed a message explains it and the game opens flat.\n- \`VX_BROWSER=<path to chrome / edge>\` picks a specific browser; \`xr-launch.js\` is plain Node code you can read and change.\n- In Steamworks set the store page's **VR Support** (headsets, input, play area) – see STORE-CHECKLIST.md. The Steam overlay and \`steamworks.js\` are not available inside the browser window.\n\n` : ''}## Notes\n- Achievements/leaderboards from the game's blocks are Vextra's own services; to use Steam's, call \`steam\` from \`preload.js\` and expose it with \`contextBridge\`.
 - The first build downloads Electron (~100 MB per platform).
 `;
   return f;
 }
 
-function checklist(o) { return `# Store checklist – ${o.name}
+function checklist(o) { return `# Store checklist – ${o.name}${o.xrKinds.vr || o.xrKinds.ar ? `\n\n> This is a **${xrWord(o.xrKinds)}** game – see the VR / AR sections below.` : ''}
 
 ## Everyone
 - [ ] Final icon and name checked, no trademarked material you do not own
@@ -188,7 +335,25 @@ function checklist(o) { return `# Store checklist – ${o.name}
 - [ ] App privacy "nutrition label", age rating, export-compliance answers
 - [ ] A way for App Review to play (no login walls, or provide a demo account)
 
-## Steam
+${o.meta ? `## Meta Quest – Meta Horizon Store (meta/ folder)
+- [ ] Game hosted on https and opens in the Meta Quest Browser before you build the app
+- [ ] assetlinks.json published with your signing key fingerprint (full-screen, no browser bar)
+- [ ] Meta Horizon Developer Dashboard: organisation + app created, target headsets chosen
+- [ ] Real cover art (square, landscape, portrait), icon, screenshots and trailer – the files in meta/store-assets are placeholders
+- [ ] Age rating, Data Use Checkup, privacy policy URL, VR comfort rating (movement, seated / standing / room-scale), supported input
+- [ ] Tested on a real headset: steady frame rate, no sudden camera movement, readable UI, controllers (and hands only if you claim them)
+
+` : ''}${o.xr ? `## Android VR / AR (xr/ folder)
+- [ ] Game hosted on https and opens in Chrome on an ARCore phone before you build the app
+- [ ] assetlinks.json published with your signing key fingerprint
+- [ ] Google Play (AR): ARCore "AR optional/required" choice and the camera permission explained in the data-safety form
+
+` : ''}${o.xrKinds.vr ? `## Steam VR
+- [ ] Steamworks → Store page → **VR Support**: headsets supported, input (tracked controllers / keyboard), play area (seated / standing / room-scale), VR only or optional
+- [ ] Tested with SteamVR running and the system's default OpenXR runtime set to SteamVR
+- [ ] VR-specific screenshots / trailer
+
+` : ''}## Steam
 - [ ] Store page: capsule images (header, small, main, vertical), screenshots, trailer (optional), description, tags
 - [ ] Release date, price, system requirements, supported languages
 - [ ] Build set live on the default branch; store page and build both approved
@@ -269,7 +434,7 @@ async function run() {
   const project = forge.game.current(); const root = forge.fs.root();
   if (!project) return forge.ui.toast('Open a game first (a .vxgame tab).', 'warn');
   if (!root) return forge.ui.toast('Open a folder first – the packages are written into it (store-export/).', 'warn');
-  const sprites = Object.values(project.assets.sprites);
+  const sprites = Object.values(project.assets.sprites), det = xrKinds(project);
   const v = await forge.ui.form({ title: 'Store Export', submit: 'Create packages', intro: 'Prepares build-ready projects. Signing, building and uploading are done with the store tools (see the README in each folder).', fields: [
     { key: 'name', label: 'App name', value: project.settings.title, required: true },
     { key: 'id', label: 'Package id', value: 'com.yourname.' + slugify(project.settings.title).replace(/-/g, ''), hint: 'Reverse-domain, lowercase. Cannot change after publishing.', required: true },
@@ -281,10 +446,17 @@ async function run() {
     { key: 'steamId', label: 'Steam App ID (optional)', placeholder: 'e.g. 1234560' },
     { key: 'depotBase', label: 'First Steam depot id', type: 'number', value: 1234561, hint: 'Windows, macOS, Linux use this and the next two.' },
     { key: 'auto', label: 'Install, assign and build automatically (desktop app)', type: 'checkbox', value: true, hint: 'Installs, assigns and builds step by step with a plain checklist. Needs Node.js; for Android, Java, Gradle and the Android SDK are found automatically (JAVA_HOME …) or downloaded and kept up to date for you – official sources only, checksum-verified, no Android Studio needed.' },
+    { key: 'xrMode', label: 'VR / AR', type: 'select', value: 'auto', options: [['auto', 'Detect from the game (found: ' + xrWord(det) + ')'], ['none', 'Flat game (no VR / AR)'], ['vr', 'VR game'], ['ar', 'AR game'], ['both', 'VR + AR game']], hint: 'Adds the VR / AR packages and permissions. Detected from the VR and AR blocks the game uses.' },
+    { key: 'meta', label: 'Meta Quest – Meta Horizon Store (WebXR app)', type: 'checkbox', value: det.vr, hint: 'Runs the game as a VR app in the headset’s WebXR engine and prepares the Horizon Store submission. Needs the game hosted on https.' },
+    { key: 'xr', label: 'Android VR / AR – ARCore and WebXR (PWA + Bubblewrap)', type: 'checkbox', value: det.ar, hint: 'Real AR surface tracking needs a WebXR engine, so this package runs the game as a web app in Chrome. Needs the game hosted on https.' },
+    { key: 'webHost', label: 'Web address of the hosted game (for the Meta / Android WebXR apps)', placeholder: 'mygame.example.com', hint: 'Without https:// – where you will upload the www folder (🌐 Publish works too). Leave empty to fill in later.' },
     { key: 'android', label: 'Google Play + App Store project (Capacitor)', type: 'checkbox', value: true, hint: 'Android builds use the latest Java, Gradle and Android SDK, downloaded and updated automatically when needed.' }, { key: 'steam', label: 'Steam project (Electron)', type: 'checkbox', value: true },
-  ], validate: (x) => (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(x.id) ? 'Package id must look like com.company.game' : !/^\d+(\.\d+){0,2}$/.test(x.version) ? 'Version must be numbers like 1.0.0' : !x.android && !x.steam ? 'Pick at least one target' : null) });
+  ], validate: (x) => (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(x.id) ? 'Package id must look like com.company.game' : !/^\d+(\.\d+){0,2}$/.test(x.version) ? 'Version must be numbers like 1.0.0' : !x.android && !x.steam && !x.xr && !x.meta ? 'Pick at least one target' : null) });
   if (!v) return;
-  const o = Object.assign({}, v, { code: Math.max(1, Math.round(v.code) || 1), depotBase: Math.round(v.depotBase) || 1234561, steamId: String(v.steamId || '').trim().replace(/\D/g, ''), publisher: v.publisher || 'Your Name' });
+  const o = Object.assign({}, v, { code: Math.max(1, Math.round(v.code) || 1), depotBase: Math.round(v.depotBase) || 1234561, webHost: String(v.webHost || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, ''), steamId: String(v.steamId || '').trim().replace(/\D/g, ''), publisher: v.publisher || 'Your Name' });
+  o.xrKinds = v.xrMode === 'none' ? { vr: false, ar: false } : v.xrMode === 'vr' ? { vr: true, ar: false } : v.xrMode === 'ar' ? { vr: false, ar: true } : v.xrMode === 'both' ? { vr: true, ar: true } : det; o.meta = !!v.meta; o.xr = !!v.xr;
+  if ((o.meta || o.xr) && !o.xrKinds.vr && !o.xrKinds.ar) o.xrKinds = o.meta ? { vr: true, ar: false } : { vr: false, ar: true };
+  if (!o.xr && !o.meta && (o.xrKinds.vr || o.xrKinds.ar) && !(await forge.ui.confirm('This is a ' + xrWord(o.xrKinds) + ' game, but the Meta Quest and Android WebXR packages are off. Phone and Steam packages still work (phone VR / camera AR, Edge / Chrome on Steam), but headsets such as Meta Quest need the Meta Quest package. Continue anyway?', 'Continue'))) return;
   const slug = slugify(o.name), out = root.replace(/[\\/]$/, '') + '/store-export/' + slug;
   try {
     forge.ui.toast('Exporting game…');
@@ -295,12 +467,24 @@ async function run() {
       await write('mobile/www/index.html', html); for (const [k, rel] of Object.entries(mobileFiles(o, slug))) await write('mobile/' + k, rel);
       await writeImg('mobile/assets/icon-only.png', cv.iconOnly); await writeImg('mobile/assets/icon-foreground.png', cv.fg); await writeImg('mobile/assets/icon-background.png', cv.bg); await writeImg('mobile/assets/splash.png', cv.splash); await writeImg('mobile/assets/splash-dark.png', cv.splash);
     }
+    for (const kind of ['meta', 'xr']) {
+      if (!o[kind]) continue; const dir = kind === 'meta' ? 'meta' : 'xr';
+      for (const [k, t] of Object.entries(xrFiles(o, slug, html, kind === 'meta' ? 'meta' : 'android'))) await write(dir + '/' + k, t);
+      const sc = (src, n) => { const c = document.createElement('canvas'); c.width = c.height = n; c.getContext('2d').drawImage(src, 0, 0, n, n); return c; };
+      const mask = (() => { const c = document.createElement('canvas'); c.width = c.height = 1024; const x = c.getContext('2d'); x.drawImage(cv.bg, 0, 0); x.drawImage(cv.fg, 0, 0); return c; })();
+      await writeImg(dir + '/www/icons/icon-192.png', sc(cv.iconOnly, 192)); await writeImg(dir + '/www/icons/icon-512.png', sc(cv.iconOnly, 512)); await writeImg(dir + '/www/icons/icon-maskable-512.png', sc(mask, 512));
+      if (kind === 'meta') {
+        /* placeholder store artwork in the usual cover shapes (colour + icon) – the README says to replace them with real art */
+        const art = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = o.color; x.fillRect(0, 0, w, h); const k = Math.min(w, h) * 0.55; x.drawImage(cv.fg, (w - k) / 2, (h - k) / 2, k, k); return c; };
+        await writeImg('meta/store-assets/icon-512.png', sc(cv.iconOnly, 512)); await writeImg('meta/store-assets/cover-square-1024.png', art(1024, 1024)); await writeImg('meta/store-assets/cover-landscape-2560x1440.png', art(2560, 1440)); await writeImg('meta/store-assets/cover-portrait-1008x1456.png', art(1008, 1456));
+      }
+    }
     if (o.steam) {
       await write('steam/www/index.html', html); for (const [k, rel] of Object.entries(steamFiles(o, slug))) await write('steam/' + k, rel); await writeImg('steam/build/icon.png', cv.iconOnly);
     }
     forge.ui.toast('Packages written to store-export/' + slug, 'ok');
     if (o.auto && forge.proc.available()) { await autoBuild(o, out); return; }
-    forge.ui.modal({ title: 'Packages ready', html: `<div style="line-height:1.6"><p>Created in <code>store-export/${slug}/</code>:</p><ul>${o.android ? '<li><b>mobile/</b> – Google Play + App Store (Capacitor). Open <code>README-MOBILE.md</code>.</li>' : ''}${o.steam ? '<li><b>steam/</b> – Steam (Electron + steamcmd files). Open <code>README-STEAM.md</code>.</li>' : ''}<li><b>STORE-CHECKLIST.md</b> – assets and forms the stores require.</li></ul><p>Next: <code>npm install</code> in the target folder and follow its README. Signing and uploading happen with your own store accounts.</p></div>` });
+    forge.ui.modal({ title: 'Packages ready', html: `<div style="line-height:1.6"><p>Created in <code>store-export/${slug}/</code>:</p><ul>${o.android ? '<li><b>mobile/</b> – Google Play + App Store (Capacitor). Open <code>README-MOBILE.md</code>.</li>' : ''}${o.steam ? '<li><b>steam/</b> – Steam (Electron + steamcmd files). Open <code>README-STEAM.md</code>.</li>' : ''}${o.meta ? '<li><b>meta/</b> – Meta Quest (Meta Horizon Store): web app to host on https + Bubblewrap project + store artwork. Open <code>README-META.md</code>.</li>' : ''}${o.xr ? '<li><b>xr/</b> – Android VR / AR (WebXR, ARCore): web app + Bubblewrap project. Open <code>README-XR.md</code>.</li>' : ''}<li><b>STORE-CHECKLIST.md</b> – assets and forms the stores require.</li></ul><p>Next: <code>npm install</code> in the target folder and follow its README. Signing and uploading happen with your own store accounts.</p></div>` });
   } catch (e) { forge.ui.toast('Store export failed: ' + e.message, 'error'); }
 }
 forge.commands.register({ id: 'package', title: 'Store Export: Package game…', run });

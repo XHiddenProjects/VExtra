@@ -44,6 +44,7 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 - **Import from other tools:** FBX (Mixamo, Maya, 3ds Max…), Collada, STL, PLY, 3MF → game-ready `.glb`.
 - A **live Blender link** (`tools/blender-addon`): pull models from Blender, send models to it, auto-sync edits – plus one-click glb export and a **model optimizer** (`tools/model-optimize`).
 - Bluetooth now works in the Play tab (permission fix).
+- **Store Export understands VR / AR games:** **Meta Quest (Horizon Store)** package, Android WebXR package, phone permissions, Steam VR launcher.
 
 ## What was new in 3.9.0
 - **GLB / glTF models** – import 3D models from Blender and others in Assets → Models.
