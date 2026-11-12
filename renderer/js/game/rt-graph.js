@@ -41,12 +41,18 @@
       else if (n.type === 'animation' && p.loop !== undefined && p.mode === undefined) { n.params = Object.assign({}, p, { mode: p.loop === false ? 'once' : '' }); delete n.params.loop; }
       if (n.graph) VXRT.migrateGraph(n.graph);
     }
-    /* Once / Always no longer have inputs (they start with the game). Old projects: a signal-gated Once becomes "Once (gate)", a switchable Always becomes "Always (switch)"; wires into a plain start Once are dropped. */
+    /* Once / Always have no inputs (they start with the game). Old projects: a signal-gated Once becomes a Filter set to "once"; a switchable Always becomes a fast Timer (enable → start, disable → stop); other wires into them are removed. */
     const into = (id) => wires.filter((w) => w.to === id);
     for (const n of nodes) {
       const p = n.params || {};
-      if (n.type === 'once') { const ws = into(n.id); if (p.when === 'signal') { n.type = 'onceGate'; for (const w of ws) w.in = w.in === 'reset' ? 'reset' : 'in'; } else if (ws.length) graph.wires = wires.filter((w) => w.to !== n.id); if (n.params) delete n.params.when; }
-      else if (n.type === 'always' && (into(n.id).length || p.enabled === false)) n.type = 'alwaysSwitch';
+      if (n.type === 'once') {
+        const ws = into(n.id);
+        if (p.when === 'signal') { n.type = 'filter'; n.params = { op: 'once', value: '0', value2: '1' }; for (const w of ws) w.in = w.in === 'reset' ? 'reset' : 'in'; for (const w of wires) if (w.from === n.id) w.out = 'pass'; }
+        else { if (ws.length) graph.wires = wires.filter((w) => w.to !== n.id); if (n.params) delete n.params.when; }
+      } else if (n.type === 'always' && (into(n.id).length || p.enabled === false)) {
+        n.type = 'timer'; n.params = { interval: 0.016, delay: 0, repeat: true, autoStart: p.enabled !== false };
+        for (const w of wires) { if (w.to === n.id) w.in = w.in === 'disable' ? 'stop' : 'start'; if (w.from === n.id) w.out = 'tick'; }
+      }
     }
     try { Object.defineProperty(graph, '_mig3', { value: true, enumerable: false }); } catch { /* frozen */ } return graph;
   };

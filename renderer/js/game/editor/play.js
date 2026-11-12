@@ -33,7 +33,7 @@
     async start() {
       const my = ++this.token; this.sense && this.sense.destroy(); this.paused = false; this.pb && (this.pb.textContent = '⏸ Pause');
       try {
-        this.chan = { token: VX.channel.token(), origin: VX.channel.origin() }; const html = await VX.gameExport.toHTML(this.ctx.project(), { channel: this.chan }); if (my !== this.token) return;
+        this.chan = { token: VX.channel.token(), origin: VX.channel.origin() }; const html = await VX.gameExport.toHTML(this.ctx.project(), { channel: this.chan, live: !!this.ctx.onLive }); if (my !== this.token) return;
         this.frame.srcdoc = html; this.layout(); this.frame.onload = () => { this.send('debug', this.debug); this.send('mute', this.muted); if (this.ctx.onLive) for (const ms of [0, 400, 1200, 2500]) setTimeout(() => { if (my === this.token) this.send('live', true); }, ms); this.frame.focus(); };
         this.ctx.onLog && this.ctx.onLog('info', '▶ Game started');
       } catch (e) { this.ctx.onLog && this.ctx.onLog('error', 'Could not start: ' + e.message); VX.ui.toast('Could not start game: ' + e.message, 'error'); }

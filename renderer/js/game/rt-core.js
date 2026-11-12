@@ -174,7 +174,7 @@
     /* ----- lifecycle ----- */
     /** opts.hold: build the scene and draw it, but do not run any blocks (Once, Always, timers…) until release() – used while a loading page is still covering the game. */
     start(container, opts = {}) {
-      this.holding = !!opts.hold;
+      this.holding = !!opts.hold; if (window.__VX_LIVE && window.__VX_CH) { this.liveOn = true; clearInterval(this._liveT); this._liveT = setInterval(() => VXRT.liveFlush(this), 140); } /* editor live view: record from the very first block so start-up blocks (Once) show too */
       this.container = container; container.classList.add('vx-root');
       container.style.cssText += ';position:relative;overflow:hidden;background:' + this.settings.bg + ';user-select:none;-webkit-user-select:none;touch-action:none';
       this.stageEl = document.createElement('div'); this.stageEl.style.cssText = 'position:absolute;inset:0;display:grid;place-items:center'; container.append(this.stageEl);

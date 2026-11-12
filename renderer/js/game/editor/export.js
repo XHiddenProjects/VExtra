@@ -39,7 +39,7 @@
 <meta name="generator" content="Vextra Studio"><title>${title}</title>
 <style>html,body{margin:0;height:100%;background:${bg};overflow:hidden;overscroll-behavior:none}#vx-game{position:fixed;inset:0;width:100%;height:100%}${LD.css}</style><script>${LD.script}</script></head>
 <body><div id="vx-game"></div>${LD.html}
-<script>window.VXRT = window.VXRT || {};${opts.channel ? `window.__VX_CH = ${VX.jsLit({ token: String(opts.channel.token), origin: String(opts.channel.origin) })};` : ''}${opts.cloudUrl ? `window.VX_CLOUD = { url: ${VX.jsLit(opts.cloudUrl)} };` : ''}</script>
+<script>window.VXRT = window.VXRT || {};${opts.channel ? `window.__VX_CH = ${VX.jsLit({ token: String(opts.channel.token), origin: String(opts.channel.origin) })};${opts.live ? 'window.__VX_LIVE = true;' : ''}` : ''}${opts.cloudUrl ? `window.VX_CLOUD = { url: ${VX.jsLit(opts.cloudUrl)} };` : ''}</script>
 <script type="module">
 const DATA = ${json};
 ${has3d ? `const THREE_SRC = ${lit(threeSrc)};
