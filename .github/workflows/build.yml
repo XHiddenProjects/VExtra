@@ -1,9 +1,14 @@
-name: build
+name: release-build
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'GitHub Release ID to attach assets to'
+        required: true
+        type: string
 
 jobs:
   build:
@@ -54,8 +59,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'See the assets to download this version.'
-          releaseDraft: true
-          args: ${{ matrix.args }}
+          tagName: v${{ github.event.release.tag_name || inputs.release_id }}
+          releaseId: ${{ github.event.release.id || inputs.release_id }}
+          args: ${{ matrix.args }}   
