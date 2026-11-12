@@ -1,6 +1,7 @@
 /* Vextra blocks – 4. Properties (15): read and change the attributes of an object. */
 (function () {
   const VXRT = window.VXRT, U = VXRT.util, B = VXRT.registerBlock, P = VXRT.P, each = VXRT.each;
+  const fail = (n, g, e) => { const m = (e && e.message) || String(e); g.send(n, 'error', m); try { g.log('warn', '[' + n.def.label + '] ' + m); } catch { /* no log */ } };
   const is3 = (g) => g.dim === '3d';
   const blank = (s) => s === '' || s === undefined || s === null || (typeof s === 'string' && Number.isNaN(parseFloat(s)));
   const pv = (s) => (blank(s) ? null : parseFloat(s));
@@ -20,6 +21,24 @@
   B({ id: 'alpha', cat: 'properties', label: 'Alpha', desc: 'Transparency: 1 = solid, 0 = invisible. Fade things in and out with a transition time.',
     inputs: ['in'], outputs: ['out'], params: [P.target(), P.sel('mode', 'Mode', [['set', 'Set to'], ['add', 'Add'], ['multiply', 'Multiply by']]), P.num('value', 'Value', 0.5, { min: -1, max: 1, step: 0.05 }), SRC([['signal', 'The incoming number']]), ...TW],
     onInput(n, port, v, g) { each(n, g, (o) => { const a = n.p.source === 'signal' ? U.num(v) : U.num(n.p.value); setv(n, o, 'alpha', n.p.mode, a); g.send(n, 'out', o.alpha); }); } });
+
+  B({ id: 'modelAnimation', cat: 'properties', label: 'Model Animation', desc: 'Plays the animations inside a 3D model (.glb / .gltf with a skeleton or animation clips – walk, run, idle, open…). "play" starts the clip, "stop" ends it, "pause" / "resume" freeze and continue it. Leave Clip empty for the first one, or type its name or number. "clips" sends the list of clips the model contains (e.g. "Idle, Walk, Run"), "started" and "finished" send the clip name (finished fires for non-looping clips).',
+    inputs: ['play', 'stop', 'pause', 'resume'], outputs: ['started', 'finished', 'clips', 'error'],
+    params: [P.target(), P.text('clip', 'Clip name or number', '', { hint: 'empty = first clip' }), P.bool('loop', 'Loop', true), P.num('speed', 'Speed', 1, { min: -4, max: 4, step: 0.1 }), P.num('fade', 'Blend time (s)', 0.2, { min: 0, max: 5, step: 0.05 }), P.bool('auto', 'Play when the game starts', false)],
+    init(n) { n.st.todo = n.p.auto ? 'play' : null; n.st.wait = 0; },
+    onInput(n, port, v, g) { n.st.todo = port; n.st.wait = 0; },
+    update(n, dt, g) {
+      if (!n.st.todo) return; let pending = false, any = false;
+      each(n, g, (o) => {
+        any = true; const an = o.obj3d && o.obj3d.userData.vxAnim; if (!an) { pending = true; return; }
+        an.onFinish = (name) => g.send(n, 'finished', name);
+        if (!n.st.listed) { n.st.listed = true; g.send(n, 'clips', an.names.join(', ')); }
+        if (n.st.todo === 'play') { const r = an.play(n.p.clip, n.p.loop !== false, U.num(n.p.speed, 1), U.num(n.p.fade, 0.2)); if (r === null) fail(n, g, 'no clip "' + (n.p.clip || '1') + '" – the model has: ' + an.names.join(', ')); else g.send(n, 'started', r); }
+        else if (n.st.todo === 'stop') an.stop(); else if (n.st.todo === 'pause') an.pause(true); else if (n.st.todo === 'resume') an.pause(false);
+      });
+      if (!any) { n.st.todo = null; return; }
+      if (pending) { n.st.wait += dt; if (n.st.wait > 6) { n.st.todo = null; fail(n, g, 'the model has no animations (or is still loading)'); } } else n.st.todo = null;
+    } });
 
   B({ id: 'size', cat: 'properties', label: 'Size', desc: 'Changes width / height (and depth in 3D). Leave empty to keep an axis. "Multiply by" scales relative to the current size.',
     inputs: ['in'], outputs: ['out', 'w', 'h', 'd'], params: [P.target(), P.sel('mode', 'Mode', [['set', 'Set to'], ['add', 'Add'], ['multiply', 'Multiply by']]), P.text('w', 'Width', ''), P.text('h', 'Height', ''), P.text('d', 'Depth (3D)', ''), P.bool('uniform', 'Use the Width value for all axes', false), SRC([['signal', 'The incoming number (all axes)']]), ...TW],

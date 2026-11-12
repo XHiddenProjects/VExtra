@@ -2,7 +2,7 @@
  * The browser always shows its own device picker, so Connect has to be triggered by a click / key / touch. Unsupported browsers (Safari, Firefox) send "error". */
 (function () {
   const VXRT = window.VXRT, U = VXRT.util, B = VXRT.registerBlock, P = VXRT.P;
-  const fail = (n, g, e) => { const m = (e && e.message) || String(e); g.send(n, 'error', m); try { g.log('warn', '[bluetooth] ' + m); } catch { /* no log */ } };
+  const fail = (n, g, e) => { let m = (e && e.message) || String(e); if (/permissions? policy|disallowed/i.test(m)) m = 'Bluetooth is blocked for this page. If the game is embedded in another page, add allow="bluetooth" to its <iframe>; the Studio Play tab and exported games opened directly allow it. (' + m + ')'; else if (e && e.name === 'NotFoundError') m = 'No device was chosen (the picker was closed or nothing matched the filter)'; else if (e && e.name === 'SecurityError') m = 'Bluetooth needs a click or key press to start, and a secure page (https or localhost)'; g.send(n, 'error', m); try { g.log('warn', '[bluetooth] ' + m); } catch { /* no log */ } };
   const BT = () => (typeof navigator !== 'undefined' ? navigator.bluetooth : null);
   /** Shared connection table per game: key (the "Device name" you type on every Bluetooth block) -> { dev, server, chars }. */
   const table = (g) => (g._bt || (g._bt = {}));

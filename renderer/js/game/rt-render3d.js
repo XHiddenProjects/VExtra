@@ -31,7 +31,7 @@
     const b = g.boundingBox, s = 1 / Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z, 1e-6); g.translate(-(b.max.x + b.min.x) / 2, -(b.max.y + b.min.y) / 2, -(b.max.z + b.min.z) / 2); g.scale(s, s, s); return g;
   };
 
-  /* ---------- glTF 2.0 / GLB (static meshes, materials and textures; no skins, animation, Draco or Meshopt) ---------- */
+  /* ---------- glTF 2.0 / GLB: the small built-in reader below handles static meshes; when three's GLTFLoader kit is present (editor and exports that contain models) the full loader is used: skeletons, animations, morph targets, Draco and Meshopt ---------- */
   const GL_CT = { 5120: [Int8Array, 1], 5121: [Uint8Array, 1], 5122: [Int16Array, 2], 5123: [Uint16Array, 2], 5125: [Uint32Array, 4], 5126: [Float32Array, 4] }, GL_N = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
   const b64bytes = (b64) => { const bin = atob(b64), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
   const dataUri = (u) => { const m = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(u); if (!m) throw new Error('only embedded (data:) files are supported – export the glTF as a single .glb'); return { mime: m[1], bytes: m[2] ? b64bytes(m[3]) : new TextEncoder().encode(decodeURIComponent(m[3])) }; };
@@ -98,6 +98,50 @@
     root.updateMatrixWorld(true); const box = new T.Box3().setFromObject(root); if (box.isEmpty()) throw new Error('the model has no meshes');
     const sz = new T.Vector3(), c = new T.Vector3(); box.getSize(sz); box.getCenter(c); const k = 1 / Math.max(sz.x, sz.y, sz.z, 1e-6), wrap = new T.Group(); root.position.sub(c); const holder = new T.Group(); holder.add(root); holder.scale.setScalar(k); wrap.add(holder); return wrap;
   };
+  /* ---------- full glTF loader (VXGLTF = GLTFLoader + SkeletonUtils + Draco + Meshopt, bundled by scripts/vendor.js) ---------- */
+  const glbEntries = new WeakMap();
+  /** Which compression a model uses – the export only embeds the (large) Draco decoder when a model needs it. */
+  VXRT.glbExtensions = function (as) { try { const json = as.kind === 'glb' ? VXRT.glbChunks(VXRT.glbBytes(as)).json : JSON.parse(as.text || '{}'); return { used: json.extensionsUsed || [], draco: (json.extensionsUsed || []).includes('KHR_draco_mesh_compression'), meshopt: (json.extensionsUsed || []).includes('EXT_meshopt_compression'), skins: (json.skins || []).length, animations: (json.animations || []).length, morphs: (json.meshes || []).some((m) => (m.primitives || []).some((p) => p.targets)) }; } catch { return { used: [], draco: false, meshopt: false, skins: 0, animations: 0, morphs: false }; } };
+  const dracoLib = async (url, type) => {
+    const emb = window.VXDRACO; const wasm = /\.wasm$/.test(url);
+    if (emb) { if (!wasm) return emb.js; const bin = atob(emb.wasm), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8.buffer; }
+    const r = await fetch((window.VXDRACO_BASE || 'vendor/three/draco/') + (wasm ? 'draco_decoder.wasm' : 'draco_wasm_wrapper.js')); if (!r.ok) throw new Error('the Draco decoder is missing (' + r.status + ')'); return type === 'arraybuffer' ? r.arrayBuffer() : r.text();
+  };
+  /** Starts (once) loading a .glb / .gltf asset with the full loader. Returns { ready, scene, animations, error, promise } or null when the loader kit is not available. */
+  VXRT.glbLoad = function (as) {
+    if (glbEntries.has(as)) return glbEntries.get(as); const K = window.VXGLTF; if (!K) return null;
+    const ent = { ready: false, scene: null, animations: [], error: null, promise: null }; glbEntries.set(as, ent);
+    ent.promise = new Promise((res) => {
+      const ok = (gltf) => { ent.scene = gltf.scene || (gltf.scenes && gltf.scenes[0]); ent.animations = gltf.animations || []; ent.ready = !!ent.scene; if (!ent.ready) ent.error = new Error('the model has no scene'); res(ent); };
+      const bad = (e) => { ent.error = e instanceof Error ? e : new Error(String((e && e.message) || e)); res(ent); };
+      try {
+        const L = new K.GLTFLoader(); L.setMeshoptDecoder(K.MeshoptDecoder);
+        const x = VXRT.glbExtensions(as); if (x.draco) { const d = new K.DRACOLoader(); d._loadLibrary = dracoLib; d.setWorkerLimit(2); L.setDRACOLoader(d); }
+        if (as.kind === 'glb') L.parse(VXRT.glbBytes(as).slice(0), '', ok, bad); else L.parse(as.text || '{}', '', ok, bad);
+      } catch (e) { bad(e); }
+    });
+    return ent;
+  };
+  /** Loads every model of a project up front (used by exported games so nothing pops in). */
+  VXRT.preloadModels = function (assets) { const list = Object.values((assets && assets.models) || {}).filter((m) => m && (m.kind === 'glb' || m.kind === 'gltf')); return Promise.all(list.map((m) => { const e = VXRT.glbLoad(m); return e ? e.promise : null; })); };
+  /** Animation helper put on the object's 3D root: obj3d.userData.vxAnim */
+  const makeAnim = (T, root, ent) => {
+    const mixer = new T.AnimationMixer(root), clips = ent.animations, api = { mixer, names: clips.map((c, i) => c.name || 'clip' + (i + 1)), current: null, speed: 1, paused: false, onFinish: null };
+    const find = (q) => { q = String(q ?? '').trim(); if (!q) return 0; if (/^\d+$/.test(q) && +q < clips.length && !api.names.includes(q)) return +q; const i = api.names.findIndex((n) => n.toLowerCase() === q.toLowerCase()); return i >= 0 ? i : api.names.findIndex((n) => n.toLowerCase().includes(q.toLowerCase())); };
+    api.play = (name, loop, speed, fade) => { const i = find(name); if (i < 0 || !clips[i]) return null; const a = mixer.clipAction(clips[i]); a.reset(); a.setLoop(loop === false ? T.LoopOnce : T.LoopRepeat, Infinity); a.clampWhenFinished = true; a.timeScale = Number.isFinite(speed) ? speed : 1; a.paused = false; const prev = api.current; if (prev && prev !== a) { if (fade > 0) { a.play(); prev.crossFadeTo(a, fade, false); } else { prev.stop(); a.play(); } } else a.play(); api.current = a; api.paused = false; return api.names[i]; };
+    api.stop = () => { mixer.stopAllAction(); api.current = null; };
+    api.pause = (on) => { api.paused = on; if (api.current) api.current.paused = on; };
+    mixer.addEventListener('finished', (e) => { if (api.onFinish) api.onFinish(e.action.getClip().name || ''); });
+    return api;
+  };
+  const attachGLTF = (T, g, ent) => {
+    const K = window.VXGLTF, clone = K.SkeletonUtils.clone(ent.scene); clone.updateMatrixWorld(true);
+    clone.traverse((c) => { if (c.isMesh || c.isSkinnedMesh) { c.castShadow = c.receiveShadow = true; c.userData.keepColor = true; if (c.isSkinnedMesh) c.frustumCulled = false; } });
+    const box = new T.Box3().setFromObject(clone); if (box.isEmpty()) throw new Error('the model has no meshes'); const sz = new T.Vector3(), ct = new T.Vector3(); box.getSize(sz); box.getCenter(ct);
+    const k = 1 / Math.max(sz.x, sz.y, sz.z, 1e-6), holder = new T.Group(), wrap = new T.Group(); clone.position.sub(ct); holder.add(clone); holder.scale.setScalar(k); wrap.add(holder); g.add(wrap);
+    if (ent.animations.length) { let top = g; while (top.parent) top = top.parent; top.userData.vxAnim = makeAnim(T, clone, ent); g.userData.vxAnim = top.userData.vxAnim; }
+  };
+  const placeholder = (T) => new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0x8899bb, wireframe: true, transparent: true, opacity: 0.35 }));
   const glbMem = new WeakMap();
   VXRT.glbBytes = function (as) { if (glbMem.has(as)) return glbMem.get(as); const d = String(as.data || ''), i = d.indexOf(','), u8 = b64bytes(i >= 0 ? d.slice(i + 1) : d), buf = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength); glbMem.set(as, buf); return buf; };
   /** Voxel model -> merged geometry with per-vertex colours, hidden faces culled. */
@@ -194,7 +238,7 @@
     } else if (o.type === 'camera' || o.type === 'empty') { root = new T.Group(); }
     else if (o.type === 'model') {
       const as = (env.assets || (env.data && env.data.assets) || {}).models?.[p.model]; root = new T.Group();
-      if (as) { const part = buildModel(T, as, o, env); root.add(part); }
+      if (as) { const part = buildModel(T, as, o, env); root.add(part); if (part.userData.vxAnim) root.userData.vxAnim = part.userData.vxAnim; }
       else { const m = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshStandardMaterial({ color: '#ff5577', wireframe: true })); root.add(m); }
     } else if (o.type === 'text') {
       /* 3D text: a flat plane showing the text (kept up to date every frame, so {score} etc. work). Great for VR / AR, where the screen HUD is not visible. */
@@ -212,8 +256,14 @@
     if (as.kind === 'voxel') { const geo = VXRT.voxelGeometry(T, as); const mat = makeMaterial(T, o, env, true); const m = new T.Mesh(geo, mat); m.userData.baseMat = mat; m.castShadow = m.receiveShadow = true; g.add(m); }
     else if (as.kind === 'obj') { const geo = VXRT.parseOBJ(T, as.text || ''); const mat = makeMaterial(T, o, env); const m = new T.Mesh(geo, mat); m.userData.baseMat = mat; m.castShadow = m.receiveShadow = true; g.add(m); }
     else if (as.kind === 'glb' || as.kind === 'gltf') {
-      try { let json, bin = null; if (as.kind === 'glb') { const c = VXRT.glbChunks(VXRT.glbBytes(as)); json = c.json; bin = c.bin; } else json = JSON.parse(as.text || '{}'); g.add(VXRT.buildGLTF(T, json, bin)); }
-      catch (e) { console.warn('3D model "' + (as.name || '') + '" could not be loaded: ' + e.message); const m = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0xff3366, wireframe: true })); g.add(m); }
+      const ent = VXRT.glbLoad(as), fallback = () => {
+        try { let json, bin = null; if (as.kind === 'glb') { const c = VXRT.glbChunks(VXRT.glbBytes(as)); json = c.json; bin = c.bin; } else json = JSON.parse(as.text || '{}'); g.add(VXRT.buildGLTF(T, json, bin)); }
+        catch (e) { console.warn('3D model "' + (as.name || '') + '" could not be loaded: ' + e.message); g.add(new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0xff3366, wireframe: true }))); }
+      };
+      if (!ent) fallback();
+      else if (ent.ready) { try { attachGLTF(T, g, ent); } catch (e) { console.warn('3D model "' + (as.name || '') + '": ' + e.message); fallback(); } }
+      else if (ent.error) { console.warn('3D model "' + (as.name || '') + '" could not be loaded: ' + ent.error.message); fallback(); }
+      else { const ph = placeholder(T); g.add(ph); ent.promise.then(() => { g.remove(ph); if (ent.ready) { try { attachGLTF(T, g, ent); return; } catch (e) { console.warn('3D model "' + (as.name || '') + '": ' + e.message); } } else console.warn('3D model "' + (as.name || '') + '" could not be loaded: ' + (ent.error && ent.error.message)); fallback(); }); }
     }
     else if (as.kind === 'group') {
       for (const part of as.parts || []) {
@@ -284,7 +334,7 @@
     const T = g.THREE; if (!g.renderer3d || !g.scene3d) return; const c = g.cam3d, cam = g.camera3d;
     // sync objects
     for (const o of g.objects) {
-      if (!o.obj3d) continue; VXRT.syncTransform3D(T, o); if (o.type === 'text' && o.obj3d.userData.txt) VXRT.refreshText3D(g, o); const vis = o.visible && o.enabled; if (o.obj3d.visible !== vis) o.obj3d.visible = vis;
+      if (!o.obj3d) continue; VXRT.syncTransform3D(T, o); if (o.type === 'text' && o.obj3d.userData.txt) VXRT.refreshText3D(g, o); { const an = o.obj3d.userData.vxAnim; if (an && !g.paused) an.mixer.update(dt * (an.speed || 1)); } const vis = o.visible && o.enabled; if (o.obj3d.visible !== vis) o.obj3d.visible = vis;
       if (o.dirty3d) { o.dirty3d = false; if (o.obj3d) { g.scene3d.remove(o.obj3d); VXRT.onObjectAdded(g, o); } continue; }
       if (o.obj3d.isMesh || o.obj3d.type === 'Group') o.obj3d.traverse((m) => {
         if (!m.isMesh) return; const mat = m.userData.baseMat; if (mat) {

@@ -38,6 +38,8 @@
   import { OrbitControls } from './vendor/three/OrbitControls.js';
   import { TransformControls } from './vendor/three/TransformControls.js';
   window.THREE = THREE; window.VX_THREE = { OrbitControls, TransformControls };
+  /* full glTF loader (skeletons, animations, Draco, Meshopt) – small, read by the model viewer and the game preview */
+  await new Promise((res) => { const sc = document.createElement('script'); sc.src = './vendor/three/gltf-kit.min.js'; sc.onload = sc.onerror = res; document.head.append(sc); });
   window.dispatchEvent(new Event('three-ready'));
 </script>
 <!-- core -->
@@ -87,6 +89,7 @@
 <script src="js/game/editor/graph-editor.js"></script>
 <script src="js/game/editor/viewport2d.js"></script>
 <script src="js/game/editor/viewport3d.js"></script>
+<script src="js/game/editor/model-import.js"></script>
 <script src="js/game/editor/assets.js"></script>
 <script src="js/game/editor/sprite-editor.js"></script>
 <script src="js/game/editor/sound-editor.js"></script>
@@ -99,6 +102,7 @@
 <script src="js/game/editor/examples/examples-2d.js"></script>
 <script src="js/game/editor/examples/examples-3d.js"></script>
 <script src="js/game/editor/examples/examples-xr.js"></script>
+<script src="js/game/editor/examples/examples-model.js"></script>
 <script src="js/game/editor/play.js"></script>
 <script src="js/game/editor/loader.js"></script>
 <script src="js/game/editor/export.js"></script>

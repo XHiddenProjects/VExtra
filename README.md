@@ -39,7 +39,13 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
-## What's new in 3.9.0
+## What's new in 3.10.0
+- **Skeletons, animations, Draco and Meshopt** in 3D models, plus a **Model Animation** block to play clips.
+- **Import from other tools:** FBX (Mixamo, Maya, 3ds Max…), Collada, STL, PLY, 3MF → game-ready `.glb`.
+- A **Blender add-on** (`tools/blender-addon`) and a **model optimizer** (`tools/model-optimize`).
+- Bluetooth now works in the Play tab (permission fix).
+
+## What was new in 3.9.0
 - **GLB / glTF models** – import 3D models from Blender and others in Assets → Models.
 - **A demo video for every block** in the documentation.
 - **Voice commands can use a local model** (Whisper server on your computer) **or a cloud service**, like the AI plugin.

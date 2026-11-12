@@ -28,6 +28,10 @@
     const has3d = data.scenes.some((s) => s.dim === '3d'); const base = opts.base || '';
     const scripts = []; for (const f of RT_FILES) scripts.push(`/* ${f} */\n` + safeScript(await src(base + 'js/game/' + f + '.js')));
     let threeSrc = ''; if (has3d) threeSrc = await src(base + 'vendor/three/three.module.min.js');
+    /* models: the glTF toolkit (skeletons, animation, Meshopt) is embedded only when a model exists; the Draco decoder only when a model is Draco-compressed */
+    const models = has3d ? Object.values((data.assets && data.assets.models) || {}).filter((m) => m && (m.kind === 'glb' || m.kind === 'gltf')) : [];
+    const exts = models.map((m) => window.VXRT && VXRT.glbExtensions ? VXRT.glbExtensions(m) : { draco: false });
+    let kitSrc = '', dracoLit = ''; if (models.length) { kitSrc = await src(base + 'vendor/three/gltf-kit.min.js'); if (exts.some((e) => e.draco)) { const js = await src(base + 'vendor/three/draco/draco_wasm_wrapper.js'); const r = await fetch(base + 'vendor/three/draco/draco_decoder.wasm'); if (!r.ok) throw new Error('Could not load the Draco decoder (' + r.status + ')'); const u8 = new Uint8Array(await r.arrayBuffer()); let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); dracoLit = lit({ js, wasm: btoa(bin) }); } }
     const title = esc(data.settings.title || 'Vextra game'); const json = lit(data);
     const bg = esc(data.settings.bg || '#10131a'); const LD = VX.gameLoader.build(data, { channel: opts.channel });
     return `<!doctype html>
@@ -40,7 +44,9 @@
 const DATA = ${json};
 ${has3d ? `const THREE_SRC = ${lit(threeSrc)};
 const url = URL.createObjectURL(new Blob([THREE_SRC], { type: 'text/javascript' }));
-window.THREE = await import(url);` : ''}
+window.THREE = await import(url);${kitSrc ? `
+(0, eval)(${lit(kitSrc)});` : ''}${dracoLit ? `
+window.VXDRACO = ${dracoLit};` : ''}` : ''}
 const RT = ${lit(scripts.join("\n;\n"))};
 (0, eval)(RT);
 const VXL = window.__vxl;
@@ -51,6 +57,7 @@ try {
   /* decode every sprite frame first, so the game starts with its pictures ready */
   const pics = []; for (const sp of Object.values((DATA.assets && DATA.assets.sprites) || {})) for (const f of (sp.frames || [])) if (typeof f === 'string' && f.indexOf('data:image/') === 0) pics.push(f);
   let done = 0; await Promise.all(pics.map((src) => new Promise((res) => { const im = new Image(); im.onload = im.onerror = () => { done++; VXL.set(0.5 + 0.4 * done / pics.length); res(); }; im.src = src; })));
+  if (window.VXGLTF && VXRT.preloadModels) { try { await VXRT.preloadModels(DATA.assets); } catch (e) { console.warn(e); } }
   await VXL.finish();
   g.start(document.getElementById('vx-game')); VXL.hide();
   window.addEventListener('error', (e) => g.log('error', e.message));

@@ -5,11 +5,12 @@
 | Version | Supported |
 | ------- | --------- |
 | 3.9.x   | ✅ security fixes (current) |
-| 3.8.x   | ⚠️ please upgrade to 3.9.x |
-| 3.7.x   | ⚠️ please upgrade to 3.9.x |
+| 3.9.x   | ✅ security fixes |
+| 3.8.x   | ⚠️ please upgrade to 3.10.x |
+| 3.7.x   | ⚠️ please upgrade to 3.10.x |
 | 3.6.x and older | ❌ please upgrade |
 
-Current version: **3.9.0** (see `VERSION`). This policy was last reviewed for 3.9.0.
+Current version: **3.10.0** (see `VERSION`). This policy was last reviewed for 3.10.0.
 
 ## Reporting a vulnerability
 
@@ -46,6 +47,12 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.10.0 notes
+- **Model loaders:** `.glb` / `.gltf` are parsed by three.js' official GLTFLoader (bundled, no network access, no external URIs – only data inside the file). Draco and Meshopt are decoded by their official WebAssembly decoders; Draco runs in a Web Worker created from a Blob and fed only the file's bytes. Files over 40 MB are refused.
+- **Importing other formats (FBX, DAE, STL, PLY, 3MF):** the readers run only in the editor, are loaded on demand, and the result is re-saved as an ordinary `.glb`; they are never included in exported games. Imports are limited to 60 MB. Textures that would need a file path or URL are dropped, so an imported file can never make the editor fetch anything.
+- **Bluetooth permission:** the Play frame is allowed to ask for *bluetooth* (and usb / serial / hid); the browser still shows its own picker and nothing is paired without a click.
+- **Blender add-on / optimizer script:** plain, readable scripts. The add-on only calls Blender's own glTF exporter; the optimizer runs `npx @gltf-transform/cli` (downloaded from npm on first use) – read it before running.
 
 ## v3.9.0 notes
 - **Bluetooth blocks** use Web Bluetooth: the browser always shows its own picker (needs a click / key / touch and https or localhost), a game can only reach the device you choose and the services listed in the block, and nothing pairs in the background. Connections are closed when the game stops.

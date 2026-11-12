@@ -255,9 +255,35 @@ Design sound effects without any files: choose a wave (square, saw, triangle, si
 
 - **Voxel models** – paint cubes in a 3D grid with a colour palette. Perfect for characters and props.
 - **Shape groups** – combine primitives (cube, sphere, cylinder…) with position, rotation, scale and colour per part.
-- **OBJ import** – bring in \`.obj\` meshes or \`.glb\` / \`.gltf\` models (colours, textures, normal and emissive maps, transparency – scaled to fit a unit cube; no skeletons, animation or Draco compression).
+- **OBJ import** – bring in \`.obj\` meshes or \`.glb\` / \`.gltf\` models (colours, textures, normal and emissive maps, transparency – scaled to fit a unit cube). **.glb / .gltf keep their skeleton, skin, animation clips and morph targets, and Draco / Meshopt compressed files load too.** FBX, Collada (.dae), STL, PLY and 3MF are converted to .glb when you import them – see *3D models from other tools* below.
 
 Then use the model in 3D scenes with the **Model** object type.
+
+## 3D models from other tools
+
+Vextra's model format is **glTF (.glb)** – the "JPEG of 3D" that every tool exports. Import with *Assets → Models → Import*:
+
+| Tool / source | How to get a model in |
+|---|---|
+| **Blender** | Install the add-on in \`tools/blender-addon/vextra_tools.py\` (Preferences → Add-ons → Install). Then *File → Export → Vextra game model* (or the *Vextra* tab in the 3D view sidebar): skeletons, animations and shape keys are kept, Draco compression is on by default, and *Check game budget* counts triangles, bones and textures first. Without the add-on use *File → Export → glTF 2.0 (.glb)*. |
+| **Maya, 3ds Max, Cinema 4D, Unity, Unreal** | Export **FBX** (embed media for textures) or glTF and import it. FBX is converted to .glb automatically. |
+| **Mixamo** | Download the character as **FBX (.fbx)** with skin, and animations as FBX too; import – bones and clips are kept. Use the *Model Animation* block to play them. |
+| **Sketchfab, Poly Pizza, Kenney, Quaternius** | Download the **glTF / GLB** version. |
+| **CAD / 3D printing (Fusion, Onshape, Tinkercad)** | Export **STL** or **3MF**; imported as a plain-colour mesh. |
+| **Scans, MagicaVoxel exporters** | **PLY** (with vertex colours) or OBJ. |
+| **Collada (.dae)** | Imported and converted to .glb. |
+
+Notes: textures must be **embedded** in the file (GLB, or FBX/DAE exported with embedded media) – texture files left next to the original are dropped and the material keeps its colour. Y is up in Vextra; CAD formats (STL / 3MF) are often Z-up, so rotate the Model object 90° if it lies on its back.
+
+### Playing animations
+Add a **Model Animation** block next to your Model object. Leave *Clip* empty for the first one or type a clip name; \`clips\` tells you what the file contains, \`started\` / \`finished\` send the clip name, and *Blend time* cross-fades from the previous clip. The Assets preview already plays the first clip.
+
+### Making files smaller
+Large models make big project and export files. Compress them once:
+\`\`\`
+node tools/model-optimize/optimize.js hero.glb hero-small.glb --compress meshopt --texture-size 1024 --webp
+\`\`\`
+(or \`--compress draco\`). Both compressed forms load in the editor and in exported games; the 300 KB Draco decoder is embedded in an export only when a model needs it.
 
 ## Using assets
 

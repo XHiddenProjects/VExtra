@@ -2,7 +2,22 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.9.0] — current
+## [3.10.0] — current
+
+### Added
+- **Skeletons and animations in 3D models:** `.glb` / `.gltf` now keep their skins, bones, animation clips and morph targets (powered by three.js' own glTF loader, bundled with Vextra). The Assets preview plays the first clip.
+- **Draco and Meshopt compression:** compressed `.glb` files load in the editor, the Play tab and exported games. The Draco decoder is embedded in an export only if a model uses Draco; the loader toolkit only if the game has models.
+- **Model Animation block (Properties):** play / stop / pause / resume a model's clips by name or number, with loop, speed and blend time; outputs `started`, `finished`, `clips` (the list of clips in the file) and `error`. Has a demo clip.
+- **Import FBX, Collada (.dae), STL, PLY and 3MF:** converted to a game-ready `.glb` on import, keeping skeletons and animations (Mixamo, Maya, 3ds Max, Cinema 4D, CAD tools…). The converters load only when you import such a file and never ship in a game.
+- **Blender add-on** (`tools/blender-addon/vextra_tools.py`): *File → Export → Vextra game model* and a *Vextra* sidebar tab with one-click export to your project folder, Draco on by default, animations, and a *Check game budget* report (triangles, bones, textures).
+- **Model optimizer** (`tools/model-optimize/optimize.js`): dedupe, Draco / Meshopt compression and texture shrinking (optionally WebP) using the open-source glTF-Transform CLI.
+- **Example game *Animated Model (skeleton + Draco)*** and a docs section *3D models from other tools* (Blender, Maya, 3ds Max, Cinema 4D, Mixamo, Sketchfab, CAD…).
+- Sample-model generator `tools/model-samples/make-samples.js`.
+
+### Fixed
+- **Bluetooth in the Play tab:** the game frame did not grant the *bluetooth* permission ("Access to the feature "bluetooth" is disallowed by permissions policy"). It does now (also usb / serial / hid), and Bluetooth errors explain what to do.
+
+## [3.9.0]
 
 ### Added
 - **GLB / glTF models:** import `.glb` (or self-contained `.gltf`) in Assets → Models. Meshes, node transforms, base colour, vertex colours, textures, normal / emissive / metal-rough maps and transparency are shown in the editor and in exported games; the model is scaled to a unit cube. Not supported (yet): skeletons, animations, Draco / Meshopt compression.

@@ -606,5 +606,9 @@
  "typewriter": {
   "cap": "Typewriter (plugin) types text one letter at a time. Space starts it.",
   "kb": 17
+ },
+ "modelAnimation": {
+  "cap": "Model Animation plays the clips stored inside a 3D model (skeleton + animation, Draco-compressed here). Space starts “Wave”, N switches to “Nod”; the block also tells which clips exist.",
+  "kb": 39
  }
 }

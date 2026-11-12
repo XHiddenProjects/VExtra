@@ -21,18 +21,22 @@
       this.cam = new T.PerspectiveCamera(45, w / hgt, 0.05, 100); this.cam.position.set(1.8, 1.4, 2.2); this.orbit = new VX_THREE.OrbitControls(this.cam, this.el); this.orbit.addEventListener('change', () => this.draw()); this.orbit.update(); this.obj = null;
     }
     set(asset, project) {
-      const T = this.T; if (this.obj) this.scene.remove(this.obj); this.obj = null; if (!asset) { this.draw(); return; }
+      const T = this.T; this.asset = asset; if (this.obj) this.scene.remove(this.obj); this.obj = null; if (!asset) { this.draw(); return; }
       const env = { assets: { sprites: {}, sounds: {}, models: { m: asset }, materials: {}, ...(project ? { sprites: project.assets.sprites, materials: project.assets.materials || {} } : {}) }, imgs: new Map(), onImageLoad: () => this.draw() };
       try {
         const o = { type: 'model', x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, w: 1, h: 1, d: 1, color: '#ffffff', alpha: 1, material: {}, props: { model: 'm' } };
         this.obj = VXRT.build3D(T, o, env);
         if (asset.kind === 'voxel') { const b = new T.Box3().setFromObject(this.obj); const s = new T.Vector3(); b.getSize(s); const k = 1.6 / Math.max(s.x, s.y, s.z, 1e-6); const c = new T.Vector3(); b.getCenter(c); this.obj.scale.setScalar(k); this.obj.position.set(-c.x * k, -c.y * k, -c.z * k); }
         this.scene.add(this.obj);
+        /* models that still load (or carry animations): redraw when ready and keep playing the first clip */
+        const ent = (asset.kind === 'glb' || asset.kind === 'gltf') && VXRT.glbLoad ? VXRT.glbLoad(asset) : null;
+        if (ent && !ent.ready && !ent.error) ent.promise.then(() => { if (this.asset === asset) this.set(asset, project); });
+        const an = this.obj.userData.vxAnim; if (an) { an.play('', true, 1, 0); this.playing = true; if (!this.looping) { this.looping = true; let last = performance.now(); const tick = (t) => { if (!this.looping) return; const cur = this.obj && this.obj.userData.vxAnim; if (cur && this.playing) { cur.mixer.update(Math.min(0.1, (t - last) / 1000)); this.draw(); } last = t; requestAnimationFrame(tick); }; requestAnimationFrame(tick); } } else this.playing = false;
       } catch (e) { console.warn('preview failed', e); }
       this.draw();
     }
     draw() { this.r.render(this.scene, this.cam); }
-    dispose() { this.orbit.dispose(); this.r.dispose(); }
+    dispose() { this.looping = false; this.orbit.dispose(); this.r.dispose(); }
   }
   VX.ModelPreview = ModelPreview;
 
@@ -92,8 +96,13 @@
       body.append(bar, grid, h('div', { class: 'as-hint' }, kind === 'sounds' ? 'Click to add • double-click to hear it' : 'Click an item to add a copy to this project')); draw();
       VX.ui.modal({ title: 'Default ' + kind, body, wide: true });
     }
+    /** Makes sure a model really loads (skeletons, animations, Draco and Meshopt included) before it is added. */
+    async checkModel(a, f) {
+      if (window.VXGLTF) { const e = VXRT.glbLoad(a); await e.promise; if (e.error) throw e.error; const x = VXRT.glbExtensions(a), bits = [x.skins ? x.skins + ' skeleton' + (x.skins > 1 ? 's' : '') : '', e.animations.length ? e.animations.length + ' animation' + (e.animations.length > 1 ? 's' : '') : '', x.morphs ? 'morph targets' : '', x.draco ? 'Draco compression' : '', x.meshopt ? 'Meshopt compression' : ''].filter(Boolean); if (bits.length) VX.ui.toast('"' + a.name + '": ' + bits.join(', ')); return; }
+      if (a.kind === 'glb') { const chk = VXRT.glbChunks(await f.arrayBuffer()); VXRT.buildGLTF(window.THREE, chk.json, chk.bin); } else VXRT.buildGLTF(window.THREE, JSON.parse(a.text), null);
+    }
     async import() {
-      const kind = this.tab; const accept = kind === 'sprites' ? 'image/*' : kind === 'sounds' ? 'audio/*' : kind === 'materials' ? '.vxmat,.json,.mtl' : kind === 'animations' ? '.vxanim,.json' : kind === 'shaders' ? '.glsl,.frag,.vert,.vxshader,.txt' : '.obj,.glb,.gltf';
+      const kind = this.tab; const accept = kind === 'sprites' ? 'image/*' : kind === 'sounds' ? 'audio/*' : kind === 'materials' ? '.vxmat,.json,.mtl' : kind === 'animations' ? '.vxanim,.json' : kind === 'shaders' ? '.glsl,.frag,.vert,.vxshader,.txt' : '.glb,.gltf,.obj,.fbx,.dae,.stl,.ply,.3mf';
       const files = await VX.pickBrowserFile(accept, true); if (!files || !files.length) return;
       for (const f of files) {
         const name = f.name.replace(/\.[^.]+$/, '');
@@ -103,8 +112,9 @@
           else if (kind === 'materials') { const a = Object.assign({ id: uid('mat'), name, color: '#cccccc', metalness: 0.1, roughness: 0.7 }, VX.parseMaterialFile(await VX.readFileAsText(f), f.name)); a.id = uid('mat'); this.A.materials[a.id] = a; }
           else if (kind === 'animations') { const j = JSON.parse(await VX.readFileAsText(f)); const a = Object.assign({ duration: 1, loop: 'once', tracks: [] }, j, { id: uid('anm'), name: j.name || name }); this.A.animations[a.id] = a; }
           else if (kind === 'shaders') { const a = { id: uid('shd'), name, code: await VX.readFileAsText(f) }; this.A.shaders[a.id] = a; }
-          else if (/\.glb$/i.test(f.name)) { if (f.size > 40e6) throw new Error('file is over 40 MB'); const data = await VX.readFileAsDataURL(f); if (f.size > 8e6) VX.ui.toast('Large model (' + (f.size / 1e6).toFixed(1) + ' MB) – it will bloat the project file', 'warn'); const chk = VXRT.glbChunks(await f.arrayBuffer()); VXRT.buildGLTF(window.THREE, chk.json, chk.bin); const a = { id: uid('mdl'), name, kind: 'glb', data }; this.A.models[a.id] = a; }
-          else if (/\.gltf$/i.test(f.name)) { const text = await VX.readFileAsText(f); VXRT.buildGLTF(window.THREE, JSON.parse(text), null); const a = { id: uid('mdl'), name, kind: 'gltf', text }; this.A.models[a.id] = a; }
+          else if (/\.glb$/i.test(f.name)) { if (f.size > 40e6) throw new Error('file is over 40 MB'); const data = await VX.readFileAsDataURL(f); if (f.size > 8e6) VX.ui.toast('Large model (' + (f.size / 1e6).toFixed(1) + ' MB) – it will bloat the project file', 'warn'); const a = { id: uid('mdl'), name, kind: 'glb', data }; await this.checkModel(a, f); this.A.models[a.id] = a; }
+          else if (VX.modelImport && VX.modelImport.exts.includes((/\.([a-z0-9]+)$/i.exec(f.name) || [])[1]?.toLowerCase())) { if (f.size > 60e6) throw new Error('file is over 60 MB'); const c = await VX.modelImport.convert(f); const a = { id: uid('mdl'), name, kind: 'glb', data: c.data }; await this.checkModel(a, f); if (c.glb.byteLength > 8e6) VX.ui.toast('Large model (' + (c.glb.byteLength / 1e6).toFixed(1) + ' MB after conversion) – it will bloat the project file', 'warn'); this.A.models[a.id] = a; VX.ui.toast('Converted .' + f.name.split('.').pop().toLowerCase() + ' → glb (' + c.info.meshes + ' mesh' + (c.info.meshes === 1 ? '' : 'es') + (c.info.bones ? ', ' + c.info.bones + ' bones' : '') + (c.info.clips ? ', ' + c.info.clips + ' animation' + (c.info.clips > 1 ? 's' : '') : '') + ')' + (c.info.droppedTextures ? ' – ' + c.info.droppedTextures + ' texture file(s) were not embedded in the original, so those materials stay plain colours. Export with embedded textures to keep them.' : '')); }
+          else if (/\.gltf$/i.test(f.name)) { const text = await VX.readFileAsText(f); const a = { id: uid('mdl'), name, kind: 'gltf', text }; await this.checkModel(a, f); this.A.models[a.id] = a; }
           else { const text = await VX.readFileAsText(f); const a = { id: uid('mdl'), name, kind: 'obj', text }; this.A.models[a.id] = a; }
         } catch (e) { VX.ui.toast('Could not import ' + f.name + ': ' + e.message, 'error'); }
       }
