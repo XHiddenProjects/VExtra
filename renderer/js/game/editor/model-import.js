@@ -31,5 +31,10 @@
     if (!(glb instanceof ArrayBuffer)) throw new Error('conversion failed');
     return { name: file.name.replace(/\.[^.]+$/, ''), glb, data: await toDataURL(glb), info: { meshes, bones, clips: animations.length, droppedTextures: dropped } };
   }
-  VX.modelImport = { exts: EXTS, convert };
+  /** Turns a three.js object (a voxel / OBJ model of the project, say) into a .glb ArrayBuffer – used to send those models to Blender. */
+  async function toGLB(obj, animations) {
+    const K = await kit(), glb = await new K.GLTFExporter().parseAsync(obj, { binary: true, animations: animations || [], onlyVisible: false, maxTextureSize: 1024 });
+    if (!(glb instanceof ArrayBuffer)) throw new Error('conversion failed'); return glb;
+  }
+  VX.modelImport = { exts: EXTS, convert, toGLB };
 })();

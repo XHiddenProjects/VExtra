@@ -259,13 +259,27 @@ Design sound effects without any files: choose a wave (square, saw, triangle, si
 
 Then use the model in 3D scenes with the **Model** object type.
 
+## Live link with Blender
+
+The Blender add-on (v1.1) can talk to Vextra directly, so you never export and import by hand:
+
+1. In Blender install \`tools/blender-addon/vextra_tools.py\`, press **N** over the 3D view → **Vextra** tab → **Start link**. The panel shows a *key*.
+2. In Vextra open *Assets → 3D Models → 🟠 Blender*, paste the key and press **Connect**.
+3. **From Blender into the game:** pick *Selected objects*, *The whole scene* or a *Collection* and press **Pull model**. Skeletons, animations and materials come along (rigs of selected meshes are included automatically).
+4. **Linked models:** a pulled model stays linked. With **Auto-sync** on, every change you make in Blender (shape, material, pose, animation) shows up in the game a moment after you stop editing. *Update now* does it by hand; *Unlink* cuts the link.
+5. **From the game into Blender:** choose any model and press **Send to Blender**. It appears in a collection called *Vextra: name*. glb/gltf models stay linked, so what you edit there flows back; voxel, shape-group and OBJ models arrive as a copy.
+
+Right-click a model card for *Send to Blender*, *Update from Blender* and *Unlink*. Auto-sync waits while you are in Edit Mode or playing an animation in Blender, then continues.
+
+The link runs only on this computer (127.0.0.1, port 7788 – change it in the add-on preferences) and every request must carry the key, so nothing else can read or change your Blender scene. It is off until you press *Start link* (or tick *Start the link when Blender starts* in the add-on preferences).
+
 ## 3D models from other tools
 
 Vextra's model format is **glTF (.glb)** – the "JPEG of 3D" that every tool exports. Import with *Assets → Models → Import*:
 
 | Tool / source | How to get a model in |
 |---|---|
-| **Blender** | Install the add-on in \`tools/blender-addon/vextra_tools.py\` (Preferences → Add-ons → Install). Then *File → Export → Vextra game model* (or the *Vextra* tab in the 3D view sidebar): skeletons, animations and shape keys are kept, Draco compression is on by default, and *Check game budget* counts triangles, bones and textures first. Without the add-on use *File → Export → glTF 2.0 (.glb)*. |
+| **Blender** | Install the add-on in \`tools/blender-addon/vextra_tools.py\` (Preferences → Add-ons → Install). Then *File → Export → Vextra game model* (or the *Vextra* tab in the 3D view sidebar): skeletons, animations and shape keys are kept, Draco compression is on by default, and *Check game budget* counts triangles, bones and textures first. Without the add-on use *File → Export → glTF 2.0 (.glb)*. For a **live two-way link** see *Live link with Blender* below. |
 | **Maya, 3ds Max, Cinema 4D, Unity, Unreal** | Export **FBX** (embed media for textures) or glTF and import it. FBX is converted to .glb automatically. |
 | **Mixamo** | Download the character as **FBX (.fbx)** with skin, and animations as FBX too; import – bones and clips are kept. Use the *Model Animation* block to play them. |
 | **Sketchfab, Poly Pizza, Kenney, Quaternius** | Download the **glTF / GLB** version. |

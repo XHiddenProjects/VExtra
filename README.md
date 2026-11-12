@@ -42,7 +42,7 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 ## What's new in 3.10.0
 - **Skeletons, animations, Draco and Meshopt** in 3D models, plus a **Model Animation** block to play clips.
 - **Import from other tools:** FBX (Mixamo, Maya, 3ds Max…), Collada, STL, PLY, 3MF → game-ready `.glb`.
-- A **Blender add-on** (`tools/blender-addon`) and a **model optimizer** (`tools/model-optimize`).
+- A **live Blender link** (`tools/blender-addon`): pull models from Blender, send models to it, auto-sync edits – plus one-click glb export and a **model optimizer** (`tools/model-optimize`).
 - Bluetooth now works in the Play tab (permission fix).
 
 ## What was new in 3.9.0

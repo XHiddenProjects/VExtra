@@ -5,6 +5,7 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 ## [3.10.0] — current
 
 ### Added
+- **Live Blender link:** the Blender add-on (now v1.1) runs a small local server (127.0.0.1 only, pairing key required) and Vextra's *Assets → 3D Models → 🟠 Blender* window uses it to **pull** the selection, a collection or the whole scene from Blender, **send** models to Blender (voxel / group / OBJ / glb / gltf, into a *Vextra: name* collection) and **auto-sync** linked models when they change in Blender (waits for Edit Mode and animation playback to finish, skips identical results, no echo loop). Right-click menu: *Send to Blender*, *Update from Blender*, *Unlink*. Tested against a real Blender 5.0.
 - **Skeletons and animations in 3D models:** `.glb` / `.gltf` now keep their skins, bones, animation clips and morph targets (powered by three.js' own glTF loader, bundled with Vextra). The Assets preview plays the first clip.
 - **Draco and Meshopt compression:** compressed `.glb` files load in the editor, the Play tab and exported games. The Draco decoder is embedded in an export only if a model uses Draco; the loader toolkit only if the game has models.
 - **Model Animation block (Properties):** play / stop / pause / resume a model's clips by name or number, with loop, speed and blend time; outputs `started`, `finished`, `clips` (the list of clips in the file) and `error`. Has a demo clip.
