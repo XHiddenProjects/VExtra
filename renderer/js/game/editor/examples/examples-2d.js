@@ -151,7 +151,7 @@
       done.to(put('state', 'set', 0), 'pass').to(ex('shots <= 0 && targets > 0', 'Out of boulders?')).to(flt('truthy')).to(put('state', 'set', 3), 'pass');
     });
     const targetB = K.bhv(p, 'Target – knock it over', ({ block, ex, put, flt, snd }) => {
-      const gate = block('once', { when: 'signal' });
+      const gate = block('onceGate', {});
       block('collision', { with: 'Boulder', phase: 'enter' }).to(gate); block('sensor', { target: 'self', property: 'vy', op: '>', value: 450, mode: 'edge' }).to(gate); block('sensor', { target: 'self', property: 'y', op: '>', value: 600, mode: 'edge' }).to(gate);
       const kill = gate.to(block('destroyer', { target: 'self', burst: true, color: '#e5484d' })); gate.to(snd('crash'));
       gate.to(put('targets', 'subtract', 1)).to(ex('a <= 0', 'All targets down?'), 'changed').to(flt('truthy')).to(put('state', 'set', 2), 'pass');
@@ -221,7 +221,7 @@
     });
     const gapB = K.bhv(p, 'Gap – build pipes, count score', ({ block, put, snd, flt }) => {
       const s = block('once', { when: 'start' }); s.to(block('spawn', { template: 'Pipe', at: 'self', offsetY: -335, speed: 210, dir: 'left' })); s.to(block('spawn', { template: 'Pipe', at: 'self', offsetY: 335, speed: 210, dir: 'left' }));
-      const pass = block('collision', { with: 'Bird', phase: 'enter' }).to(block('once', { when: 'signal' })); pass.to(put('score', 'add', 1)); pass.to(snd('point'));
+      const pass = block('collision', { with: 'Bird', phase: 'enter' }).to(block('onceGate', {})); pass.to(put('score', 'add', 1)); pass.to(snd('point'));
       block('sensor', { target: 'self', property: 'global:state', op: '==', value: 2, mode: 'edge' }).to(block('velocity', { target: 'self', mode: 'stop' }));
       block('sensor', { target: 'self', property: 'x', op: '<', value: -120, mode: 'edge' }).to(block('destroyer', { target: 'self' }));
     });

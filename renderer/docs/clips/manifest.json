@@ -13,15 +13,15 @@
  },
  "always": {
   "cap": "Always runs every frame while it is enabled. Here it feeds a Spin block, so the box turns without any input.",
-  "kb": 18
+  "kb": 17
  },
  "timer": {
   "cap": "Timer sends a signal every “interval” seconds (here 0.8 s). Wire it to anything that should repeat.",
   "kb": 15
  },
  "once": {
-  "cap": "Once fires a single time – when the scene starts (or after a delay). Perfect for setting things up.",
-  "kb": 13
+  "cap": "Once fires a single time when the game starts (after its delay) and sends 1 from its output. Nothing to connect – the label shows what it sent.",
+  "kb": 15
  },
  "mouseClick": {
   "cap": "Mouse Click fires when the mouse button is clicked – anywhere, or only on this object (set “On” to self). It also sends the click position.",
@@ -610,5 +610,13 @@
  "modelAnimation": {
   "cap": "Model Animation plays the clips stored inside a 3D model (skeleton + animation, Draco-compressed here). Space starts “Wave”, N switches to “Nod”; the block also tells which clips exist.",
   "kb": 39
+ },
+ "alwaysSwitch": {
+  "cap": "Always (switch) fires every frame while it is on. E switches it on (the box spins), D switches it off.",
+  "kb": 17
+ },
+ "onceGate": {
+  "cap": "Once (gate) lets only the first signal through. Press Space three times – only the first one gets to the label.",
+  "kb": 15
  }
 }

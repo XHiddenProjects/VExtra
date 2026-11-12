@@ -13,7 +13,10 @@
   VXRT.each = each;
   const MATCH = (spec, other) => { const s = String(spec ?? 'any').trim(); if (!other) return s === 'any' || s === ''; if (s === '' || s === 'any') return true; if (s.startsWith('tag:')) return (other.tags || []).includes(s.slice(4)); return other.name === s || (other.tags || []).includes(s); };
 
-  B({ id: 'always', cat: 'triggers', label: 'Always', desc: 'Fires every frame. Output value is the frame time in seconds (dt). Use Enable/Disable to switch it on and off.',
+  B({ id: 'always', cat: 'triggers', label: 'Always', desc: 'Runs every frame from the moment the game starts – there is nothing to connect or switch on. The output value is the frame time in seconds (dt). Need to turn it on and off? Use Always (switch).',
+    inputs: [], outputs: ['out'], params: [],
+    update(n, dt, g) { g.send(n, 'out', dt); } });
+  B({ id: 'alwaysSwitch', cat: 'triggers', label: 'Always (switch)', desc: 'Fires every frame while it is on. Output value is the frame time in seconds (dt). "enable" / "disable" switch it on and off; tick "Enabled at start" to begin on.',
     inputs: ['enable', 'disable'], outputs: ['out'], params: [P.bool('enabled', 'Enabled at start', true)],
     init(n) { n.st.on = n.p.enabled; }, onInput(n, port) { n.st.on = port === 'enable'; }, update(n, dt, g) { if (n.st.on) g.send(n, 'out', dt); } });
 
@@ -23,10 +26,14 @@
     onInput(n, port) { if (port === 'start') n.st.run = true; else if (port === 'stop') n.st.run = false; else if (port === 'reset') { n.st.t = -U.num(n.p.delay); n.st.count = 0; } },
     update(n, dt, g) { if (!n.st.run) return; n.st.t += dt; const iv = Math.max(0.005, U.num(n.p.interval, 1)); while (n.st.t >= iv) { n.st.t -= iv; n.st.count++; g.send(n, 'tick', n.st.count); if (!n.p.repeat) { n.st.run = false; break; } } } });
 
-  B({ id: 'once', cat: 'triggers', label: 'Once', desc: 'Fires exactly one time, then stays silent until reset. "At start" fires after the delay when the game starts; "On first signal" lets only the first incoming signal through (a one-shot gate). Send "reset" to arm it again.',
-    inputs: ['fire', 'reset'], outputs: ['out'], params: [P.sel('when', 'Fire', [['start', 'At game start'], ['signal', 'On first signal']]), P.num('delay', 'Delay (s)', 0, { min: 0, step: 0.1 })],
-    init(n) { n.st.done = false; n.st.t = 0; n.st.pend = n.p.when === 'start'; },
-    onInput(n, port, v, g) { if (port === 'reset') { n.st.done = false; n.st.t = 0; n.st.pend = n.p.when === 'start'; return; } if (n.st.done) return; if (U.num(n.p.delay) > 0) { n.st.pend = true; n.st.t = 0; n.st.val = v; return; } n.st.done = true; g.send(n, 'out', v === undefined ? 1 : v); },
+  B({ id: 'once', cat: 'triggers', label: 'Once', desc: 'Fires exactly one time when the game (or scene) starts – after the optional delay. The output is 1. Nothing to connect: use it to set things up, play a first sound, show a first message. Need a one-shot that waits for a signal? Use Once (gate).',
+    inputs: [], outputs: ['out'], params: [P.num('delay', 'Delay (s)', 0, { min: 0, step: 0.1 })],
+    init(n) { n.st.done = false; n.st.t = 0; },
+    update(n, dt, g) { if (n.st.done) return; n.st.t += dt; if (n.st.t >= U.num(n.p.delay)) { n.st.done = true; g.send(n, 'out', 1); } } });
+  B({ id: 'onceGate', cat: 'triggers', label: 'Once (gate)', desc: 'Lets only the FIRST incoming signal through (a one-shot gate) – the value passes along. After an optional delay. Send "reset" to arm it again.',
+    inputs: ['in', 'reset'], outputs: ['out'], params: [P.num('delay', 'Delay (s)', 0, { min: 0, step: 0.1 })],
+    init(n) { n.st.done = false; n.st.t = 0; n.st.pend = false; },
+    onInput(n, port, v, g) { if (port === 'reset') { n.st.done = false; n.st.t = 0; n.st.pend = false; return; } if (n.st.done || n.st.pend) return; if (U.num(n.p.delay) > 0) { n.st.pend = true; n.st.t = 0; n.st.val = v; return; } n.st.done = true; g.send(n, 'out', v === undefined ? 1 : v); },
     update(n, dt, g) { if (!n.st.pend || n.st.done) return; n.st.t += dt; if (n.st.t >= U.num(n.p.delay)) { n.st.pend = false; n.st.done = true; g.send(n, 'out', n.st.val === undefined ? 1 : n.st.val); } } });
 
   const btnOK = (p, b) => p === 'any' || (p === 'left' && b === 0) || (p === 'middle' && b === 1) || (p === 'right' && b === 2);

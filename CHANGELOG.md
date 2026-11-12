@@ -14,6 +14,9 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - **Example game *Animated Model (skeleton + Draco)*** and a docs section *3D models from other tools* (Blender, Maya, 3ds Max, Cinema 4D, Mixamo, Sketchfab, CAD…).
 - Sample-model generator `tools/model-samples/make-samples.js`.
 
+### Changed
+- **Once and Always have no inputs any more** – they start with the game, so there was nothing useful to connect. *Once* shows its output (it sends `1`; the demo clip and the Logic tab's ▶ Live view show it). The old behaviours live on as **Once (gate)** (lets only the first signal through, with *reset*) and **Always (switch)** (with *enable* / *disable*). Existing projects are converted automatically: a signal-gated Once becomes Once (gate), a switchable Always becomes Always (switch), and wires into a plain start Once are removed.
+
 ### Fixed
 - **Once / Always / timers ran behind the loading page:** the game's blocks started while the loading screen was still fading, so a *Once* block fired where nobody could see its effects and input arrived before the game was ready. The game now builds the scene, waits until the loading page is completely gone, then starts its clock at 0 with clean input (and focuses the game).
 - **Bluetooth "no device found" after a successful connect:** every "not found" was reported as if no device had been chosen. Errors are now specific – a missing service/characteristic, a service that is not listed in *Bluetooth Connect → Services* (the browser only allows listed services; the default list now includes battery, heart rate, device information and generic access), a different *Device name* on the blocks, and so on.
