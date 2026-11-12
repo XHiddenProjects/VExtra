@@ -27,7 +27,7 @@
     const script = `(function(){var t0=Date.now(),tips=${VX.jsLit(tips)},min=${min},showPct=${L.showPercent ? 'true' : 'false'},ti=0,timer=null,p=0;function q(s){return document.querySelector('#vx-boot '+s)}
 window.__vxl={reset:function(){p=0;var b=q('.vxl-bar i');if(b)b.style.width='0'},set:function(v){p=Math.max(p,Math.min(1,v));var b=q('.vxl-bar i');if(b)b.style.width=(p*100)+'%';var c=q('.vxl-pct');if(c&&showPct&&b)c.textContent=Math.round(p*100)+'%'},
 finish:function(){var self=this;return new Promise(function(r){var wait=Math.max(0,min-(Date.now()-t0));setTimeout(function(){self.set(1);setTimeout(r,120)},wait)})},
-hide:function(){var e=document.getElementById('vx-boot');if(!e)return;e.classList.add('out');clearInterval(timer);setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e)},450)},
+hide:function(){return new Promise(function(r){var e=document.getElementById('vx-boot');clearInterval(timer);if(!e){r();return}e.classList.add('out');setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e);r()},480)})},
 fail:function(m){clearInterval(timer);var e=q('.vxl-err');if(e)e.textContent=m;var s=q('.vxl-sub');if(s)s.textContent='Could not start'}};
 function tip(){var e=q('.vxl-tip');if(e&&tips.length){e.textContent=tips[ti++%tips.length]}}
 document.addEventListener('DOMContentLoaded',function(){tip();if(tips.length>1)timer=setInterval(tip,2600)});})();`;

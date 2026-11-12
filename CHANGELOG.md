@@ -15,6 +15,8 @@ All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://
 - Sample-model generator `tools/model-samples/make-samples.js`.
 
 ### Fixed
+- **Once / Always / timers ran behind the loading page:** the game's blocks started while the loading screen was still fading, so a *Once* block fired where nobody could see its effects and input arrived before the game was ready. The game now builds the scene, waits until the loading page is completely gone, then starts its clock at 0 with clean input (and focuses the game).
+- **Bluetooth "no device found" after a successful connect:** every "not found" was reported as if no device had been chosen. Errors are now specific – a missing service/characteristic, a service that is not listed in *Bluetooth Connect → Services* (the browser only allows listed services; the default list now includes battery, heart rate, device information and generic access), a different *Device name* on the blocks, and so on.
 - **Bluetooth in the Play tab:** the game frame did not grant the *bluetooth* permission ("Access to the feature "bluetooth" is disallowed by permissions policy"). It does now (also usb / serial / hid), and Bluetooth errors explain what to do.
 
 ## [3.9.0]

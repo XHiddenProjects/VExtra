@@ -59,7 +59,7 @@ try {
   let done = 0; await Promise.all(pics.map((src) => new Promise((res) => { const im = new Image(); im.onload = im.onerror = () => { done++; VXL.set(0.5 + 0.4 * done / pics.length); res(); }; im.src = src; })));
   if (window.VXGLTF && VXRT.preloadModels) { try { await VXRT.preloadModels(DATA.assets); } catch (e) { console.warn(e); } }
   await VXL.finish();
-  g.start(document.getElementById('vx-game')); VXL.hide();
+  g.start(document.getElementById('vx-game'), { hold: true }); await VXL.hide(); g.release();
   window.addEventListener('error', (e) => g.log('error', e.message));
   window.addEventListener('unhandledrejection', (e) => g.log('error', String(e.reason && e.reason.message || e.reason)));
 } catch (e) { VXL.fail('Could not start the game: ' + e.message); console.error(e); if (window.parent !== window) window.parent.postMessage({ vx: 'log', token: window.__VX_CH && window.__VX_CH.token, level: 'error', text: e.stack || e.message }, window.__VX_CH ? window.__VX_CH.origin : location.origin); }

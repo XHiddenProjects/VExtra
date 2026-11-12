@@ -172,7 +172,9 @@
     emit(name, payload) { const s = this.bus.get(name); if (s) for (const fn of [...s]) { try { fn(payload); } catch (e) { this.log('error', 'Error in listener "' + name + '": ' + e.message); } } }
 
     /* ----- lifecycle ----- */
-    start(container) {
+    /** opts.hold: build the scene and draw it, but do not run any blocks (Once, Always, timers…) until release() – used while a loading page is still covering the game. */
+    start(container, opts = {}) {
+      this.holding = !!opts.hold;
       this.container = container; container.classList.add('vx-root');
       container.style.cssText += ';position:relative;overflow:hidden;background:' + this.settings.bg + ';user-select:none;-webkit-user-select:none;touch-action:none';
       this.stageEl = document.createElement('div'); this.stageEl.style.cssText = 'position:absolute;inset:0;display:grid;place-items:center'; container.append(this.stageEl);
@@ -183,6 +185,12 @@
       this._last = performance.now(); const loop = (t) => { if (!this.running) return; this._raf = requestAnimationFrame(loop); this.tick(t); }; this._raf = requestAnimationFrame(loop);
       this.log('info', 'Game started: ' + this.settings.title);
       return this;
+    }
+    /** Ends hold mode: the game's clock starts now, with clean input (nothing pressed before this moment counts). */
+    release() {
+      if (!this.holding) return; this.holding = false; this._last = performance.now(); this.time = 0;
+      const I = this.input; if (I) { try { I.pressed.clear(); I.released.clear(); if (I.down && I.down.clear) I.down.clear(); if (I.keys && I.keys.clear) I.keys.clear(); I.wheel = 0; } catch { /* ignore */ } }
+      try { window.focus(); if (this.container && this.container.focus) this.container.focus({ preventScroll: true }); } catch { /* ignore */ }
     }
     destroy() {
       this.running = false; cancelAnimationFrame(this._raf); VXRT.sense && VXRT.sense.destroy(this); this._ro && this._ro.disconnect(); this.teardownScene(); VXRT.destroyInput && VXRT.destroyInput(this); VXRT.destroyRender && VXRT.destroyRender(this);
@@ -283,6 +291,7 @@
     /* ----- main loop ----- */
     tick(now) {
       let dt = Math.min(0.05, (now - this._last) / 1000); this._last = now; this.fps = this.fps * 0.95 + (1 / Math.max(dt, 0.0001)) * 0.05;
+      if (this.holding) { VXRT.render(this); return; }
       this.realDt = dt; if (this.paused) { if (this.pending.length) { const p = this.pending.splice(0); for (const fn of p) { try { fn(); } catch (e) { this.log('error', e.message); } } } VXRT.render(this); return; }
       dt *= this.timeScale; this.dt = dt; this.time += dt; this.frame++;
       try {

@@ -2,7 +2,17 @@
  * The browser always shows its own device picker, so Connect has to be triggered by a click / key / touch. Unsupported browsers (Safari, Firefox) send "error". */
 (function () {
   const VXRT = window.VXRT, U = VXRT.util, B = VXRT.registerBlock, P = VXRT.P;
-  const fail = (n, g, e) => { let m = (e && e.message) || String(e); if (/permissions? policy|disallowed/i.test(m)) m = 'Bluetooth is blocked for this page. If the game is embedded in another page, add allow="bluetooth" to its <iframe>; the Studio Play tab and exported games opened directly allow it. (' + m + ')'; else if (e && e.name === 'NotFoundError') m = 'No device was chosen (the picker was closed or nothing matched the filter)'; else if (e && e.name === 'SecurityError') m = 'Bluetooth needs a click or key press to start, and a secure page (https or localhost)'; g.send(n, 'error', m); try { g.log('warn', '[bluetooth] ' + m); } catch { /* no log */ } };
+  const fail = (n, g, e, where) => {
+    let m = (e && e.message) || String(e), name = e && e.name;
+    if (/permissions? policy|disallowed/i.test(m)) m = 'Bluetooth is blocked for this page. If the game is embedded in another page, add allow="bluetooth" to its <iframe>; the Studio Play tab and exported games opened directly allow it. (' + m + ')';
+    else if (/optionalServices/i.test(m) || (name === 'SecurityError' && where === 'service')) m = 'The device refused: that service was not listed in Bluetooth Connect → Services. Add it there (one per line), then connect again. (' + m + ')';
+    else if (name === 'NotFoundError' && where === 'connect') m = 'No device was chosen (the picker was closed, or nothing matched the name filter)';
+    else if (name === 'NotFoundError') m = 'The device is connected, but it has no such service / characteristic – check the names (Service: ' + (n.p.service || '') + ', Characteristic: ' + (n.p.char || '') + ') and that the service is listed in Bluetooth Connect → Services. (' + m + ')';
+    else if (name === 'SecurityError') m = 'Bluetooth needs a click or key press to start, and a secure page (https or localhost)';
+    else if (name === 'NetworkError') m = 'The device did not answer (out of range, or it dropped the connection) – connect again. (' + m + ')';
+    else if (name === 'NotSupportedError') m = 'This characteristic does not support that action (read / write / notify). (' + m + ')';
+    g.send(n, 'error', m); try { g.log('warn', '[bluetooth] ' + m); } catch { /* no log */ }
+  };
   const BT = () => (typeof navigator !== 'undefined' ? navigator.bluetooth : null);
   /** Shared connection table per game: key (the "Device name" you type on every Bluetooth block) -> { dev, server, chars }. */
   const table = (g) => (g._bt || (g._bt = {}));
@@ -37,14 +47,14 @@
   const SVC = P.text('service', 'Service', 'battery_service', { hint: 'battery_service · heart_rate · 0xFFE0 · full UUID' });
   const CHR = P.text('char', 'Characteristic', 'battery_level', { hint: 'battery_level · heart_rate_measurement · 0xFFE1 …' });
   const chr = async (n, g) => {
-    const c = table(g)[keyOf(n)]; if (!c || !c.server || !c.server.connected) throw new Error('Not connected – use Bluetooth Connect first (device "' + keyOf(n) + '")');
+    const c = table(g)[keyOf(n)]; if (!c || !c.server || !c.server.connected) { const known = Object.keys(table(g)).filter((k) => table(g)[k].server && table(g)[k].server.connected); throw new Error(known.length ? 'No connected device is called "' + keyOf(n) + '" – the connected one is called "' + known.join('", "') + '". Use the same Device name on every Bluetooth block.' : 'Not connected yet – run Bluetooth Connect first (device "' + keyOf(n) + '")'); };
     const ck = n.p.service + '|' + n.p.char; if (c.chars[ck]) return c.chars[ck];
-    const s = await c.server.getPrimaryService(uuid(n.p.service)); return (c.chars[ck] = await s.getCharacteristic(uuid(n.p.char)));
+    let s; try { s = await c.server.getPrimaryService(uuid(n.p.service)); } catch (e) { e.stage = 'service'; throw e; } return (c.chars[ck] = await s.getCharacteristic(uuid(n.p.char)));
   };
 
-  B({ id: 'bluetoothConnect', cat: 'mobile', label: 'Bluetooth Connect', desc: 'Connects to a Bluetooth Low Energy device. The browser shows its device picker (so trigger this from a click, key or touch – not "Always"). List the services you will use (one per line, e.g. battery_service / heart_rate); optionally filter by name prefix. "connected" sends the device name, "disconnected" fires when it drops or you send "disconnect". "name" also gets the device name. Works in Chrome, Edge, Opera and Android; not in Safari / iOS or Firefox – those send "error".',
+  B({ id: 'bluetoothConnect', cat: 'mobile', label: 'Bluetooth Connect', desc: 'Connects to a Bluetooth Low Energy device. The browser shows its device picker (so trigger this from a click, key or touch – not "Always"). IMPORTANT: list every service that Read / Write / Notify will use (one per line, e.g. battery_service / heart_rate / 0xFFE0) – the browser only lets the game reach services listed here. Optionally filter by name prefix. "connected" sends the device name, "disconnected" fires when it drops or you send "disconnect". "name" also gets the device name. Works in Chrome, Edge, Opera and Android; not in Safari / iOS or Firefox – those send "error".',
     inputs: ['connect', 'disconnect'], outputs: ['connected', 'disconnected', 'name', 'error'],
-    params: [DEV, P.area('services', 'Services (one per line)', 'battery_service', { hint: 'battery_service · heart_rate · 0xFFE0' }), P.text('prefix', 'Name starts with', '', { hint: 'Empty = show every device' })],
+    params: [DEV, P.area('services', 'Services (one per line)', 'battery_service\nheart_rate\ndevice_information\ngeneric_access', { hint: 'battery_service · heart_rate · 0xFFE0' }), P.text('prefix', 'Name starts with', '', { hint: 'Empty = show every device' })],
     init(n, g) { n.cleanups.push(() => { const c = table(g)[keyOf(n)]; if (c && c.dev && c.dev.gatt && c.dev.gatt.connected) { try { c.dev.gatt.disconnect(); } catch { /* gone */ } } delete table(g)[keyOf(n)]; }); },
     async onInput(n, port, v, g) {
       const key = keyOf(n);
@@ -57,16 +67,16 @@
         table(g)[key] = { dev, server, chars: {} };
         dev.addEventListener('gattserverdisconnected', () => { delete table(g)[key]; g.send(n, 'disconnected', dev.name || dev.id); });
         g.send(n, 'name', dev.name || dev.id); g.send(n, 'connected', dev.name || dev.id);
-      } catch (e) { fail(n, g, e); }
+      } catch (e) { fail(n, g, e, 'connect'); }
     } });
 
   B({ id: 'bluetoothRead', cat: 'mobile', label: 'Bluetooth Read', desc: 'Reads one value from a connected device (battery level, a sensor …). Pick how the bytes become a result: a number, text, decimal, heart rate, or the raw bytes. "out" gets the result; "bytes" always gets the raw byte list.',
     inputs: ['in'], outputs: ['out', 'bytes', 'error'], params: [DEV, SVC, CHR, P.sel('format', 'Result as', FMT_OUT, 'u8')],
-    async onInput(n, port, v, g) { try { const dv = await (await chr(n, g)).readValue(); g.send(n, 'bytes', bytes(dv)); g.send(n, 'out', decode(dv, n.p.format)); } catch (e) { fail(n, g, e); } } });
+    async onInput(n, port, v, g) { try { const dv = await (await chr(n, g)).readValue(); g.send(n, 'bytes', bytes(dv)); g.send(n, 'out', decode(dv, n.p.format)); } catch (e) { fail(n, g, e, e && e.stage); } } });
 
   B({ id: 'bluetoothWrite', cat: 'mobile', label: 'Bluetooth Write', desc: 'Sends the incoming value to a connected device (switch an LED, set a motor speed …). Choose how it is packed: bytes, text, a number or hex bytes. "done" fires when the device accepted it.',
     inputs: ['in'], outputs: ['done', 'error'], params: [DEV, SVC, CHR, P.sel('format', 'Send as', FMT_IN, 'u8'), P.bool('noResponse', 'Without response (faster)', false)],
-    async onInput(n, port, v, g) { try { const c = await chr(n, g), d = encode(v, n.p.format); if (n.p.noResponse && c.writeValueWithoutResponse) await c.writeValueWithoutResponse(d); else await c.writeValue(d); g.send(n, 'done', v); } catch (e) { fail(n, g, e); } } });
+    async onInput(n, port, v, g) { try { const c = await chr(n, g), d = encode(v, n.p.format); if (n.p.noResponse && c.writeValueWithoutResponse) await c.writeValueWithoutResponse(d); else await c.writeValue(d); g.send(n, 'done', v); } catch (e) { fail(n, g, e, e && e.stage); } } });
 
   B({ id: 'bluetoothNotify', cat: 'mobile', label: 'Bluetooth Notify', desc: 'Listens for values the device pushes by itself (heart rate, button presses, sensor streams). Send "start" to subscribe, "stop" to unsubscribe (or tick Auto start). Every update goes to "out" in the chosen format, raw bytes to "bytes".',
     inputs: ['start', 'stop'], outputs: ['out', 'bytes', 'started', 'error'], params: [DEV, P.text('service', 'Service', 'heart_rate'), P.text('char', 'Characteristic', 'heart_rate_measurement'), P.sel('format', 'Result as', FMT_OUT, 'heart'), P.bool('auto', 'Auto start when connected', false)],
@@ -78,6 +88,6 @@
         if (port === 'stop') { if (n.st.c) { n.st.c.removeEventListener('characteristicvaluechanged', n.st.fn); await n.st.c.stopNotifications(); n.st.c = null; } return; }
         if (n.st.c) return;
         const c = await chr(n, g); await c.startNotifications(); c.addEventListener('characteristicvaluechanged', n.st.fn); n.st.c = c; g.send(n, 'started', true);
-      } catch (e) { fail(n, g, e); } finally { n.st.busy = false; }
+      } catch (e) { fail(n, g, e, e && e.stage); } finally { n.st.busy = false; }
     } });
 })();
