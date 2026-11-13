@@ -2,7 +2,13 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.11.0] — current
+## [3.11.1] — current
+
+### Fixed
+- **GitHub Pages demo failed to deploy:** the `demo-site` workflow also ran when a release was published, but GitHub's `github-pages` environment only accepts deployments from the default branch, so every release run was rejected. It now runs on pushes to `main` / `master` and by hand only. The unnecessary `configure-pages` step (another way to fail when Pages was not yet enabled) is gone, and a short check makes sure the site contains the app, the built-in plugin list and the 3D engine before it is uploaded. The setup requirements (Settings → Pages → Source: GitHub Actions; public repository or a paid plan) are written at the top of the workflow.
+- Verified from a clean checkout: `npm ci` → `postinstall` (vendor build) → `npm run build:web` produces a complete site.
+
+## [3.11.0]
 
 ### Added
 - **VR / AR games in Store Export (plugin 2.5.0):** the plugin detects VR and AR blocks (or you choose *VR / AR* yourself) and packages the game accordingly. New **Meta Quest – Meta Horizon Store** target (`meta/`): the game as an installable web app (manifest, offline cache, icons, `assetlinks.json` template), a **Bubblewrap** Quest project (`isMetaQuest`), placeholder store artwork (square, landscape, portrait, icon) and `README-META.md` covering headset testing and the Horizon Developer Dashboard submission; plus an **Android VR / AR (WebXR)** target (`xr/`) for ARCore phones – real WebXR needs a web engine, so these are the routes to real headset VR and ARCore AR. **Google Play / App Store (Capacitor)** projects now get the gyroscope / camera / ARCore entries (Android) and camera / motion usage texts (iOS) that phone VR and camera AR need (idempotent patch script). **Steam**: Electron has no WebXR, so VR / AR games start in the player's Edge / Chrome (full-screen app window, local 127.0.0.1 server, SteamVR / OpenXR), falling back to a normal window with a clear message. Checklists gained Meta Horizon, Google Play AR and Steam VR items. Store Export plugin is now 2.5.0. Exporting a VR / AR game as plain HTML now reminds you that WebXR needs https.

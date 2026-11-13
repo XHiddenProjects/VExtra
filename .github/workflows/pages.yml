@@ -1,13 +1,14 @@
 # Publishes the live demo (Vextra Studio running in the browser) to GitHub Pages.
-# One-time setup: repository Settings → Pages → Source: "GitHub Actions".
+# One-time setup (the workflow cannot do this for you): repository Settings → Pages → Source: "GitHub Actions".
+#   • The repository must be allowed to use Pages (public, or a paid plan for private repositories).
+#   • Deploys only run from the default branch: the "github-pages" environment rejects other branches and tags
+#     (Settings → Environments → github-pages → Deployment branches). That is why this workflow no longer runs on releases.
 # The demo is the same app as the desktop version, without the desktop-only parts (local files, the bundled server).
 name: demo-site
 
 on:
   push:
     branches: [main, master]
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -36,7 +37,12 @@ jobs:
       - name: build the static site
         run: node scripts/build-web.js --out dist-web
 
-      - uses: actions/configure-pages@v5
+      # A static site needs no base-path handling (every path is relative), so no configure-pages step – one less thing that can fail.
+      - name: check the site
+        run: |
+          test -f dist-web/index.html
+          test -f dist-web/__ext/plugins
+          test -d dist-web/vendor/three
 
       - uses: actions/upload-pages-artifact@v3
         with:

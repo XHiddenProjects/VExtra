@@ -10,7 +10,7 @@
 | 3.8.x   | ⚠️ please upgrade to 3.11.x |
 | 3.7.x and older | ❌ please upgrade |
 
-Current version: **3.11.0** (see `VERSION`). This policy was last reviewed for 3.11.0.
+Current version: **3.11.1** (see `VERSION`). This policy was last reviewed for 3.11.1.
 
 ## Reporting a vulnerability
 
@@ -47,6 +47,9 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.11.1 notes
+- **Pages workflow:** no longer triggered by releases (tags cannot deploy to the protected `github-pages` environment). It keeps the minimum permissions (`contents: read`, `pages: write`, `id-token: write`); the deploy step is the only one that can publish, and only from the default branch.
 
 ## v3.11.0 notes
 - **Store Export for VR / AR (Steam):** the generated launcher serves the game from a local http server bound to `127.0.0.1` on a random port (path-traversal safe, `Cache-Control: no-store`) and starts the player's installed Edge / Chrome with a separate profile folder; nothing is reachable from the network. The generated Android / iOS projects only add the permissions a VR / AR game needs (camera for AR, motion sensors) and iOS explains them to the player.

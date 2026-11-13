@@ -39,11 +39,11 @@ Your own projects and games are never deleted. The same clean-up of app data is 
 ## Write a plugin
 Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `/** @forge-plugin {...} */` manifest and an optional `/** @forge-docs ... */` block. See `plugins/` for examples and Docs → Plugins → Plugin API.
 
-## What's new in 3.11.0
+## What's new in 3.11.x
 - A **live Blender link** (`tools/blender-addon`): pull models from Blender, send models to it, auto-sync edits – plus one-click glb export and a **model optimizer** (`tools/model-optimize`).
 - **Store Export understands VR / AR games:** **Meta Quest (Horizon Store)** package, Android WebXR package, phone permissions, Steam VR launcher.
 - **Download installers from the Releases page** – built automatically by GitHub Actions for Linux, macOS (Apple silicon + Intel) and Windows, with SHA-256 checksums.
-- **Live demo in your browser** (GitHub Pages) – look around without installing. Build it yourself with `npm run build:web`.
+- **Live demo in your browser** (GitHub Pages) – look around without installing. Build it yourself with `npm run build:web`. To publish it from your fork: Settings → Pages → Source: *GitHub Actions*, then push to the default branch.
 
 ## What was new in 3.10.0
 - **Skeletons, animations, Draco and Meshopt** in 3D models, plus a **Model Animation** block to play clips.
