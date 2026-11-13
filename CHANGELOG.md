@@ -2,7 +2,15 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.11.1] — current
+## [3.11.2] — current
+
+### Changed
+- **GitHub Actions now use the newest of everything** (checked against the official release pages): `actions/checkout@v7`, `actions/setup-node@v7`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v5`, `tauri-apps/tauri-action@v1` (v1 renamed some options; the two Vextra uses – `releaseId` and `args` – are unchanged) and `swatinem/rust-cache@v2` (the v2 tag follows its newest release).
+- **Runners:** `ubuntu-latest` (GitHub is moving it to Ubuntu 26.04 during Oct 19 – Nov 19, 2026), `windows-latest`, `macos-latest` (Apple silicon) and `macos-26-intel` for Intel Macs.
+- **Node.js:** `node-version: lts/*`, so the builds always use the current LTS (Node 26 today). Verified with Node 26.13: selftest 237 passed, the server compiles into a working single executable (`/api/health` answers) and `npm run build:web` builds the demo.
+- The Linux job no longer pins Ubuntu 22.04. An AppImage built on a newer Ubuntu needs a newer glibc on the player's computer; the workflow comment says how to pin an older image if that matters.
+
+## [3.11.1]
 
 ### Fixed
 - **GitHub Pages demo failed to deploy:** the `demo-site` workflow also ran when a release was published, but GitHub's `github-pages` environment only accepts deployments from the default branch, so every release run was rejected. It now runs on pushes to `main` / `master` and by hand only. The unnecessary `configure-pages` step (another way to fail when Pages was not yet enabled) is gone, and a short check makes sure the site contains the app, the built-in plugin list and the 3D engine before it is uploaded. The setup requirements (Settings → Pages → Source: GitHub Actions; public repository or a paid plan) are written at the top of the workflow.

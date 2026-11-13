@@ -10,7 +10,7 @@
 | 3.8.x   | ⚠️ please upgrade to 3.11.x |
 | 3.7.x and older | ❌ please upgrade |
 
-Current version: **3.11.1** (see `VERSION`). This policy was last reviewed for 3.11.1.
+Current version: **3.11.2** (see `VERSION`). This policy was last reviewed for 3.11.2.
 
 ## Reporting a vulnerability
 
@@ -47,6 +47,9 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.11.2 notes
+- **Workflow dependencies:** the release and Pages workflows use the newest major versions of the official actions (`actions/*`, `tauri-apps/tauri-action`, `swatinem/rust-cache`, `dtolnay/rust-toolchain`) and the newest runner images and Node.js LTS, so they get upstream security fixes. Actions are referenced by major-version tag, not pinned to a commit hash; if your threat model requires it, pin them to full commit SHAs (Dependabot's `github-actions` ecosystem can keep those up to date). Permissions are unchanged: `contents: write` only for the build / checksum jobs, `pages: write` + `id-token: write` only for the Pages deploy.
 
 ## v3.11.1 notes
 - **Pages workflow:** no longer triggered by releases (tags cannot deploy to the protected `github-pages` environment). It keeps the minimum permissions (`contents: read`, `pages: write`, `id-token: write`); the deploy step is the only one that can publish, and only from the default branch.

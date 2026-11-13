@@ -47,16 +47,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # 22.04 on purpose: an AppImage built here also runs on older Linux distributions.
+          # All runners use the newest image. (An AppImage built on a newer Ubuntu needs a newer glibc on the player's PC;
+          # if you want it to run on older distributions, pin this one entry to an older image such as ubuntu-24.04.)
           - name: linux
-            runner: ubuntu-22.04
+            runner: ubuntu-latest
             args: "--bundles deb,appimage"
           # The bundled server is compiled for the machine that builds it, so each Mac CPU gets its own build.
           - name: macos-apple-silicon
             runner: macos-latest
             args: "--bundles app,dmg"
           - name: macos-intel
-            runner: macos-15-intel
+            runner: macos-26-intel
             args: "--bundles app,dmg"
           - name: windows
             runner: windows-latest
@@ -65,14 +66,14 @@ jobs:
     name: build (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: lts/*   # always the current Node.js LTS
           cache: npm
 
       - name: install Rust stable
@@ -99,7 +100,7 @@ jobs:
         run: node scripts/build-server.js
 
       - name: build & upload to the release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

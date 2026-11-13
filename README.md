@@ -42,7 +42,7 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 ## What's new in 3.11.x
 - A **live Blender link** (`tools/blender-addon`): pull models from Blender, send models to it, auto-sync edits – plus one-click glb export and a **model optimizer** (`tools/model-optimize`).
 - **Store Export understands VR / AR games:** **Meta Quest (Horizon Store)** package, Android WebXR package, phone permissions, Steam VR launcher.
-- **Download installers from the Releases page** – built automatically by GitHub Actions for Linux, macOS (Apple silicon + Intel) and Windows, with SHA-256 checksums.
+- **Download installers from the Releases page** – built automatically by GitHub Actions (newest runners and Node.js LTS) for Linux, macOS (Apple silicon + Intel) and Windows, with SHA-256 checksums.
 - **Live demo in your browser** (GitHub Pages) – look around without installing. Build it yourself with `npm run build:web`. To publish it from your fork: Settings → Pages → Source: *GitHub Actions*, then push to the default branch.
 
 ## What was new in 3.10.0
