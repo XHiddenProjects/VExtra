@@ -2,7 +2,29 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.11.2] — current
+## [3.12.0] — current
+
+### Added
+- **Signed automatic updates (desktop).** Settings → About now offers **Install and restart**: the app downloads the update, checks its signature against the public key built into the app, installs it and restarts. Windows installs passively; macOS uses the `.app.tar.gz`; Linux updates the AppImage (the .deb has to be reinstalled).
+- `npm run updater:keygen` creates the signing key pair and prints the `gh secret set` commands; commit `src-tauri/updater/pubkey.txt`.
+- The release workflow signs bundles and uploads `latest.json` when the secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` exist, and verifies `latest.json` afterwards. Without them it builds exactly as before.
+- Close-workspace button now has its own icon (folder with an ×) so it is no longer confused with *New file*.
+
+### Fixed
+- **Markdown Preview:** code blocks without a language, with extra info (` ```ts title="x" `), or indented are now highlighted (unlabelled blocks get a language guess); checkboxes, including nested ones, no longer show list bullets.
+
+## [3.11.3]
+
+### Fixed
+- **Release workflow: “Signature not found for the updater JSON. Skipping upload...”** – Vextra has no auto-updater, but `tauri-action` v1 looks for updater signatures and a `latest.json` by default. The workflow now sets `uploadUpdaterJson: false` and `uploadUpdaterSignatures: false`, so the message (and the pointless step) is gone.
+
+### Added
+- **MSI uninstall with “also delete my app data”, like the .exe installer.** A new WiX fragment (`src-tauri/windows/fragments/data-removal.wxs`, wired in `tauri.conf.json`) asks *“Also delete Vextra Studio's settings, plugins, themes and local data?”* when the .msi is uninstalled with a user interface. Silent uninstalls keep the data unless you pass `REMOVEUSERDATA=1`; upgrades never ask and never delete; if anything fails nothing is deleted. It removes `%APPDATA%` and `%LOCALAPPDATA%` `studio.vextra.app` only – never your project folders. The .exe (NSIS) uninstaller already has its “Delete the application data” box.
+- **Safety net in the release workflow:** if the MSI fragment ever breaks the Windows build, the job builds Windows again without it (`src-tauri/windows/no-wix-fragment.conf.json`) and shows a warning, so a release is never blocked.
+- **Settings → Uninstall Vextra → “Delete everything & prepare to uninstall”** for every system (macOS and Linux have no uninstaller of their own): stops the local server and deletes settings, sign-in data, plugins, themes, local server data and the app's browser storage, then tells you to uninstall. Project folders are never touched.
+- Docs: new “Uninstalling Vextra Studio” page (per-installer steps, `REMOVEUSERDATA=1`, leftover folders per OS).
+
+## [3.11.2]
 
 ### Changed
 - **GitHub Actions now use the newest of everything** (checked against the official release pages): `actions/checkout@v7`, `actions/setup-node@v7`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v5`, `tauri-apps/tauri-action@v1` (v1 renamed some options; the two Vextra uses – `releaseId` and `args` – are unchanged) and `swatinem/rust-cache@v2` (the v2 tag follows its newest release).

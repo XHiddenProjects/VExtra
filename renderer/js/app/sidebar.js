@@ -78,7 +78,7 @@
 
   SB.views.explorer = {
     title: 'Explorer',
-    actions: () => [abtn('file', 'New file', () => SB.newFile()), abtn('folder', 'New folder', () => SB.newFolder()), abtn('refresh', 'Refresh', () => SB.refresh()), abtn('plus', 'New project…', () => VX.app.newProject()), abtn('files', 'Database', () => VX.web.openDatabase()), abtn('globe', 'Export website (ZIP / tar.gz)', () => VX.web.exportSite()), ...(S.root ? [abtn('close', 'Close workspace', () => VX.app.closeWorkspace())] : [])],
+    actions: () => [abtn('file', 'New file', () => SB.newFile()), abtn('folder', 'New folder', () => SB.newFolder()), abtn('refresh', 'Refresh', () => SB.refresh()), abtn('plus', 'New project…', () => VX.app.newProject()), abtn('files', 'Database', () => VX.web.openDatabase()), abtn('globe', 'Export website (ZIP / tar.gz)', () => VX.web.exportSite()), ...(S.root ? [abtn('folderx', 'Close workspace', () => VX.app.closeWorkspace())] : [])],
     render(c) {
       if (!S.root) { c.append(h('div', { class: 'empty' }, h('p', {}, 'No folder open.'), h('button', { class: 'btn primary', onclick: () => VX.app.openFolder() }, VX.icon('folder', 14), 'Open folder'), h('div', {}, h('button', { class: 'btn', onclick: () => VX.app.newProject() }, VX.icon('plus', 14), 'New project')))); return; }
       c.append(h('div', { class: 'group-title', title: S.root }, VX.path.base(S.root), h('span', { class: 'tag' }, VX.app.settings.mode)));

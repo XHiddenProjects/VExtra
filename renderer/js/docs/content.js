@@ -259,6 +259,26 @@ Design sound effects without any files: choose a wave (square, saw, triangle, si
 
 Then use the model in 3D scenes with the **Model** object type.
 
+## Automatic updates
+Settings → About shows when a new version exists; **Install and restart** downloads it, verifies its signature and installs it.
+1. Run \`npm run updater:keygen\` once and commit \`src-tauri/updater/pubkey.txt\`.
+2. Add the GitHub secrets \`TAURI_SIGNING_PRIVATE_KEY\` and \`TAURI_SIGNING_PRIVATE_KEY_PASSWORD\` (the command prints them).
+3. Publish a release: the workflow signs the bundles and uploads \`latest.json\`.
+
+Builds made before the key was added cannot update themselves; install one new build by hand. Linux updates work for the AppImage only.
+
+## Uninstalling Vextra Studio
+
+| Installer | How to uninstall | Delete my data? |
+|---|---|---|
+| Windows **.exe** (setup) | Windows Settings → Apps → Vextra Studio → Uninstall | A **“Delete the application data”** box in the uninstaller |
+| Windows **.msi** | Windows Settings → Apps → Vextra Studio → Uninstall (or run the .msi again → Remove) | A **Yes / No question** appears. Silent uninstall keeps the data unless you add \`REMOVEUSERDATA=1\`: \`msiexec /x Vextra.msi REMOVEUSERDATA=1 /qn\`. Upgrades never delete anything. |
+| macOS **.dmg** | Drag *Vextra Studio* from Applications to the Bin | Settings → *Uninstall Vextra* → **Delete everything & prepare to uninstall** first |
+| Linux **.deb** | \`sudo apt remove vextra-studio\` | The same Settings button first |
+| Linux **AppImage** | Delete the file | The same Settings button first |
+
+**Settings → Uninstall Vextra** removes everything Vextra keeps: settings, sign-in data, plugins, themes, local server data and the app's own browser storage. Your project folders are never touched. Leftover folders, if you uninstalled first: Windows \`%APPDATA%\\studio.vextra.app\` and \`%LOCALAPPDATA%\\studio.vextra.app\`, macOS \`~/Library/Application Support/studio.vextra.app\` and \`~/Library/WebKit/studio.vextra.app\`, Linux \`~/.local/share/studio.vextra.app\`.
+
 ## Exporting VR and AR games to stores
 
 Open the game and press **📦 Store export** (enable the *Store Export* plugin). It detects VR and AR blocks and offers matching packages:

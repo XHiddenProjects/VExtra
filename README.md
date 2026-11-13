@@ -42,7 +42,7 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 ## What's new in 3.11.x
 - A **live Blender link** (`tools/blender-addon`): pull models from Blender, send models to it, auto-sync edits – plus one-click glb export and a **model optimizer** (`tools/model-optimize`).
 - **Store Export understands VR / AR games:** **Meta Quest (Horizon Store)** package, Android WebXR package, phone permissions, Steam VR launcher.
-- **Download installers from the Releases page** – built automatically by GitHub Actions (newest runners and Node.js LTS) for Linux, macOS (Apple silicon + Intel) and Windows, with SHA-256 checksums.
+- **Download installers from the Releases page** – built automatically by GitHub Actions (newest runners and Node.js LTS) for Linux, macOS (Apple silicon + Intel) and Windows, with SHA-256 checksums. The Windows installers (.exe and .msi) both offer to delete your app data when you uninstall (see Docs → Uninstalling).
 - **Live demo in your browser** (GitHub Pages) – look around without installing. Build it yourself with `npm run build:web`. To publish it from your fork: Settings → Pages → Source: *GitHub Actions*, then push to the default branch.
 
 ## What was new in 3.10.0
@@ -83,6 +83,7 @@ Drop a `.js` file in the plugins folder (Plugins panel → Open folder) with a `
 ## What's new in 3.5.0
 - **Ten example games** (5 × 2D, 5 × 3D) in Library → Games.
 - **Store Export** checks Java / Gradle / Android SDK automatically (JAVA_HOME), installs and updates them for you, and shows a simple checklist.
+- **Signed auto-updates** on desktop (Settings → About → Install and restart); set up once with `npm run updater:keygen`.
 - Voice Command speech-service fallback, mouse-look and kinematic-gravity fixes. See `CHANGELOG.md`.
 - Community files: contributing guide, code of conduct, issue and pull request templates.
 

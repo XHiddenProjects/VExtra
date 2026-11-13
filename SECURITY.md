@@ -10,7 +10,7 @@
 | 3.8.x   | ⚠️ please upgrade to 3.11.x |
 | 3.7.x and older | ❌ please upgrade |
 
-Current version: **3.11.2** (see `VERSION`). This policy was last reviewed for 3.11.2.
+Current version: **3.11.3** (see `VERSION`). This policy was last reviewed for 3.11.3.
 
 ## Reporting a vulnerability
 
@@ -47,6 +47,14 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 ## v3.0.0 additions (still apply in 3.1.0)
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
+
+## v3.12.0 notes
+- **Auto-updater:** updates are verified with a minisign public key compiled from `src-tauri/updater/pubkey.txt`; an unsigned or tampered download is rejected. The private key lives only in GitHub secrets (never in the repo), the endpoint is HTTPS-only, no `dangerous*` options are used, and the updater commands are Rust-side only (no `updater:default` capability for the webview). The downgrade guard (`requireSignedVersion`) is not enabled yet.
+
+## v3.11.3 notes
+- **MSI data removal:** deleting data on uninstall is destructive, so it is opt-in at every step: the question defaults to *No* (also after a 2-minute timeout), a silent uninstall deletes nothing unless `REMOVEUSERDATA=1` is passed, upgrades never delete (`UPGRADINGPRODUCTCODE`), and the paths are fixed (`%APPDATA%\studio.vextra.app`, `%LOCALAPPDATA%\studio.vextra.app`) – never a folder the user chose. The question is a small inline JScript custom action; it only shows a Yes / No box and sets a property, and its failure is ignored (`Return="ignore"`). Some antivirus products treat any script custom action in an MSI as suspicious; the installers are unsigned anyway (see v3.11.0 notes) – verify downloads against `SHA256SUMS.txt`.
+- **Updater:** there is no auto-updater and no updater signing key; the workflow no longer asks for updater signatures. If an updater is added later, its private key must be stored as an encrypted repository secret, never in the repository.
+- **Delete-everything button:** it only touches Vextra's own data folder and browser storage and asks for confirmation first.
 
 ## v3.11.2 notes
 - **Workflow dependencies:** the release and Pages workflows use the newest major versions of the official actions (`actions/*`, `tauri-apps/tauri-action`, `swatinem/rust-cache`, `dtolnay/rust-toolchain`) and the newest runner images and Node.js LTS, so they get upstream security fixes. Actions are referenced by major-version tag, not pinned to a commit hash; if your threat model requires it, pin them to full commit SHAs (Dependabot's `github-actions` ecosystem can keep those up to date). Permissions are unchanged: `contents: write` only for the build / checksum jobs, `pages: write` + `id-token: write` only for the Pages deploy.

@@ -13,3 +13,4 @@ src-tauri/resources/server/sea-*
 *.AppImage
 *.deb
 dist-web/
+src-tauri/updater/enable.conf.json

@@ -43,9 +43,23 @@
   for (const k of Object.keys(T)) ALIAS[k] = ALIAS[k] || k;
   const norm = (l) => ALIAS[String(l || '').toLowerCase().trim()] || '';
 
+  /** Unlabelled or unknown fences: guess the language from the text so they are still coloured. */
+  function guess(c) {
+    const t = String(c).trim(); if (!t) return '';
+    if (/^[\[{][\s\S]*[\]}]$/.test(t) && /"\s*:/.test(t)) return 'json';
+    if (/^<(!doctype|html|head|body|div|span|p|svg|template|script|style|a|ul|section|main|h\d)\b/i.test(t)) return 'html';
+    if (/^<\?php/.test(t)) return 'php';
+    if (/^\s*(\$ |#!\/|sudo |npm |npx |git |cd |curl |pip |apt )/.test(t)) return 'sh';
+    if (/^\s*(select|insert|update|delete|create|alter|drop)\b[\s\S]*\b(from|into|table|set|where)\b/i.test(t)) return 'sql';
+    if (/^\s*(def |class \w+(\(.*\))?:|import \w+$|from \w+ import|print\()/m.test(t)) return 'py';
+    if (/^[^{}\n]*\{[^}]*:[^}]*;[^}]*\}/m.test(t) && !/\b(function|=>|const|let|var)\b/.test(t)) return 'css';
+    if (/\b(function|const|let|var|=>|console\.|import .* from|export |require\()/.test(t)) return 'js';
+    if (/^\s*[\w.-]+:\s*\S/m.test(t) && !/[;{}]/.test(t)) return 'yml';
+    return '';
+  }
   /** Embedded <script>/<style> inside HTML get their own language. */
   function tokens(code, lang) {
-    const L = norm(lang); const spec = T[L]; if (!spec) return [[null, code]];
+    const L = norm(String(lang || '').replace(/^language-/i, '')) || guess(code); const spec = T[L]; if (!spec) return [[null, code]];
     const out = []; let last = 0, m; spec.re.lastIndex = 0;
     while ((m = spec.re.exec(code))) {
       if (m[0] === '') { spec.re.lastIndex++; continue; }

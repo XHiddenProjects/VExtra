@@ -20,6 +20,7 @@ use tauri::{
     AppHandle, Emitter, Manager,
 };
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_updater::UpdaterExt;
 
 mod builtin {
     include!(concat!(env!("OUT_DIR"), "/builtin.rs"));
@@ -467,6 +468,82 @@ async fn app_clean(app: AppHandle, what: Vec<String>) -> Res<Vec<String>> {
         }
     }
     Ok(removed)
+}
+
+/* ---------------------------------------------------------------- auto-updater */
+
+/// The updater's PUBLIC key (src-tauri/updater/pubkey.txt, made by `npm run updater:keygen`). Updates are only installed when their
+/// signature matches this key, so only the holder of the private key (a GitHub secret) can ship an update. "NOT-SET…" = updater off.
+const UPDATER_PUBKEY: &str = include_str!("../updater/pubkey.txt");
+/// `latest.json` is attached to every GitHub release by the release workflow (tauri-action).
+const UPDATER_ENDPOINT: &str = "https://github.com/XHiddenProjects/VExtraStudio/releases/latest/download/latest.json";
+
+#[derive(Default)]
+struct UpdaterState(Mutex<Option<tauri_plugin_updater::Update>>);
+
+fn updater_key() -> Option<String> {
+    let k = UPDATER_PUBKEY.trim();
+    if k.len() < 40 || k.to_uppercase().starts_with("NOT-SET") {
+        None
+    } else {
+        Some(k.to_string())
+    }
+}
+
+#[derive(Serialize)]
+struct UpdateInfo {
+    /// false = this build has no updater key (the app then only tells you that a newer version exists)
+    enabled: bool,
+    available: bool,
+    current: String,
+    version: Option<String>,
+    notes: Option<String>,
+    date: Option<String>,
+    reason: Option<String>,
+}
+
+/// Asks GitHub whether a newer signed version exists. Nothing is downloaded or installed.
+#[tauri::command]
+async fn updater_check(app: AppHandle, state: tauri::State<'_, UpdaterState>) -> Res<UpdateInfo> {
+    let current = app.package_info().version.to_string();
+    let Some(key) = updater_key() else {
+        return Ok(UpdateInfo { enabled: false, available: false, current, version: None, notes: None, date: None, reason: Some("This build was made without an updater key.".into()) });
+    };
+    let url = UPDATER_ENDPOINT.parse().map_err(err)?;
+    let updater = app.updater_builder().pubkey(key).endpoints(vec![url]).map_err(err)?.build().map_err(err)?;
+    let found = updater.check().await.map_err(err)?;
+    let info = match &found {
+        Some(u) => UpdateInfo { enabled: true, available: true, current, version: Some(u.version.clone()), notes: u.body.clone(), date: u.date.map(|d| d.to_string()), reason: None },
+        None => UpdateInfo { enabled: true, available: false, current, version: None, notes: None, date: None, reason: None },
+    };
+    *state.0.lock().map_err(err)? = found;
+    Ok(info)
+}
+
+/// Downloads the update found by `updater_check`, checks its signature and installs it. Progress: event `updater:progress` { done, total }.
+/// Windows: the installer starts and the app exits by itself. macOS / Linux: call `app_restart` afterwards.
+#[tauri::command]
+async fn updater_install(app: AppHandle, state: tauri::State<'_, UpdaterState>) -> Res<()> {
+    let update = state.0.lock().map_err(err)?.clone().ok_or_else(|| "Check for updates first.".to_string())?;
+    let handle = app.clone();
+    let mut done: u64 = 0;
+    update
+        .download_and_install(
+            move |chunk, total| {
+                done += chunk as u64;
+                let _ = handle.emit("updater:progress", serde_json::json!({ "done": done, "total": total }));
+            },
+            || {},
+        )
+        .await
+        .map_err(err)?;
+    *state.0.lock().map_err(err)? = None;
+    Ok(())
+}
+
+#[tauri::command]
+fn app_restart(app: AppHandle) {
+    app.restart();
 }
 
 /* ---------------------------------------------------------------- http (cloud features) */
@@ -1114,6 +1191,8 @@ pub fn run() {
             }
         })
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(UpdaterState::default())
         .setup(|app| {
             let menu = build_menu(app.handle())?;
             app.set_menu(menu)?;
@@ -1126,7 +1205,8 @@ pub fn run() {
             fs_open_folder, fs_open_file, fs_save_as, fs_pick_files, fs_read_dir, fs_read_file, fs_read_base64, fs_write_file,
             fs_write_base64, fs_create, fs_remove, fs_rename, fs_exists, fs_reveal, fs_list_files, fs_search, ext_list, ext_save,
             ext_remove, ext_import, ext_open_dir, settings_load, settings_save, secret_get, secret_set, app_info, app_clean,
-            http_request, http_download, run_start, run_poll, run_cancel, open_url, php_check, php_start, php_stop, serve_start, serve_stop, server_start, server_status, server_stop
+            http_request, http_download, run_start, run_poll, run_cancel, open_url, php_check, php_start, php_stop, serve_start, serve_stop, server_start, server_status, server_stop,
+            updater_check, updater_install, app_restart
         ])
         .run(tauri::generate_context!())
         .expect("error while running Vextra Studio");

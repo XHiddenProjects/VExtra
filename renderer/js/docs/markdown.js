@@ -21,7 +21,7 @@
     const isTable = (k) => lines[k] && lines[k].includes('|') && lines[k + 1] && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lines[k + 1]);
     while (i < lines.length) {
       const l = lines[i];
-      if (/^(```|~~~)/.test(l)) { const fence = l.slice(0, 3); const lang = l.slice(3).trim().split(/[\s{]/)[0]; const buf = []; i++; while (i < lines.length && !lines[i].startsWith(fence)) buf.push(lines[i++]); i++; out.push(VX.codeBlock && !opts.plain ? VX.codeBlock(buf.join('\n'), lang) : `<pre data-lang="${esc(lang)}"><code>${esc(buf.join('\n'))}</code></pre>`); continue; }
+      if (/^\s{0,3}(```|~~~)/.test(l)) { const fm = /^(\s{0,3})(```+|~~~+)\s*(.*)$/.exec(l); const fence = fm[2]; const ind = fm[1].length; const lang = fm[3].trim().replace(/^[{.]/, '').split(/[\s{,:=]/)[0]; const buf = []; i++; while (i < lines.length && !new RegExp('^\\s{0,3}' + fence[0] + '{' + fence.length + ',}\\s*$').test(lines[i])) buf.push(lines[i++].replace(new RegExp('^\\s{0,' + ind + '}'), '')); i++; out.push(VX.codeBlock && !opts.plain ? VX.codeBlock(buf.join('\n'), lang) : `<pre data-lang="${esc(lang)}"><code>${esc(buf.join('\n'))}</code></pre>`); continue; }
       const hm = /^(#{1,6})\s+(.*?)\s*#*\s*$/.exec(l); if (hm) { const n = hm[1].length; let id = slug(hm[2]) || 'section', k = 2; while (seen.has(id)) id = slug(hm[2]) + '-' + k++; seen.add(id); out.push(`<h${n} id="${id}">${inline(hm[2])}</h${n}>`); i++; continue; }
       if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(l)) { out.push('<hr>'); i++; continue; }
       if (/^>\s?/.test(l)) { const buf = []; while (i < lines.length && /^>\s?/.test(lines[i])) buf.push(lines[i++].replace(/^>\s?/, '')); out.push(`<blockquote>${render(buf.join('\n'), { seen, plain: opts.plain })}</blockquote>`); continue; }
@@ -32,7 +32,7 @@
           const m = /^(\s*)([-*+]|\d+\.)\s+(.*)$/.exec(lines[i]);
           if (m) items.push({ indent: m[1].length, text: m[3] }); else items[items.length - 1].text += ' ' + lines[i].trim(); i++;
         }
-        const build = (arr, from, indent) => { let html = ''; let k = from; while (k < arr.length && arr[k].indent >= indent) { if (arr[k].indent > indent) { const sub = build(arr, k, arr[k].indent); html = html.replace(/<\/li>$/, sub.html + '</li>'); k = sub.next; continue; } html += `<li>${inline(arr[k].text)}</li>`; k++; } return { html: `${html ? '' : ''}${html}`, next: k }; };
+        const build = (arr, from, indent) => { let html = ''; let k = from; while (k < arr.length && arr[k].indent >= indent) { if (arr[k].indent > indent) { const sub = build(arr, k, arr[k].indent); html = html.replace(/<\/li>$/, sub.html + '</li>'); k = sub.next; continue; } { const tk = /^\[( |x|X)\]\s+(.*)$/.exec(arr[k].text); html += tk ? `<li class="task"><input type="checkbox" disabled${tk[1] === ' ' ? '' : ' checked'}> ${inline(tk[2])}</li>` : `<li>${inline(arr[k].text)}</li>`; } k++; } return { html: `${html ? '' : ''}${html}`, next: k }; };
         const base = items[0].indent; const tag = ordered ? 'ol' : 'ul'; let html = ''; let k = 0;
         while (k < items.length) { if (items[k].indent > base) { const sub = build(items, k, items[k].indent); html = html.replace(/<\/li>$/, `<${tag}>${sub.html}</${tag}></li>`); k = sub.next; } else { const tk = /^\[( |x|X)\]\s+(.*)$/.exec(items[k].text); html += tk ? `<li class="task"><input type="checkbox" disabled${tk[1] === ' ' ? '' : ' checked'}> ${inline(tk[2])}</li>` : `<li>${inline(items[k].text)}</li>`; k++; } }
         out.push(`<${tag}>${html}</${tag}>`); continue;

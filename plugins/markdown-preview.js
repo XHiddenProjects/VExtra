@@ -1,4 +1,4 @@
-/** @forge-plugin {"id":"markdown-preview","name":"Markdown Preview","version":"3.11.2","description":"Full Markdown viewer: outline, tables, task lists, syntax-highlighted code with line numbers and a Copy button that follows the scroll."} */
+/** @forge-plugin {"id":"markdown-preview","name":"Markdown Preview","version":"3.12.0","description":"Full Markdown viewer: outline, tables, task lists, syntax-highlighted code with line numbers and a Copy button that follows the scroll."} */
 /** @forge-docs
  * ## Using Markdown Preview
  * Open any `.md` file and press **👁 Markdown Preview** in the toolbar, or run **Markdown: Preview current file** from the Command Palette.
@@ -41,7 +41,7 @@ a{color:var(--accent)}.bar{display:flex;align-items:center;gap:6px;padding:7px 1
 .toc a:hover{background:var(--hover);color:var(--text)}.toc a.on{color:var(--accent);border-left-color:var(--accent);background:var(--sel)}.toc a.l2{padding-left:16px}.toc a.l3{padding-left:26px}.toc a.l4{padding-left:36px}
 .doc h1,.doc h2{border-bottom:1px solid var(--border);padding-bottom:.25em}.doc h1,.doc h2,.doc h3,.doc h4,.doc h5,.doc h6{scroll-margin-top:12px}.doc code{background:var(--bg2);padding:1px 6px;border-radius:5px;font-size:.9em}
 .doc blockquote{border-left:4px solid var(--accent);margin:12px 0;padding:2px 16px;color:var(--muted)}.doc table{border-collapse:collapse;display:block;overflow:auto}.doc td,.doc th{border:1px solid var(--border);padding:5px 12px}.doc th{background:var(--bg2)}.doc img{max-width:100%}.doc hr{border:0;border-top:1px solid var(--border)}
-.doc li.task{list-style:none;margin-left:-1.2em}.doc li.task input{margin-right:6px;accent-color:var(--accent)}.doc pre:not(.cb-pre){background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow:auto}
+.doc li.task{list-style:none!important;margin-left:-1.4em}.doc li.task::marker{content:''}.doc ul:has(>li.task){list-style:none;padding-left:1.6em}.doc li.task input{vertical-align:-1px}.doc li.task input{margin-right:6px;accent-color:var(--accent)}.doc pre:not(.cb-pre){background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow:auto}
 #src{display:none}body.show-src #rendered{display:none}body.show-src #src{display:block}body.show-src .toc{display:none}
 @media(max-width:760px){.toc{display:none}.scroll{padding:0 14px 60px}}${highlightCss()}`;
   const js = `(function(){var $=function(s){return document.querySelector(s)},sc=$('.scroll'),toc=$('.toc'),doc=$('#rendered');

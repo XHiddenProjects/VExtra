@@ -72,7 +72,7 @@
         row('Mode', 'Simple hides advanced tools (code views, problems, raw JSON). Advanced shows everything.', modeSeg),
         row('Theme', '', themeSel),
         row('Language', 'Interface language. “Automatic” follows your system. Text without a translation stays in English.', (() => { const sel = h('select', {}, h('option', { value: 'auto' }, 'Automatic'), VX.i18n.list().map((l) => h('option', { value: l.code, 'data-no-i18n': '' }, l.name))); sel.value = s.language || 'auto'; sel.onchange = () => { app.set('language', sel.value); VX.i18n.set(sel.value); }; return sel; })()),
-        row('Check for updates', 'Reads the VERSION file of the Vextra Studio GitHub repository on start-up (one small request, nothing is sent about you).', h('div', { style: 'display:flex;gap:8px;align-items:center' }, h('button', { class: 'btn sm', onclick: () => VX.update.check({}).then(() => VX.update.dialog()) }, 'Check now'), VX.ui.sw(s.updateCheck !== false, (v) => app.set('updateCheck', v))))),
+        row('Check for updates', 'Asks the Vextra Studio GitHub releases whether a newer, signed version exists (on start-up; one small request, nothing is sent about you). The desktop app can then install it for you.', h('div', { style: 'display:flex;gap:8px;align-items:center' }, h('button', { class: 'btn sm', onclick: () => VX.update.check({}).then(() => VX.update.dialog()) }, 'Check now'), VX.ui.sw(s.updateCheck !== false, (v) => app.set('updateCheck', v))))),
       h('div', { class: 'settings-sec' }, h('h3', {}, 'Accessibility'),
         row('Reduce motion', 'Turns off animations and transitions, and tones down screen shake in games you play here. “System” follows your operating system setting.', (() => { const sel = h('select', {}, [['system', 'System'], ['reduce', 'Always reduce'], ['full', 'Never reduce']].map(([v, t]) => h('option', { value: v }, t))); sel.value = s.motion || 'system'; sel.onchange = () => app.set('motion', sel.value); return sel; })()),
         row('Interface zoom (%)', 'Makes the whole interface larger or smaller (70–200).', num('uiZoom', 70, 200)),
@@ -107,6 +107,21 @@
         row('Auto-start local server', 'Start it when Vextra opens, if the server address is this computer and nothing is running.', VX.ui.sw(!!VX.app.settings.autoServer, (v) => { VX.app.set('autoServer', v); })),
         row('Connection', '', h('button', { class: 'btn sm', onclick: () => VX.cloudUI.testConnection() }, 'Test connection'))),
       h('div', { class: 'settings-sec' }, h('h3', {}, 'About & maintenance'), info,
+        h('div', { class: 'srow' }, h('div', { class: 'l' }, h('b', {}, 'Uninstall Vextra'), h('span', {}, 'Windows: Settings → Apps → Vextra Studio → Uninstall (the .exe uninstaller has a “delete application data” box; the .msi asks the same question – or run msiexec /x Vextra.msi REMOVEUSERDATA=1). macOS: drag Vextra Studio to the Bin. Linux: apt remove vextra-studio (or delete the AppImage). This button deletes everything Vextra keeps – settings, sign-in data, plugins, themes, local server data and this app\'s own browser storage – so nothing is left behind. Your project folders are never touched.')), h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end' }, h('button', { class: 'btn sm danger', onclick: async () => {
+          if (!(await VX.ui.confirm('Delete ALL data Vextra Studio keeps on this computer and get ready to uninstall? This cannot be undone. Project folders you opened from your disk are not touched.', 'Delete everything', { danger: true }))) return;
+          const left = [];
+          try {
+            const i = await window.native.info();
+            try { await window.native.server.stop(); } catch (e) { /* not running */ }
+            await window.native.clean(['all']);
+            if (i.platform !== 'browser' && i.userDir) { try { await window.native.fs.remove(VX.path.join(i.userDir, 'server-data')); } catch (e) { /* none */ } }
+            try { localStorage.clear(); sessionStorage.clear(); } catch (e) { left.push('browser storage'); }
+            try { if (indexedDB.databases) for (const d of await indexedDB.databases()) if (d.name) indexedDB.deleteDatabase(d.name); } catch (e) { left.push('databases'); }
+            try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch (e) { /* none */ }
+          } catch (e) { VX.ui.toast(e.message, 'error'); return; }
+          document.body.textContent = ''; document.body.style.cssText = 'font:15px/1.6 system-ui,sans-serif;padding:48px;max-width:640px;margin:auto;color:#ddd;background:#14161b';
+          document.body.append(h('h2', {}, 'Vextra Studio is ready to uninstall'), h('p', {}, 'All app data was deleted' + (left.length ? ' (could not clear: ' + left.join(', ') + ')' : '') + '. Close this window, then uninstall the app from your system. If you reopen it, it starts fresh.'));
+        } }, 'Delete everything & prepare to uninstall'))),
         h('div', { class: 'srow' }, h('div', { class: 'l' }, h('b', {}, 'Clean up app data'), h('span', {}, 'Removes data Vextra stored on this computer. Your projects are never touched.')), h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end' }, clean(['plugins'], 'my plugins'), clean(['themes'], 'my themes'), clean(['secrets'], 'sign-in data'), clean(['all'], 'everything'))),
         h('div', { class: 'srow' }, h('div', { class: 'l' }, h('b', {}, 'Uninstall'), h('span', {}, 'From the project folder run npm run uninstall (interactive) or npm run uninstall:auto. See Docs → Uninstalling.')), h('button', { class: 'btn sm', onclick: () => VX.docs.open('uninstall') }, 'Instructions')))));
   }

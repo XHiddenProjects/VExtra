@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vextra Studio – MSI uninstall with an "also delete my app data" option (the .exe installer has the same check box).
+
+  How it works
+    • Uninstall from Windows Settings → Apps (or run the .msi again → Remove): a Yes / No question appears – "Also delete Vextra Studio's settings, plugins, themes and local data?"
+    • Silent / scripted uninstall asks nothing and KEEPS the data unless you pass the property:   msiexec /x Vextra.msi REMOVEUSERDATA=1 /qn
+    • An UPGRADE (installing a newer version over this one) never asks and never deletes anything (UPGRADINGPRODUCTCODE is set then).
+    • What is deleted: %APPDATA%\studio.vextra.app (settings, plugins, themes, local server data) and %LOCALAPPDATA%\studio.vextra.app (browser-engine cache).
+      Your own project folders are never touched. If the question cannot be shown, or anything fails, nothing is deleted (Return="ignore").
+  Referenced from tauri.conf.json → bundle.windows.wix (fragmentPaths + componentRefs).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Fragment>
+    <!-- the question (JScript; shown only when the uninstall has a user interface, i.e. UILevel >= 3) -->
+    <CustomAction Id="VxAskRemoveData" Script="jscript" Execute="immediate" Return="ignore"><![CDATA[
+      try {
+        var sh = new ActiveXObject("WScript.Shell");
+        var answer = sh.Popup("Also delete Vextra Studio's settings, plugins, themes and local data?\n\nYour own project folders are never touched.\n\nYes = delete the app data\nNo = keep it (handy if you reinstall later)", 120, "Uninstall Vextra Studio", 36);
+        if (answer == 6) { Session.Property("REMOVEUSERDATA") = "1"; }
+      } catch (e) { }
+    ]]></CustomAction>
+
+    <!-- the two folders, set only when the user said yes (or passed REMOVEUSERDATA=1) -->
+    <CustomAction Id="VxSetDataRoaming" Property="VXDATA_ROAMING" Value="[AppDataFolder]studio.vextra.app" />
+    <CustomAction Id="VxSetDataLocal" Property="VXDATA_LOCAL" Value="[LocalAppDataFolder]studio.vextra.app" />
+
+    <InstallExecuteSequence>
+      <Custom Action="VxAskRemoveData" After="CostFinalize">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND NOT REMOVEUSERDATA AND UILevel &gt;= 3</Custom>
+      <Custom Action="VxSetDataRoaming" After="VxAskRemoveData">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND REMOVEUSERDATA="1"</Custom>
+      <Custom Action="VxSetDataLocal" After="VxSetDataRoaming">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND REMOVEUSERDATA="1"</Custom>
+    </InstallExecuteSequence>
+
+    <!-- the component that removes the folders when the product is uninstalled (a per-user / per-machine registry value is its key path) -->
+    <DirectoryRef Id="TARGETDIR">
+      <Component Id="VextraDataRemoval" Guid="*">
+        <RegistryValue Root="HKMU" Key="Software\studio.vextra.app" Name="DataRemovalSupport" Type="integer" Value="1" KeyPath="yes" />
+        <util:RemoveFolderEx On="uninstall" Property="VXDATA_ROAMING" />
+        <util:RemoveFolderEx On="uninstall" Property="VXDATA_LOCAL" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

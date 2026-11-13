@@ -99,13 +99,58 @@ jobs:
       - name: build server
         run: node scripts/build-server.js
 
+      # Signed auto-updater. It is switched on only when BOTH exist: the private key as the secret TAURI_SIGNING_PRIVATE_KEY and the
+      # public key in src-tauri/updater/pubkey.txt (made once by `npm run updater:keygen`). Without them the installers are built as
+      # before and the log says so – and the action is told not to look for updater signatures ("Signature not found for the updater JSON").
+      - name: prepare the signed updater
+        id: upd
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          PUB=$(tr -d '[:space:]' < src-tauri/updater/pubkey.txt)
+          if [ -n "$SIGNING_KEY" ] && [ "${#PUB}" -gt 40 ] && [[ "$PUB" != NOT-SET* ]]; then
+            node -e "const fs=require('fs');const k=fs.readFileSync('src-tauri/updater/pubkey.txt','utf8').trim();fs.writeFileSync('src-tauri/updater/enable.conf.json',JSON.stringify({bundle:{createUpdaterArtifacts:true},plugins:{updater:{pubkey:k}}}))"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Signed updater: ON"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Auto-updater is off::Add the repository secret TAURI_SIGNING_PRIVATE_KEY (and TAURI_SIGNING_PRIVATE_KEY_PASSWORD) and commit src-tauri/updater/pubkey.txt – run 'npm run updater:keygen' once. The installers are still built."
+          fi
+
+      # Updater files (latest.json + signatures) are only uploaded when the updater is on.
       - name: build & upload to the release
+        id: tauri
+        # Windows: the MSI carries an extra "delete my app data" fragment (src-tauri/windows/fragments/data-removal.wxs).
+        # If that fragment ever breaks the MSI build, the next step builds Windows again without it, so a release is never blocked.
+        continue-on-error: ${{ matrix.name == 'windows' }}
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.prepare.outputs.release_id }}
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }}${{ steps.upd.outputs.enabled == 'true' && ' --config src-tauri/updater/enable.conf.json' || '' }}
+          uploadUpdaterJson: ${{ steps.upd.outputs.enabled == 'true' }}
+          uploadUpdaterSignatures: ${{ steps.upd.outputs.enabled == 'true' }}
+
+      - name: build Windows again without the MSI data-removal fragment
+        if: matrix.name == 'windows' && steps.tauri.outcome == 'failure'
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          args: ${{ matrix.args }} --config src-tauri/windows/no-wix-fragment.conf.json${{ steps.upd.outputs.enabled == 'true' && ' --config src-tauri/updater/enable.conf.json' || '' }}
+          uploadUpdaterJson: ${{ steps.upd.outputs.enabled == 'true' }}
+          uploadUpdaterSignatures: ${{ steps.upd.outputs.enabled == 'true' }}
+
+      - name: tell me if the fallback was used
+        if: matrix.name == 'windows' && steps.tauri.outcome == 'failure'
+        run: echo "::warning title=MSI without data removal::The Windows build failed with the MSI data-removal fragment and was rebuilt without it. Check the log of the first build step."
 
   # One file with the SHA-256 of every installer, so people can check their download.
   checksums:
@@ -128,3 +173,22 @@ jobs:
           else
             echo "No installers found on the release – nothing to hash."
           fi
+
+      # The four build jobs each add their platform to latest.json. If two finish at the same moment one entry can get lost,
+      # so check that every platform is there and say so if not (re-running the failed build job adds the missing entry).
+      - name: check latest.json (auto-updater)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          mkdir -p upd && cd upd
+          if ! gh release download "$TAG" --repo "${{ github.repository }}" --pattern latest.json; then
+            echo "No latest.json on this release – the auto-updater was off for this build."; exit 0
+          fi
+          node -e "
+            const j = JSON.parse(require('fs').readFileSync('latest.json','utf8')), have = Object.keys(j.platforms || {});
+            const need = ['linux-x86_64', 'darwin-aarch64', 'darwin-x86_64', 'windows-x86_64'];
+            const missing = need.filter((n) => !have.some((h) => h === n || h.startsWith(n + '-')));
+            console.log('version', j.version, '| platforms:', have.join(', '));
+            if (missing.length) { console.log('::warning title=latest.json is missing platforms::' + missing.join(', ') + ' – re-run the build job of that platform (Actions → this run → Re-run job).'); }
+          "
