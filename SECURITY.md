@@ -4,13 +4,13 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 3.9.x   | ✅ security fixes (current) |
-| 3.9.x   | ✅ security fixes |
-| 3.8.x   | ⚠️ please upgrade to 3.10.x |
-| 3.7.x   | ⚠️ please upgrade to 3.10.x |
-| 3.6.x and older | ❌ please upgrade |
+| 3.11.x  | ✅ security fixes (current) |
+| 3.10.x  | ✅ security fixes |
+| 3.9.x   | ⚠️ please upgrade to 3.11.x |
+| 3.8.x   | ⚠️ please upgrade to 3.11.x |
+| 3.7.x and older | ❌ please upgrade |
 
-Current version: **3.10.0** (see `VERSION`). This policy was last reviewed for 3.10.0.
+Current version: **3.11.0** (see `VERSION`). This policy was last reviewed for 3.11.0.
 
 ## Reporting a vulnerability
 
@@ -48,9 +48,13 @@ The repository is scanned by GitHub CodeQL. Values embedded in generated inline 
 - **Library downloads** (`http_download`): https only, 50 MB cap, archive paths sanitised, user confirmation before anything is written. Templates and games are code: install only from sources you trust.
 - **Process runner** (`run_start`): only `npm`, `npx`, `node`; working directory must be inside a `store-export` folder; arguments limited to `[A-Za-z0-9@./:=,+-_]`; no shell is used. npm packages named in generated `package.json` files run their install scripts as usual.
 
-## v3.10.0 notes
+## v3.11.0 notes
 - **Store Export for VR / AR (Steam):** the generated launcher serves the game from a local http server bound to `127.0.0.1` on a random port (path-traversal safe, `Cache-Control: no-store`) and starts the player's installed Edge / Chrome with a separate profile folder; nothing is reachable from the network. The generated Android / iOS projects only add the permissions a VR / AR game needs (camera for AR, motion sensors) and iOS explains them to the player.
 - **Blender live link:** off until you press *Start link* in Blender. The add-on's server listens on `127.0.0.1` only (never the network), every request except a harmless `/ping` needs the random pairing key (constant-time compare; *New key* in the add-on preferences revokes it), uploads are capped at 200 MB and models sent from Vextra are imported with Blender's own glTF / OBJ importers. The key is stored in the editor's local storage on your computer. Anyone who can already run code on your computer could read the key, which is why the link is not a security boundary against local malware.
+- **Release builds (GitHub Actions):** `release-build.yml` runs only when a release is published (or when someone with write access starts it by hand). It uses the built-in `GITHUB_TOKEN` with `contents: write` limited to the build and checksum jobs, needs no other secrets, validates the release ID as a number and passes it through environment variables (no shell injection from release text). Every installer gets a SHA-256 in `SHA256SUMS.txt`. **The installers are not code-signed or notarised**, so Windows SmartScreen and macOS Gatekeeper warn on first start – verify the hash against `SHA256SUMS.txt` and download only from the Releases page of this repository.
+- **Live demo site (GitHub Pages):** `pages.yml` publishes a static copy of the browser build (`scripts/build-web.js`). It runs entirely in the visitor's browser: no server, no accounts, nothing uploaded; projects stay in that browser's storage. The workflow has read access to the code and write access only to the Pages deployment. Plugins in the demo are the built-in ones; the sandboxed Play / Preview frames behave exactly as in the app.
+
+## v3.10.0 notes
 - **Model loaders:** `.glb` / `.gltf` are parsed by three.js' official GLTFLoader (bundled, no network access, no external URIs – only data inside the file). Draco and Meshopt are decoded by their official WebAssembly decoders; Draco runs in a Web Worker created from a Blob and fed only the file's bytes. Files over 40 MB are refused.
 - **Importing other formats (FBX, DAE, STL, PLY, 3MF):** the readers run only in the editor, are loaded on demand, and the result is re-saved as an ordinary `.glb`; they are never included in exported games. Imports are limited to 60 MB. Textures that would need a file path or URL are dropped, so an imported file can never make the editor fetch anything.
 - **Bluetooth permission:** the Play frame is allowed to ask for *bluetooth* (and usb / serial / hid); the browser still shows its own picker and nothing is paired without a click.

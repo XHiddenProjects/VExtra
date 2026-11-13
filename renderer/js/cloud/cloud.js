@@ -21,6 +21,7 @@
     async init() {
       try { C.token = await window.native.secret.get('cloudToken:' + C.base()); } catch { C.token = null; }
       if (C.token) { try { const r = await C.request('GET', '/api/me'); C.user = r.user; C.status = 'online'; } catch (e) { if (e.status === 401) { C.token = null; await window.native.secret.set('cloudToken:' + C.base(), null); } C.status = e.status ? 'online' : 'offline'; } }
+      else if (window.__VX_DEMO && !(VX.app.settings && VX.app.settings.serverUrl)) C.status = 'offline'; /* live demo: there is no server to ask */
       else { try { await C.request('GET', '/api/health', null, false); C.status = 'online'; } catch { C.status = 'offline'; } }
       if (C.status === 'offline' && VX.app.settings.autoServer && C.isLocal() && !C._autoTried) { C._autoTried = true; try { await C.startLocalServer(true); return; } catch { /* the Cloud panel shows the Start button and the reason */ } }
       VX.emit('cloud'); C.loadLink();

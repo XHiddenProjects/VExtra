@@ -12,3 +12,4 @@ src-tauri/resources/server/sea-*
 *.dmg
 *.AppImage
 *.deb
+dist-web/

@@ -1,0 +1,129 @@
+# Builds the desktop installers (Linux, macOS, Windows) and attaches them to a GitHub Release.
+#   • Publish a release          → every installer is built and uploaded to that release automatically.
+#   • Run it by hand (Actions tab) → give the numeric Release ID (gh api repos/OWNER/REPO/releases --jq '.[].id').
+# Needs no secrets: GITHUB_TOKEN is enough. The installers are NOT code-signed (see SECURITY.md).
+name: release-build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'GitHub Release ID to attach assets to (a number, not the tag name)'
+        required: true
+        type: string
+
+concurrency:
+  group: release-build-${{ github.event.release.id || inputs.release_id }}
+  cancel-in-progress: false
+
+jobs:
+  # Finds the release's tag, so a manual run builds the code that was released (not whatever the default branch is today).
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_id: ${{ steps.r.outputs.release_id }}
+      tag: ${{ steps.r.outputs.tag }}
+    steps:
+      - id: r
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ github.event.release.id || inputs.release_id }}
+        run: |
+          if ! [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]; then echo "::error::Release ID must be a number (got '$RELEASE_ID')"; exit 1; fi
+          TAG=$(gh api "repos/${{ github.repository }}/releases/$RELEASE_ID" --jq .tag_name)
+          echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building $TAG (release $RELEASE_ID)"
+
+  build:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 22.04 on purpose: an AppImage built here also runs on older Linux distributions.
+          - name: linux
+            runner: ubuntu-22.04
+            args: "--bundles deb,appimage"
+          # The bundled server is compiled for the machine that builds it, so each Mac CPU gets its own build.
+          - name: macos-apple-silicon
+            runner: macos-latest
+            args: "--bundles app,dmg"
+          - name: macos-intel
+            runner: macos-15-intel
+            args: "--bundles app,dmg"
+          - name: windows
+            runner: windows-latest
+            args: "--bundles msi,nsis"
+
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: install Linux dependencies
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file patchelf libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      # npm ci also runs the "postinstall" step (scripts/vendor.js) that builds renderer/vendor (3D engine, glTF/Draco, editor, sql.js).
+      - name: install frontend dependencies
+        run: npm ci
+
+      # Compiles the local server into one executable for THIS operating system (the script does not need a --target flag).
+      - name: build server
+        run: node scripts/build-server.js
+
+      - name: build & upload to the release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  # One file with the SHA-256 of every installer, so people can check their download.
+  checksums:
+    needs: [prepare, build]
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: create SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern '*.msi' --pattern '*.exe' --pattern '*.dmg' --pattern '*.deb' --pattern '*.AppImage' || true
+          if ls * >/dev/null 2>&1; then
+            sha256sum * > ../SHA256SUMS.txt && cat ../SHA256SUMS.txt
+            gh release upload "$TAG" ../SHA256SUMS.txt --repo "${{ github.repository }}" --clobber
+          else
+            echo "No installers found on the release – nothing to hash."
+          fi

@@ -2,11 +2,24 @@
 
 All notable changes to Vextra Studio. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [3.10.0] — current
+## [3.11.0] — current
 
 ### Added
-- **VR / AR games in Store Export (plugin 2.4.0):** the plugin detects VR and AR blocks (or you choose *VR / AR* yourself) and packages the game accordingly. New **Meta Quest – Meta Horizon Store** target (`meta/`): the game as an installable web app (manifest, offline cache, icons, `assetlinks.json` template), a **Bubblewrap** Quest project (`isMetaQuest`), placeholder store artwork (square, landscape, portrait, icon) and `README-META.md` covering headset testing and the Horizon Developer Dashboard submission; plus an **Android VR / AR (WebXR)** target (`xr/`) for ARCore phones – real WebXR needs a web engine, so these are the routes to real headset VR and ARCore AR. **Google Play / App Store (Capacitor)** projects now get the gyroscope / camera / ARCore entries (Android) and camera / motion usage texts (iOS) that phone VR and camera AR need (idempotent patch script). **Steam**: Electron has no WebXR, so VR / AR games start in the player's Edge / Chrome (full-screen app window, local 127.0.0.1 server, SteamVR / OpenXR), falling back to a normal window with a clear message. Checklists gained Meta Horizon, Google Play AR and Steam VR items. Store Export plugin is now 2.5.0. Exporting a VR / AR game as plain HTML now reminds you that WebXR needs https.
+- **VR / AR games in Store Export (plugin 2.5.0):** the plugin detects VR and AR blocks (or you choose *VR / AR* yourself) and packages the game accordingly. New **Meta Quest – Meta Horizon Store** target (`meta/`): the game as an installable web app (manifest, offline cache, icons, `assetlinks.json` template), a **Bubblewrap** Quest project (`isMetaQuest`), placeholder store artwork (square, landscape, portrait, icon) and `README-META.md` covering headset testing and the Horizon Developer Dashboard submission; plus an **Android VR / AR (WebXR)** target (`xr/`) for ARCore phones – real WebXR needs a web engine, so these are the routes to real headset VR and ARCore AR. **Google Play / App Store (Capacitor)** projects now get the gyroscope / camera / ARCore entries (Android) and camera / motion usage texts (iOS) that phone VR and camera AR need (idempotent patch script). **Steam**: Electron has no WebXR, so VR / AR games start in the player's Edge / Chrome (full-screen app window, local 127.0.0.1 server, SteamVR / OpenXR), falling back to a normal window with a clear message. Checklists gained Meta Horizon, Google Play AR and Steam VR items. Store Export plugin is now 2.5.0. Exporting a VR / AR game as plain HTML now reminds you that WebXR needs https.
 - **Live Blender link:** the Blender add-on (now v1.1) runs a small local server (127.0.0.1 only, pairing key required) and Vextra's *Assets → 3D Models → 🟠 Blender* window uses it to **pull** the selection, a collection or the whole scene from Blender, **send** models to Blender (voxel / group / OBJ / glb / gltf, into a *Vextra: name* collection) and **auto-sync** linked models when they change in Blender (waits for Edit Mode and animation playback to finish, skips identical results, no echo loop). Right-click menu: *Send to Blender*, *Update from Blender*, *Unlink*. Tested against a real Blender 5.0.
+- **Release workflow (`.github/workflows/release-build.yml`):** publishing a GitHub Release builds the desktop installers on GitHub's own machines – Linux (`.deb`, `.AppImage`), macOS for Apple silicon and Intel (`.app`, `.dmg`) and Windows (`.msi`, `.exe`) – and attaches them to that release, plus a `SHA256SUMS.txt`. It can also be started by hand with a Release ID; it then builds the code at that release's tag. Needs no secrets.
+- **Live demo on GitHub Pages (`.github/workflows/pages.yml`, `npm run build:web`):** a static build of the browser version so people can look around without installing anything. It shows a small “Live demo” bar, includes the built-in plugins and themes, and works under a repository sub-path.
+
+### Changed
+- The browser build reads the built-in plugin / theme list from a relative `__ext/` address (needed for sub-path hosting); the dev server is unchanged.
+- In the live demo the app no longer probes for a server that cannot exist (no console error).
+
+### Fixed
+- `SECURITY.md`: the supported-versions table listed 3.9.x twice; it now lists 3.11.x / 3.10.x as supported.
+
+## [3.10.0]
+
+### Added
 - **Skeletons and animations in 3D models:** `.glb` / `.gltf` now keep their skins, bones, animation clips and morph targets (powered by three.js' own glTF loader, bundled with Vextra). The Assets preview plays the first clip.
 - **Draco and Meshopt compression:** compressed `.glb` files load in the editor, the Play tab and exported games. The Draco decoder is embedded in an export only if a model uses Draco; the loader toolkit only if the game has models.
 - **Model Animation block (Properties):** play / stop / pause / resume a model's clips by name or number, with loop, speed and blend time; outputs `started`, `finished`, `clips` (the list of clips in the file) and `error`. Has a demo clip.
